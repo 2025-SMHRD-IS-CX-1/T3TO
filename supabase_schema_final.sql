@@ -2,19 +2,22 @@
 -- 진로 상담 서비스 ERD 생성 SQL (최종 표준화 버전)
 -- ============================================
 
--- 1. 사용자 (상담사)
+-- 1. 사용자 (상담사) - role로 권한 구분
 CREATE TABLE public.users (
     user_id VARCHAR(50) PRIMARY KEY,
     login_id VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
+    role VARCHAR(20) NOT NULL DEFAULT 'counselor',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_users_role CHECK (role IN ('admin', 'counselor', 'client'))
 );
 
 -- 인덱스 생성
 CREATE INDEX idx_users_login_id ON public.users(login_id);
 CREATE INDEX idx_users_email ON public.users(email);
+CREATE INDEX idx_users_role ON public.users(role);
 
 -- updated_at 자동 업데이트 함수
 CREATE OR REPLACE FUNCTION update_updated_at_column()
