@@ -161,8 +161,8 @@ export default function DashboardPage() {
                             </SelectContent>
                         </Select>
                         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                            <Button variant="outline" onClick={() => setIsAddDialogOpen(true)}>
-                                <Plus className="mr-2 h-4 w-4" /> 내담자 추가
+                            <Button variant="secondary" onClick={() => setIsAddDialogOpen(true)}>
+                                <Plus className="h-4 w-4" /> 내담자 추가
                             </Button>
                             <DialogContent className="sm:max-w-[600px]">
                                 <DialogHeader>
@@ -292,7 +292,7 @@ export default function DashboardPage() {
                         </p>
                         {clients.length === 0 && (
                             <Button onClick={() => setIsAddDialogOpen(true)}>
-                                <Plus className="mr-2 h-4 w-4" /> 내담자 추가하기
+                                <Plus className="h-4 w-4" /> 내담자 추가하기
                             </Button>
                         )}
                     </CardContent>
@@ -304,53 +304,47 @@ export default function DashboardPage() {
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">내담자 정보</CardTitle>
-                                <User className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                    <User className="h-4 w-4" />
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-gray-900">{selectedClient.name}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    {selectedClient.email}
-                                </p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">로드맵 진행률</CardTitle>
-                                <Map className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                    <Map className="h-4 w-4" />
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
-                                <p className="text-xs text-muted-foreground">
-                                    로드맵 미생성
-                                </p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">자기소개서</CardTitle>
-                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                    <FileText className="h-4 w-4" />
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-gray-900">0개 초안</div>
-                                <p className="text-xs text-muted-foreground">
-                                    초안 미생성
-                                </p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">다가오는 일정</CardTitle>
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                    <Calendar className="h-4 w-4" />
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-xl font-bold text-gray-900 truncate">
                                     {upcomingEvent ? upcomingEvent.title : "-"}
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    {upcomingEvent
-                                        ? `${upcomingEvent.date} ${upcomingEvent.time || ''}`
-                                        : "예정된 일정 없음"}
-                                </p>
                             </CardContent>
                         </Card>
                     </div>
@@ -362,7 +356,9 @@ export default function DashboardPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                                    <Map className="h-12 w-12 text-muted-foreground mb-4" />
+                                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
+                                        <Map className="h-6 w-6" />
+                                    </div>
                                     <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
                                     <p className="text-xs text-muted-foreground mt-2 mb-4">
                                         "새 목표 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
