@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, Search, User, LogOut, Settings } from "lucide-react"
+import { Bell, Search, User, LogOut, Settings, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -10,11 +10,22 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { deleteAccount } from "@/app/(auth)/actions"
 
 export function Navbar() {
     const [userInitial, setUserInitial] = useState("JD")
     const [userEmail, setUserEmail] = useState("")
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -84,9 +95,56 @@ export function Navbar() {
                             <LogOut className="mr-2 h-4 w-4" />
                             <span>로그아웃</span>
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                            className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
+                            onClick={() => setIsDeleteDialogOpen(true)}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>회원탈퇴</span>
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+
+            {/* 회원탈퇴 확인 다이얼로그 */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>회원탈퇴</DialogTitle>
+                        <DialogDescription>
+                            정말로 회원탈퇴를 하시겠습니까? 이 작업은 되돌릴 수 없으며, 모든 데이터가 삭제됩니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDeleteDialogOpen(false)}
+                            disabled={isDeleting}
+                        >
+                            취소
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={async () => {
+                                setIsDeleting(true)
+                                const result = await deleteAccount()
+                                
+                                if (result.error) {
+                                    alert(`회원탈퇴 실패: ${result.error}`)
+                                    setIsDeleting(false)
+                                    setIsDeleteDialogOpen(false)
+                                } else {
+                                    // 성공 시 로그인 페이지로 이동
+                                    window.location.href = '/login'
+                                }
+                            }}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? '처리 중...' : '회원탈퇴'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
