@@ -148,7 +148,7 @@ git pull origin main
 |-----------|------|
 | `.env.local` | 타 환경에서도 **같은 Supabase 프로젝트** URL/anon key 사용 |
 | DB 스키마 | **supabase_schema_final.sql** 실행 후 **supabase_sync_auth_users.sql** 실행 (회원 동기화) |
-| 역할(role) | **supabase_profiles_role.sql** 실행 → profiles 테이블 + RLS, 가입 시 자동 생성. role: admin / user |
+| 역할(role) | **supabase_profiles_role.sql** 실행 → profiles_role 테이블 + RLS, 가입 시 자동 생성. role: admin / user |
 | 회원 목록 보기 | **Authentication → Users** 또는 **Table Editor → users** |
 
 이 가이드대로 하시면 GitHub에서 프로젝트를 안전하게 관리하고, 여러 환경에서 같은 코드로 작업할 수 있습니다.
