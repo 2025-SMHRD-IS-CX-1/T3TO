@@ -45,8 +45,22 @@ export async function updateSession(request: NextRequest) {
     // Authenticated users: redirect away from auth pages or root to dashboard
     if (user && (isAuthPage || request.nextUrl.pathname === '/')) {
         const url = request.nextUrl.clone()
-        url.pathname = '/admin/clients'
+        url.pathname = '/dashboard'
         return NextResponse.redirect(url)
+    }
+
+    // /admin/* 는 role = admin 만 접근 가능 (profiles 테이블 기준)
+    if (user && request.nextUrl.pathname.startsWith('/admin')) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        if (profile?.role !== 'admin') {
+            const url = request.nextUrl.clone()
+            url.pathname = '/dashboard'
+            return NextResponse.redirect(url)
+        }
     }
 
     return supabaseResponse

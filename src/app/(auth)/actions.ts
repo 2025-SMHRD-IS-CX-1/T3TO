@@ -30,6 +30,25 @@ export async function login(formData: FormData) {
         return { error: error.message }
     }
 
+    // public.users에 없으면 동기화 (role 포함)
+    if (data.user) {
+        const role = (data.user.user_metadata?.role as string) || (data.user.app_metadata?.role as string) || 'counselor'
+        await supabase
+            .from('users')
+            .upsert(
+                [
+                    {
+                        user_id: data.user.id,
+                        email: data.user.email ?? '',
+                        login_id: data.user.email ?? data.user.id,
+                        password_hash: 'SUPABASE_AUTH',
+                        role,
+                    },
+                ],
+                { onConflict: 'user_id' }
+            )
+    }
+
     console.log('Login successful for user:', data.user?.email)
 
     revalidatePath('/', 'layout')
@@ -50,6 +69,7 @@ export async function signup(formData: FormData) {
         options: {
             data: {
                 full_name: name,
+                role: 'counselor',
             },
             emailRedirectTo: `${origin}/auth/callback`
         }
@@ -58,6 +78,29 @@ export async function signup(formData: FormData) {
     if (error) {
         console.error('Signup error:', error)
         return { error: error.message }
+    }
+
+    // public.users에 동기화 (role로 권한 구분)
+    if (data.user) {
+        const role = (data.user.user_metadata?.role as string) || 'counselor'
+        const { error: syncError } = await supabase
+            .from('users')
+            .upsert(
+                [
+                    {
+                        user_id: data.user.id,
+                        email: data.user.email ?? '',
+                        login_id: data.user.email ?? data.user.id,
+                        password_hash: 'SUPABASE_AUTH',
+                        role,
+                    },
+                ],
+                { onConflict: 'user_id' }
+            )
+        if (syncError) {
+            console.error('Signup: public.users sync failed (check DB schema):', syncError)
+            // 계정 생성은 완료됐으므로 로그만 남기고 진행
+        }
     }
 
     console.log('Signup successful for user:', data.user?.email)
