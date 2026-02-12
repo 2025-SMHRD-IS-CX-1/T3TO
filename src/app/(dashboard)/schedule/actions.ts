@@ -1,19 +1,17 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function getEvents() {
+export async function getEvents(counselorId?: string | null) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return []
 
-    if (!user) return []
-
-    // Fetch from calendar_events
     const { data, error } = await supabase
         .from('calendar_events')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userIdStr)
         .order('event_date', { ascending: true })
 
     if (error) {

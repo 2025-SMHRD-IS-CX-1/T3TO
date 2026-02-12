@@ -40,15 +40,31 @@ export default function ClientsPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientId = searchParams.get('clientId')
+    const counselorId = searchParams.get('counselorId')
+    const shouldAdd = searchParams.get('add') === 'true'
 
-    // Fetch clients on load
     useEffect(() => {
         fetchClientsData()
-    }, [])
+    }, [counselorId])
+
+    useEffect(() => {
+        // URL 파라미터에 add=true가 있으면 다이얼로그 열기
+        if (shouldAdd) {
+            setIsAddDialogOpen(true)
+            // URL에서 add 파라미터 제거
+            const params = new URLSearchParams(searchParams.toString())
+            params.delete('add')
+            const newUrl = params.toString() ? `?${params.toString()}` : ''
+            router.replace(`/admin/clients${newUrl}`)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shouldAdd])
 
     const fetchClientsData = async () => {
         setIsLoading(true)
-        const data = await getClients()
+        console.log('fetchClientsData: 내담자 목록 조회 시작', { counselorId })
+        const data = await getClients(counselorId || undefined)
+        console.log('fetchClientsData: 내담자 목록 조회 완료', { count: data.length, counselorId })
         setClients(data)
         setIsLoading(false)
     }
@@ -61,6 +77,13 @@ export default function ClientsPage() {
 
     const handleAddClient = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
+        
+        // 관리자가 상담사를 선택하지 않았을 때 경고
+        if (!isEditing && !counselorId) {
+            alert("⚠️ 내담자를 추가하려면 먼저 왼쪽 사이드바에서 상담사를 선택해주세요.")
+            return
+        }
+        
         setIsSubmitting(true)
 
         const form = e.currentTarget
@@ -68,17 +91,21 @@ export default function ClientsPage() {
 
         let result;
         if (isEditing && selectedClient) {
-            result = await updateClientProfile(selectedClient.id, formData)
+            result = await updateClientProfile(selectedClient.id, formData, counselorId || undefined)
         } else {
-            result = await createClientProfile(formData)
+            result = await createClientProfile(formData, counselorId || undefined)
         }
 
         if (result.success) {
-            await fetchClientsData()
             setIsAddDialogOpen(false)
             form?.reset()
             setSelectedClient(null)
             setIsEditing(false)
+            // 데이터 새로고침 (약간의 지연 후)
+            setTimeout(async () => {
+                await fetchClientsData()
+                router.refresh()
+            }, 100)
         } else {
             alert((isEditing ? "프로필 수정에 실패했습니다: " : "내담자 추가에 실패했습니다: ") + result.error)
         }
@@ -98,9 +125,16 @@ export default function ClientsPage() {
         setIsAddDialogOpen(true)
     }
 
+    const queryWithContext = (clientIdParam: string) => {
+        const p = new URLSearchParams()
+        p.set('clientId', clientIdParam)
+        if (counselorId) p.set('counselorId', counselorId)
+        return p.toString()
+    }
+
     const handleWriteConsultation = (e: React.MouseEvent, clientId: string) => {
         e.stopPropagation()
-        router.push(`/consultations?clientId=${clientId}`)
+        router.push(`/consultations?${queryWithContext(clientId)}`)
     }
 
     const handleOpenDetail = (client: any) => {
@@ -110,14 +144,14 @@ export default function ClientsPage() {
 
     const goToDashboard = (e: React.MouseEvent, clientId: string) => {
         e.stopPropagation()
-        router.push(`/dashboard?clientId=${clientId}`)
+        router.push(`/dashboard?${queryWithContext(clientId)}`)
     }
 
     const handleDeleteClient = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation()
         if (!confirm("정말 삭제하시겠습니까?")) return
 
-        const result = await deleteClient(id)
+        const result = await deleteClient(id, counselorId || undefined)
         if (result.success) {
             await fetchClientsData()
         } else {
@@ -365,6 +399,18 @@ export default function ClientsPage() {
                 <Button variant="outline">필터</Button>
             </div>
 
+            {!counselorId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                    <div className="flex items-start gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <div>
+                            <p className="font-semibold mb-1">상담사를 선택해주세요</p>
+                            <p className="text-xs">왼쪽 사이드바에서 상담사를 선택하면 해당 상담사의 내담자 목록이 표시됩니다.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="grid gap-4">
                 {isLoading ? (
                     <div className="flex justify-center py-10">
@@ -372,7 +418,16 @@ export default function ClientsPage() {
                     </div>
                 ) : filteredClients.length === 0 ? (
                     <div className="text-center py-10 text-gray-500">
-                        {clients.length === 0 ? "등록된 내담자가 없습니다." : "검색 결과가 없습니다."}
+                        {!counselorId ? (
+                            <div>
+                                <p className="text-lg mb-2">상담사를 선택해주세요</p>
+                                <p className="text-sm">왼쪽 사이드바에서 상담사를 선택하면 내담자 목록이 표시됩니다.</p>
+                            </div>
+                        ) : clients.length === 0 ? (
+                            "등록된 내담자가 없습니다."
+                        ) : (
+                            "검색 결과가 없습니다."
+                        )}
                     </div>
                 ) : (
                     filteredClients.map((client) => (
@@ -384,7 +439,7 @@ export default function ClientsPage() {
                                     ? "border-purple-600 bg-purple-50/50 shadow-md"
                                     : "hover:border-purple-300 border-white hover:bg-purple-50/30"
                             )}
-                            onClick={() => router.push(`/admin/clients?clientId=${client.id}`)}
+                            onClick={() => router.push(`/admin/clients?${queryWithContext(client.id)}`)}
                         >
                             <div className="flex items-center gap-4">
                                 <div className="h-10 w-10 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center">
