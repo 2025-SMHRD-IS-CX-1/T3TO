@@ -19,8 +19,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { useSearchParams } from "next/navigation"
 import { getEvents, createEvent, deleteEvent } from "./actions"
 import { getClients } from "../admin/clients/actions"
+import { useAdminContext } from "@/components/layout/shell"
 
 export default function SchedulePage() {
     const [date, setDate] = useState<Date | undefined>(new Date())
@@ -34,19 +36,24 @@ export default function SchedulePage() {
     const [minutes, setMinutes] = useState("00")
     const [availableClients, setAvailableClients] = useState<any[]>([])
 
+    const searchParams = useSearchParams()
+    const adminContext = useAdminContext()
+    const counselorId = searchParams.get('counselorId')
+    const isAdmin = adminContext?.role === 'admin'
+
     useEffect(() => {
         fetchEvents()
         fetchAvailableClients()
-    }, [])
+    }, [counselorId])
 
     const fetchAvailableClients = async () => {
-        const data = await getClients()
+        const data = await getClients(counselorId || undefined)
         setAvailableClients(data)
     }
 
     const fetchEvents = async () => {
         setIsLoading(true)
-        const data = await getEvents()
+        const data = await getEvents(counselorId || undefined)
         setEvents(data)
         setIsLoading(false)
     }
@@ -104,6 +111,19 @@ export default function SchedulePage() {
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto">
+            {/* 관리자가 상담사를 선택하지 않았을 때 안내 */}
+            {isAdmin && !counselorId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                    <div className="flex items-start gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <div>
+                            <p className="font-semibold mb-1">상담사를 선택해주세요</p>
+                            <p className="text-xs">왼쪽 사이드바에서 상담사를 선택하면 해당 상담사의 일정을 확인할 수 있습니다.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">일정 관리</h1>

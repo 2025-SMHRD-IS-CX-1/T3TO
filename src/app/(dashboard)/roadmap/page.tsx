@@ -10,10 +10,14 @@ import { getRoadmap, createInitialRoadmap, getClientProfile } from "./actions"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { motion } from "motion/react"
+import { useAdminContext } from "@/components/layout/shell"
 
 export default function RoadmapPage() {
     const searchParams = useSearchParams()
+    const adminContext = useAdminContext()
     const clientId = searchParams.get('clientId')
+    const counselorId = searchParams.get('counselorId')
+    const isAdmin = adminContext?.role === 'admin'
 
     const [steps, setSteps] = useState<RoadmapStep[]>([])
     const [skills, setSkills] = useState<any[]>([])
@@ -24,14 +28,11 @@ export default function RoadmapPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            // Fetch client profile if clientId is provided
             if (clientId) {
-                const profile = await getClientProfile(clientId)
+                const profile = await getClientProfile(clientId, counselorId || undefined)
                 setClientData(profile)
             }
-
-            // Fetch roadmap
-            const data = await getRoadmap(clientId || undefined)
+            const data = await getRoadmap(clientId || undefined, counselorId || undefined)
             if (data && data.milestones) {
                 try {
                     setSteps(JSON.parse(data.milestones))
@@ -47,13 +48,13 @@ export default function RoadmapPage() {
             setIsLoading(false)
         }
         fetchData()
-    }, [clientId])
+    }, [clientId, counselorId])
 
     const handleGenerateRoadmap = async () => {
         setIsLoading(true)
-        const result = await createInitialRoadmap(clientId || undefined, clientData)
+        const result = await createInitialRoadmap(clientId || undefined, clientData, counselorId || undefined)
         if (result.success) {
-            const data = await getRoadmap(clientId || undefined)
+            const data = await getRoadmap(clientId || undefined, counselorId || undefined)
             if (data && data.milestones) {
                 setSteps(JSON.parse(data.milestones))
                 if (data.required_skills) setSkills(JSON.parse(data.required_skills))
@@ -104,6 +105,19 @@ export default function RoadmapPage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
+            {/* 관리자가 상담사를 선택하지 않았을 때 안내 */}
+            {isAdmin && !counselorId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                    <div className="flex items-start gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <div>
+                            <p className="font-semibold mb-1">상담사를 선택해주세요</p>
+                            <p className="text-xs">왼쪽 사이드바에서 상담사를 선택하면 해당 상담사의 로드맵을 확인할 수 있습니다.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             {/* Client Info Card */}
             {clientData && (
                 <Card className="bg-purple-50 border-purple-200">

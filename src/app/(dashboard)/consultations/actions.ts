@@ -1,14 +1,13 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createInitialRoadmap, getClientProfile } from '../roadmap/actions'
 
-export async function getConsultations(profileId?: string) {
+export async function getConsultations(profileId?: string, counselorId?: string | null) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return []
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return []
 
     let query = supabase
         .from('consultations')
@@ -16,7 +15,7 @@ export async function getConsultations(profileId?: string) {
             *,
             career_profiles:profile_id (client_name)
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', userIdStr)
 
     if (profileId) {
         query = query.eq('profile_id', profileId)
@@ -74,16 +73,51 @@ export async function createConsultation(formData: FormData) {
     return { success: true }
 }
 
+/** 상담 내용을 간단히 분석해 키워드·강점·가치관 등 텍스트 추출 (규칙 기반) */
+function analyzeContent(content: string) {
+    const trimmed = content.trim().replace(/\s+/g, ' ')
+    const sentences = trimmed.split(/[.!?\n]+/).filter(Boolean).map(s => s.trim())
+    const first = sentences[0] ?? ''
+    const rest = sentences.slice(1, 4).join(' ')
+    const keywords = trimmed.slice(0, 150).replace(/\n/g, ', ')
+    return {
+        interest_keywords: keywords || '상담 내용 기반 추출',
+        concern_factors: sentences[1] || '추가 상담에서 구체화 예정',
+        career_values: first || '상담에서 파악된 희망·가치관',
+        preference_conditions: rest || '조건 정리 예정',
+        avoidance_conditions: '추가 상담 시 보완',
+        personality_traits: first.slice(0, 80) || '성향 추후 정리',
+        strengths: (sentences[0] || sentences[1] || '').slice(0, 200) || '상담에서 드러난 강점',
+        weaknesses: '지속적인 상담으로 보완 예정',
+    }
+}
+
 async function analyzeConsultation(consultationId: string, profileId: string, content: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !profileId) return
 
+    const analysis = analyzeContent(content)
+    const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
+
+    // consultation_analysis에 분석 결과 저장
+    await supabase.from('consultation_analysis').insert({
+        consultation_id: consultationId,
+        user_id: userIdStr,
+        interest_keywords: analysis.interest_keywords,
+        concern_factors: analysis.concern_factors,
+        career_values: analysis.career_values,
+        preference_conditions: analysis.preference_conditions,
+        avoidance_conditions: analysis.avoidance_conditions,
+        personality_traits: analysis.personality_traits,
+        strengths: analysis.strengths,
+        weaknesses: analysis.weaknesses,
+    })
+
     // [AI 분석 시뮬레이션] 상담 내용을 기반으로 내담자의 프로필을 업데이트합니다.
     await supabase
         .from('career_profiles')
         .update({
-            // 기존 데이터에 상담 내용을 더해 '최신 상태'로 갱신
             career_orientation: "최신 상담 반영: " + (content.length > 50 ? content.substring(0, 50) + "..." : content),
             skill_vector: "분석된 보유 기술: React, Supabase, AI API 연동",
         })

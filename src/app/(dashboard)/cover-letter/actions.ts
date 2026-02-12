@@ -1,25 +1,26 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createInitialRoadmap } from '../roadmap/actions'
 
-export async function getDrafts(profileId?: string) {
+export async function getDrafts(profileId?: string, counselorId?: string | null) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return []
 
-    if (!user) return []
+    // user_id 컬럼 유무와 관계없이 동작: 해당 상담사의 roadmap_id 목록으로 draft 조회
+    const { data: roadmaps } = await supabase
+        .from('career_roadmaps')
+        .select('roadmap_id')
+        .eq('user_id', userIdStr)
+    const roadmapIds = (roadmaps || []).map((r: { roadmap_id: string }) => r.roadmap_id)
+    if (roadmapIds.length === 0) return []
 
     let query = supabase
         .from('resume_drafts')
-        .select(`
-            *,
-            career_roadmaps (
-                user_id,
-                target_job
-            )
-        `)
-        .eq('user_id', user.id)
+        .select('*, career_roadmaps(user_id, target_job)')
+        .in('roadmap_id', roadmapIds)
 
     if (profileId) {
         query = query.eq('profile_id', profileId)
@@ -119,7 +120,7 @@ export async function generateAIDrafts(clientId: string) {
             .single()
 
         if (latestAnalysis) {
-            insights = `강점: ${latestAnalysis.strengths}\n가치관: ${latestAnalysis.values}`
+            insights = `강점: ${latestAnalysis.strengths}\n가치관: ${latestAnalysis.career_values}`
         }
     }
 
@@ -144,19 +145,22 @@ export async function generateAIDrafts(clientId: string) {
         }
     ]
 
-    // 4. Batch Insert
-    const { error } = await supabase
-        .from('resume_drafts')
-        .insert(versions.map(v => ({
-            user_id: user.id,
-            roadmap_id: roadmap.roadmap_id,
-            profile_id: clientId,
-            target_position: v.title,
-            version_type: v.type,
-            draft_content: v.content,
-            is_selected: false
-        })))
-
+    // 4. Batch Insert (user_id 컬럼이 없을 수 있는 스키마 대응)
+    const rows = versions.map(v => ({
+        user_id: user.id,
+        roadmap_id: roadmap.roadmap_id,
+        profile_id: clientId,
+        target_position: v.title,
+        version_type: v.type,
+        draft_content: v.content,
+        is_selected: false
+    }))
+    let { error } = await supabase.from('resume_drafts').insert(rows)
+    if (error?.code === '42703') {
+        const withoutUserId = rows.map(({ user_id: _, ...r }) => r)
+        const res = await supabase.from('resume_drafts').insert(withoutUserId)
+        error = res.error ?? null
+    }
     if (error) return { error: error.message }
 
     revalidatePath('/cover-letter')
@@ -169,8 +173,12 @@ export async function saveDraft(draftId: string | null, content: string, title: 
 
     if (!user) return { error: 'Unauthorized' }
 
+    const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
+
     if (draftId && draftId !== "") {
-        // Update existing
+        const draftRow = await supabase.from('resume_drafts').select('roadmap_id').eq('draft_id', draftId).single()
+        const ok = draftRow.data && (await supabase.from('career_roadmaps').select('roadmap_id').eq('roadmap_id', draftRow.data.roadmap_id).eq('user_id', userIdStr).single()).data
+        if (!ok) return { error: '권한이 없거나 초안을 찾을 수 없습니다.' }
         const { error } = await supabase
             .from('resume_drafts')
             .update({
@@ -179,31 +187,27 @@ export async function saveDraft(draftId: string | null, content: string, title: 
                 updated_at: new Date().toISOString()
             })
             .eq('draft_id', draftId)
-            .eq('user_id', user.id)
-
         if (error) return { error: error.message }
     } else {
-        // Create new
         const { data: roadmap } = await supabase
             .from('career_roadmaps')
             .select('roadmap_id, profile_id')
             .eq('profile_id', profileId)
-            .eq('user_id', user.id)
+            .eq('user_id', userIdStr)
             .single()
-
         if (!roadmap) return { error: '로드맵 정보가 필요합니다.' }
-
-        const { error } = await supabase
-            .from('resume_drafts')
-            .insert([{
-                user_id: user.id,
-                roadmap_id: roadmap.roadmap_id,
-                profile_id: roadmap.profile_id,
-                target_position: title,
-                version_type: 'Manual',
-                draft_content: content
-            }])
-
+        const insertRow: Record<string, unknown> = {
+            roadmap_id: roadmap.roadmap_id,
+            profile_id: roadmap.profile_id,
+            target_position: title,
+            version_type: 'Manual',
+            draft_content: content
+        }
+        let { error } = await supabase.from('resume_drafts').insert([{ ...insertRow, user_id: userIdStr }])
+        if (error?.code === '42703') {
+            const res = await supabase.from('resume_drafts').insert([insertRow])
+            error = res.error ?? null
+        }
         if (error) return { error: error.message }
     }
 
@@ -214,18 +218,14 @@ export async function saveDraft(draftId: string | null, content: string, title: 
 export async function deleteDraft(draftId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-
     if (!user) return { error: 'Unauthorized' }
-
-    const { error } = await supabase
-        .from('resume_drafts')
-        .delete()
-        .eq('draft_id', draftId)
-        .eq('user_id', user.id)
-
-    if (error) {
-        return { error: error.message }
-    }
+    const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
+    const draft = await supabase.from('resume_drafts').select('roadmap_id').eq('draft_id', draftId).single()
+    if (!draft.data) return { error: '초안을 찾을 수 없습니다.' }
+    const ok = (await supabase.from('career_roadmaps').select('roadmap_id').eq('roadmap_id', draft.data.roadmap_id).eq('user_id', userIdStr).single()).data
+    if (!ok) return { error: '권한이 없습니다.' }
+    const { error } = await supabase.from('resume_drafts').delete().eq('draft_id', draftId)
+    if (error) return { error: error.message }
 
     revalidatePath('/cover-letter')
     return { success: true }

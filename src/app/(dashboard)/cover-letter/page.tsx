@@ -2,10 +2,10 @@ import { CoverLetterEditor } from "@/components/cover-letter/editor"
 import { getDrafts } from "./actions"
 
 export default async function CoverLetterPage(props: {
-    searchParams: Promise<{ clientId?: string }>
+    searchParams: Promise<{ clientId?: string; counselorId?: string }>
 }) {
     const searchParams = await props.searchParams
-    const drafts = await getDrafts(searchParams.clientId)
+    const drafts = await getDrafts(searchParams.clientId, searchParams.counselorId)
 
     return (
         <div className="h-full flex flex-col space-y-4">
