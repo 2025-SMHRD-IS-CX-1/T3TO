@@ -49,10 +49,10 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    // /admin/* 는 role = admin 만 접근 가능 (profiles 테이블 기준)
+    // /admin/* 는 role = admin 만 접근 가능 (profiles_role 테이블 기준)
     if (user && request.nextUrl.pathname.startsWith('/admin')) {
         const { data: profile } = await supabase
-            .from('profiles')
+            .from('profiles_role')
             .select('role')
             .eq('id', user.id)
             .single()

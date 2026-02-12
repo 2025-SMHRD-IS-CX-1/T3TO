@@ -28,13 +28,13 @@ export async function createClient() {
     )
 }
 
-/** profiles 테이블에서 현재 로그인 사용자의 role 조회 (admin | user) */
+/** profiles_role 테이블에서 현재 로그인 사용자의 role 조회 (admin | user) */
 export async function getCurrentUserRole(): Promise<'admin' | 'user' | null> {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data } = await supabase
-        .from('profiles')
+        .from('profiles_role')
         .select('role')
         .eq('id', user.id)
         .single()
