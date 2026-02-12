@@ -1,0 +1,1029 @@
+# Career Bridge Design System Specification
+
+## 디자인 시스템 추출 분석 (기반 이미지: 의료 시스템 UI)
+
+---
+
+## 1. Color Palette (컬러 팔레트)
+
+### 1.1 Primary Colors (주요 색상)
+
+#### Purple Theme (퍼플 테마 - Career Bridge 메인 컬러)
+```json
+{
+    "primary": {
+        "purple-900": "#6B21A8",
+        "purple-800": "#7C3AED",
+        "purple-700": "#8B5CF6",
+        "purple-600": "#9F7AEA",
+        "purple-500": "#A78BFA",
+        "purple-400": "#C4B5FD",
+        "purple-300": "#DDD6FE",
+        "purple-200": "#E9E3FF",
+        "purple-100": "#F5F3FF"
+    }
+}
+```
+
+#### Accent Colors (강조 색상 - 참고 이미지에서 추출)
+```json
+{
+    "accent": {
+        "blue-primary": "#4A90E2",
+        "blue-hover": "#357ABD",
+        "teal-success": "#00BFA5",
+        "pink-alert": "#FF4081",
+        "orange-warning": "#FF9800"
+    }
+}
+```
+
+### 1.2 Neutral Colors (중립 색상)
+
+```json
+{
+    "neutral": {
+        "gray-900": "#1F2937",
+        "gray-800": "#374151",
+        "gray-700": "#4B5563",
+        "gray-600": "#6B7280",
+        "gray-500": "#9CA3AF",
+        "gray-400": "#D1D5DB",
+        "gray-300": "#E5E7EB",
+        "gray-200": "#F3F4F6",
+        "gray-100": "#F9FAFB",
+        "white": "#FFFFFF"
+    }
+}
+```
+
+### 1.3 Semantic Colors (의미론적 색상)
+
+```json
+{
+    "semantic": {
+        "success": "#10B981",
+        "warning": "#F59E0B",
+        "error": "#EF4444",
+        "info": "#3B82F6"
+    }
+}
+```
+
+---
+
+## 2. Typography System (타이포그래피)
+
+### 2.1 Font Family
+```css
+--font-primary: "Pretendard", -apple-system, BlinkMacSystemFont,
+"Segoe UI", sans-serif;
+--font-secondary: "Inter", sans-serif;
+--font-mono: "JetBrains Mono", monospace;
+```
+
+### 2.2 Font Sizes & Line Heights
+
+#### Desktop
+```json
+{
+    "typography": {
+        "h1": {
+            "fontSize": "2.25rem",
+            "lineHeight": "2.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em"
+        },
+        "h2": {
+            "fontSize": "1.875rem",
+            "lineHeight": "2.25rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.01em"
+        },
+        "h3": {
+            "fontSize": "1.5rem",
+            "lineHeight": "2rem",
+            "fontWeight": "600"
+        },
+        "h4": {
+            "fontSize": "1.25rem",
+            "lineHeight": "1.75rem",
+            "fontWeight": "600"
+        },
+        "body-large": {
+            "fontSize": "1.125rem",
+            "lineHeight": "1.75rem",
+            "fontWeight": "400"
+        },
+        "body": {
+            "fontSize": "1rem",
+            "lineHeight": "1.5rem",
+            "fontWeight": "400"
+        },
+        "body-small": {
+            "fontSize": "0.875rem",
+            "lineHeight": "1.25rem",
+            "fontWeight": "400"
+        },
+        "caption": {
+            "fontSize": "0.75rem",
+            "lineHeight": "1rem",
+            "fontWeight": "400"
+        }
+    }
+}
+```
+
+### 2.3 Text Color Application
+
+```json
+{
+    "textColors": {
+        "heading": "#1F2937",
+        "body": "#374151",
+        "secondary": "#6B7280",
+        "disabled": "#9CA3AF",
+        "inverse": "#FFFFFF",
+        "link": "#8B5CF6",
+        "linkHover": "#7C3AED"
+    }
+}
+```
+
+---
+
+## 3. Layout System (레이아웃)
+
+### 3.1 Grid System
+
+```json
+{
+    "grid": {
+        "columns": 12,
+        "gutter": "24px",
+        "margin": {
+            "mobile": "16px",
+            "tablet": "32px",
+            "desktop": "48px"
+        }
+    }
+}
+```
+
+### 3.2 Spacing Scale
+
+```json
+{
+    "spacing": {
+        "xs": "4px",
+        "sm": "8px",
+        "md": "16px",
+        "lg": "24px",
+        "xl": "32px",
+        "2xl": "48px",
+        "3xl": "64px",
+        "4xl": "96px"
+    }
+}
+```
+
+### 3.3 Container Widths
+
+```json
+{
+    "containers": {
+        "sm": "640px",
+        "md": "768px",
+        "lg": "1024px",
+        "xl": "1280px",
+        "2xl": "1536px"
+    }
+}
+```
+
+---
+
+## 4. Component Specifications (컴포넌트 사양)
+
+### 4.1 Buttons (버튼)
+
+#### Primary Button
+```json
+{
+    "button": {
+        "primary": {
+            "default": {
+                "backgroundColor": "#8B5CF6",
+                "color": "#FFFFFF",
+                "padding": "12px 24px",
+                "borderRadius": "8px",
+                "fontSize": "1rem",
+                "fontWeight": "600",
+                "border": "none",
+                "boxShadow": "0 1px 2px rgba(139, 92, 246, 0.1)"
+            },
+            "hover": {
+                "backgroundColor": "#7C3AED",
+                "boxShadow": "0 4px 6px rgba(139, 92, 246, 0.2)"
+            },
+            "active": {
+                "backgroundColor": "#6B21A8",
+                "transform": "translateY(1px)"
+            },
+            "disabled": {
+                "backgroundColor": "#D1D5DB",
+                "color": "#9CA3AF",
+                "cursor": "not-allowed"
+            }
+        }
+    }
+}
+```
+
+#### Secondary Button
+```json
+{
+    "button": {
+        "secondary": {
+            "default": {
+                "backgroundColor": "#FFFFFF",
+                "color": "#8B5CF6",
+                "border": "1px solid #8B5CF6",
+                "padding": "12px 24px",
+                "borderRadius": "8px"
+            },
+            "hover": {
+                "backgroundColor": "#F5F3FF",
+                "borderColor": "#7C3AED"
+            }
+        }
+    }
+}
+```
+
+#### Text Button
+```json
+{
+    "button": {
+        "text": {
+            "default": {
+                "backgroundColor": "transparent",
+                "color": "#8B5CF6",
+                "padding": "8px 16px",
+                "border": "none"
+            },
+            "hover": {
+                "backgroundColor": "#F5F3FF"
+            }
+        }
+    }
+}
+```
+
+### 4.2 Input Fields (입력 필드)
+
+```json
+{
+    "input": {
+        "default": {
+            "backgroundColor": "#FFFFFF",
+            "border": "1px solid #E5E7EB",
+            "borderRadius": "8px",
+            "padding": "12px 16px",
+            "fontSize": "1rem",
+            "color": "#1F2937"
+        },
+        "focus": {
+            "borderColor": "#8B5CF6",
+            "outline": "2px solid rgba(139, 92, 246, 0.1)",
+            "boxShadow": "0 0 0 3px rgba(139, 92, 246, 0.1)"
+        },
+        "error": {
+            "borderColor": "#EF4444",
+            "outline": "2px solid rgba(239, 68, 68, 0.1)"
+        },
+        "disabled": {
+            "backgroundColor": "#F3F4F6",
+            "color": "#9CA3AF",
+            "cursor": "not-allowed"
+        }
+    }
+}
+```
+
+### 4.3 Cards (카드)
+
+#### Content Card
+```json
+{
+    "card": {
+        "default": {
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": "12px",
+            "padding": "24px",
+            "border": "1px solid #E5E7EB",
+            "boxShadow": "0 1px 3px rgba(0, 0, 0, 0.05)"
+        },
+        "hover": {
+            "boxShadow": "0 4px 6px rgba(0, 0, 0, 0.07)",
+            "transform": "translateY(-2px)",
+            "transition": "all 0.2s ease"
+        }
+    }
+}
+```
+
+#### Feature Card (with Purple Accent)
+```json
+{
+    "card": {
+        "feature": {
+            "backgroundColor": "linear-gradient(135deg, #F5F3FF 0%, #FFFFFF 100%)",
+            "borderRadius": "16px",
+            "padding": "32px",
+            "border": "1px solid #DDD6FE",
+            "boxShadow": "0 4px 12px rgba(139, 92, 246, 0.08)"
+        }
+    }
+}
+```
+
+### 4.4 Navigation Bar
+
+```json
+{
+    "navbar": {
+        "desktop": {
+            "backgroundColor": "#FFFFFF",
+            "height": "64px",
+            "borderBottom": "1px solid #E5E7EB",
+            "boxShadow": "0 1px 3px rgba(0, 0, 0, 0.04)",
+            "padding": "0 48px"
+        },
+        "mobile": {
+            "height": "56px",
+            "padding": "0 16px"
+        },
+        "items": {
+            "color": "#4B5563",
+            "hoverColor": "#8B5CF6",
+            "activeColor": "#8B5CF6",
+            "activeBorder": "2px solid #8B5CF6"
+        }
+    }
+}
+```
+
+### 4.5 Sidebar (참고 이미지 분석)
+
+```json
+{
+    "sidebar": {
+        "width": "280px",
+        "backgroundColor": "#FAFBFC",
+        "borderRight": "1px solid #E5E7EB",
+        "menuItem": {
+            "default": {
+                "padding": "12px 16px",
+                "color": "#4B5563",
+                "borderRadius": "8px",
+                "margin": "4px 8px"
+            },
+            "hover": {
+                "backgroundColor": "#F3F4F6"
+            },
+            "active": {
+                "backgroundColor": "#F5F3FF",
+                "color": "#8B5CF6",
+                "fontWeight": "600"
+            }
+        },
+        "icon": {
+            "size": "20px",
+            "color": "#6B7280",
+            "activeColor": "#8B5CF6"
+        }
+    }
+}
+```
+
+### 4.6 Table (참고 이미지의 데이터 테이블)
+
+```json
+{
+    "table": {
+        "header": {
+            "backgroundColor": "#F9FAFB",
+            "color": "#6B7280",
+            "fontSize": "0.875rem",
+            "fontWeight": "600",
+            "padding": "12px 16px",
+            "borderBottom": "1px solid #E5E7EB"
+        },
+        "row": {
+            "default": {
+                "backgroundColor": "#FFFFFF",
+                "padding": "16px",
+                "borderBottom": "1px solid #F3F4F6"
+            },
+            "hover": {
+                "backgroundColor": "#F9FAFB"
+            },
+            "selected": {
+                "backgroundColor": "#F5F3FF"
+            }
+        },
+        "cell": {
+            "color": "#1F2937",
+            "fontSize": "0.875rem"
+        }
+    }
+}
+```
+
+### 4.7 Badges (뱃지/태그)
+
+```json
+{
+    "badge": {
+        "default": {
+            "backgroundColor": "#F3F4F6",
+            "color": "#4B5563",
+            "padding": "4px 12px",
+            "borderRadius": "12px",
+            "fontSize": "0.75rem",
+            "fontWeight": "500"
+        },
+        "purple": {
+            "backgroundColor": "#F5F3FF",
+            "color": "#8B5CF6"
+        },
+        "success": {
+            "backgroundColor": "#D1FAE5",
+            "color": "#10B981"
+        },
+        "warning": {
+            "backgroundColor": "#FEF3C7",
+            "color": "#F59E0B"
+        },
+        "error": {
+            "backgroundColor": "#FEE2E2",
+            "color": "#EF4444"
+        }
+    }
+}
+```
+
+### 4.8 Modal/Dialog
+
+```json
+{
+    "modal": {
+        "overlay": {
+            "backgroundColor": "rgba(0, 0, 0, 0.5)",
+            "backdropFilter": "blur(4px)"
+        },
+        "container": {
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": "16px",
+            "padding": "32px",
+            "maxWidth": "600px",
+            "boxShadow": "0 20px 25px rgba(0, 0, 0, 0.1)"
+        },
+        "header": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "color": "#1F2937",
+            "marginBottom": "16px"
+        }
+    }
+}
+```
+
+### 4.9 Tabs
+
+```json
+{
+    "tabs": {
+        "container": {
+            "borderBottom": "1px solid #E5E7EB"
+        },
+        "tab": {
+            "default": {
+                "padding": "12px 24px",
+                "color": "#6B7280",
+                "fontSize": "0.875rem",
+                "fontWeight": "500",
+                "cursor": "pointer"
+            },
+            "hover": {
+                "color": "#8B5CF6"
+            },
+            "active": {
+                "color": "#8B5CF6",
+                "borderBottom": "2px solid #8B5CF6",
+                "fontWeight": "600"
+            }
+        }
+    }
+}
+```
+
+### 4.10 Dropdown Menu
+
+```json
+{
+    "dropdown": {
+        "trigger": {
+            "padding": "8px 16px",
+            "backgroundColor": "#FFFFFF",
+            "border": "1px solid #E5E7EB",
+            "borderRadius": "8px"
+        },
+        "menu": {
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": "8px",
+            "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.1)",
+            "padding": "8px",
+            "minWidth": "200px"
+        },
+        "item": {
+            "default": {
+                "padding": "10px 12px",
+                "borderRadius": "6px",
+                "color": "#4B5563"
+            },
+            "hover": {
+                "backgroundColor": "#F3F4F6",
+                "color": "#1F2937"
+            }
+        }
+    }
+}
+```
+
+---
+
+## 5. Visual Effects (시각 효과)
+
+### 5.1 Shadows
+
+```json
+{
+    "shadows": {
+        "sm": "0 1px 2px rgba(0, 0, 0, 0.05)",
+        "md": "0 4px 6px rgba(0, 0, 0, 0.07)",
+        "lg": "0 10px 15px rgba(0, 0, 0, 0.1)",
+        "xl": "0 20px 25px rgba(0, 0, 0, 0.1)",
+        "purple": "0 4px 12px rgba(139, 92, 246, 0.15)",
+        "purpleHover": "0 8px 16px rgba(139, 92, 246, 0.2)",
+        "inner": "inset 0 2px 4px rgba(0, 0, 0, 0.06)"
+    }
+}
+```
+
+### 5.2 Border Radius
+
+```json
+{
+    "borderRadius": {
+        "none": "0",
+        "sm": "4px",
+        "md": "8px",
+        "lg": "12px",
+        "xl": "16px",
+        "2xl": "24px",
+        "full": "9999px"
+    }
+}
+```
+
+### 5.3 Transitions
+
+```json
+{
+    "transitions": {
+        "fast": "150ms ease",
+        "base": "200ms ease",
+        "slow": "300ms ease",
+        "all": "all 200ms ease",
+        "colors": "background-color 200ms ease, border-color 200ms ease, color 200ms ease",
+        "transform": "transform 200ms ease"
+    }
+}
+```
+
+### 5.4 Gradients
+
+```json
+{
+    "gradients": {
+        "purpleSoft": "linear-gradient(135deg, #F5F3FF 0%, #FFFFFF 100%)",
+        "purpleBold": "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)",
+        "graySubtle": "linear-gradient(180deg, #FFFFFF 0%, #F9FAFB 100%)"
+    }
+}
+```
+
+---
+
+## 6. Icons & Imagery (아이콘 및 이미지)
+
+### 6.1 Icon Specifications
+
+```json
+{
+    "icons": {
+        "sizes": {
+            "xs": "16px",
+            "sm": "20px",
+            "md": "24px",
+            "lg": "32px",
+            "xl": "48px"
+        },
+        "colors": {
+            "default": "#6B7280",
+            "active": "#8B5CF6",
+            "disabled": "#D1D5DB"
+        },
+        "style": "outlined"
+    }
+}
+```
+
+### 6.2 Image Treatment
+
+```json
+{
+    "images": {
+        "borderRadius": "12px",
+        "aspectRatios": {
+            "square": "1:1",
+            "landscape": "16:9",
+            "portrait": "3:4"
+        },
+        "overlay": {
+            "backgroundColor": "rgba(139, 92, 246, 0.1)"
+        }
+    }
+}
+```
+
+---
+
+## 7. State Indicators (상태 표시)
+
+### 7.1 Loading States
+
+```json
+{
+    "loading": {
+        "spinner": {
+            "color": "#8B5CF6",
+            "size": "24px"
+        },
+        "skeleton": {
+            "backgroundColor": "#F3F4F6",
+            "shimmer": "linear-gradient(90deg, #F3F4F6 0%, #E5E7EB 50%, #F3F4F6 100%)"
+        }
+    }
+}
+```
+
+### 7.2 Empty States
+
+```json
+{
+    "emptyState": {
+        "iconColor": "#D1D5DB",
+        "titleColor": "#6B7280",
+        "descriptionColor": "#9CA3AF"
+    }
+}
+```
+
+### 7.3 Error States
+
+```json
+{
+    "error": {
+        "borderColor": "#EF4444",
+        "backgroundColor": "#FEE2E2",
+        "textColor": "#DC2626"
+    }
+}
+```
+
+### 7.4 Success States
+
+```json
+{
+    "success": {
+        "borderColor": "#10B981",
+        "backgroundColor": "#D1FAE5",
+        "textColor": "#059669"
+    }
+}
+```
+
+---
+
+## 8. Responsive Breakpoints (반응형 중단점)
+
+```json
+{
+    "breakpoints": {
+        "xs": "320px",
+        "sm": "640px",
+        "md": "768px",
+        "lg": "1024px",
+        "xl": "1280px",
+        "2xl": "1536px"
+    }
+}
+```
+
+---
+
+## 9. Animation & Motion (애니메이션)
+
+### 9.1 Easing Functions
+
+```json
+{
+    "easing": {
+        "linear": "cubic-bezier(0, 0, 1, 1)",
+        "easeIn": "cubic-bezier(0.4, 0, 1, 1)",
+        "easeOut": "cubic-bezier(0, 0, 0.2, 1)",
+        "easeInOut": "cubic-bezier(0.4, 0, 0.2, 1)"
+    }
+}
+```
+
+### 9.2 Common Animations
+
+```css
+@keyframes fadeIn {
+  from { opacity: 0;
+    }
+  to { opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0;
+    }
+  to { transform: translateY(0); opacity: 1;
+    }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0;
+    }
+  to { transform: scale(1); opacity: 1;
+    }
+}
+```
+
+---
+
+## 10. Accessibility (접근성)
+
+### 10.1 Focus States
+
+```json
+{
+    "focus": {
+        "outline": "2px solid #8B5CF6",
+        "outlineOffset": "2px",
+        "borderRadius": "8px"
+    }
+}
+```
+
+### 10.2 Contrast Ratios (WCAG 2.1 AA)
+
+- **Normal text**: 4.5: 1 minimum
+- **Large text (18pt+)**: 3: 1 minimum
+- **UI components**: 3: 1 minimum
+
+### 10.3 Interactive Element Sizes
+
+```json
+{
+    "touchTargets": {
+        "minimum": "44px",
+        "recommended": "48px"
+    }
+}
+```
+
+---
+
+## 11. Component-Specific Application Rules
+
+### 11.1 Dashboard Cards
+- **Surface**: White background (#FFFFFF)
+- **Border**: 1px solid #E5E7EB
+- **Shadow**: 0 1px 3px rgba(0,
+0,
+0,
+0.05)
+- **Padding**: 24px
+- **Border Radius**: 12px
+
+### 11.2 Data Visualization
+- **Primary Chart Color**: #8B5CF6
+- **Secondary Chart Colors**: #A78BFA, #C4B5FD, #DDD6FE
+- **Grid Lines**: #E5E7EB
+- **Axis Labels**: #6B7280
+
+### 11.3 Form Layouts
+- **Label Color**: #374151
+- **Label Font Weight**: 500
+- **Field Spacing**: 16px vertical
+- **Required Indicator**: #EF4444 asterisk
+
+### 11.4 Calendar Component
+- **Header Background**: #F9FAFB
+- **Today Highlight**: #F5F3FF border with #8B5CF6 text
+- **Selected Date**: #8B5CF6 background with white text
+- **Event Indicator**: Small purple dot (#8B5CF6)
+
+---
+
+## 12. Print & Export Styles
+
+### 12.1 Document Output (로드맵/자기소개서 다운로드용)
+
+```json
+{
+    "document": {
+        "pageSize": "A4",
+        "margins": "2.54cm",
+        "headerHeight": "1.5cm",
+        "footerHeight": "1.5cm",
+        "typography": {
+            "title": {
+                "fontSize": "24pt",
+                "fontWeight": "700",
+                "color": "#1F2937"
+            },
+            "heading": {
+                "fontSize": "16pt",
+                "fontWeight": "600",
+                "color": "#4B5563"
+            },
+            "body": {
+                "fontSize": "11pt",
+                "lineHeight": "1.6",
+                "color": "#1F2937"
+            }
+        },
+        "brandAccent": {
+            "headerBar": "4px solid #8B5CF6",
+            "watermark": "rgba(139, 92, 246, 0.05)"
+        }
+    }
+}
+```
+
+---
+
+## 13. Dark Mode (Optional Future Feature)
+
+```json
+{
+    "darkMode": {
+        "backgrounds": {
+            "primary": "#111827",
+            "secondary": "#1F2937",
+            "elevated": "#374151"
+        },
+        "text": {
+            "primary": "#F9FAFB",
+            "secondary": "#D1D5DB",
+            "tertiary": "#9CA3AF"
+        },
+        "purple": {
+            "primary": "#A78BFA",
+            "hover": "#C4B5FD"
+        },
+        "borders": "#374151"
+    }
+}
+```
+
+---
+
+## 14. Implementation Notes
+
+### 14.1 CSS Variables 적용 예시
+
+```css
+:root {
+    /* Colors */
+  --color-purple-700: #8B5CF6;
+  --color-purple-600: #9F7AEA;
+  --color-purple-100: #F5F3FF;
+  --color-gray-900: #1F2937;
+  --color-gray-100: #F9FAFB;
+  --color-white: #FFFFFF;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* Typography */
+  --font-primary: "Pretendard", sans-serif;
+  --text-h1: 2.25rem;
+  --text-body: 1rem;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,
+    0,
+    0,
+    0.05);
+  --shadow-md: 0 4px 6px rgba(0,
+    0,
+    0,
+    0.07);
+  --shadow-purple: 0 4px 12px rgba(139,
+    92,
+    246,
+    0.15);
+  
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  
+  /* Transitions */
+  --transition-base: 200ms ease;
+}
+```
+
+### 14.2 Tailwind CSS 설정 예시
+
+```javascript
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        purple: {
+                    100: '#F5F3FF',
+                    200: '#E9E3FF',
+                    300: '#DDD6FE',
+                    400: '#C4B5FD',
+                    500: '#A78BFA',
+                    600: '#9F7AEA',
+                    700: '#8B5CF6',
+                    800: '#7C3AED',
+                    900: '#6B21A8',
+                }
+            },
+      fontFamily: {
+        sans: ['Pretendard', 'sans-serif'
+                ],
+            },
+      boxShadow: {
+        'purple': '0 4px 12px rgba(139,
+                92,
+                246,
+                0.15)',
+        'purple-hover': '0 8px 16px rgba(139,
+                92,
+                246,
+                0.2)',
+            }
+        }
+    }
+}
+```
+
+---
+
+## 15. Quality Assurance Checklist
+
+### Before Launch
+- [] All interactive elements meet 44px minimum touch target
+- [] Color contrast ratios meet WCAG AA standards
+- [] Focus states are visible on all interactive elements
+- [] Purple brand color is consistently applied
+- [] Hover states provide clear visual feedback
+- [] Loading states are implemented for async operations
+- [] Error messages are clear and actionable
+- [] Mobile responsive design works on 320px+ screens
+- [] Print styles are tested for PDF generation
+- [] All fonts are properly loaded and fallbacks set
+
+---
+
+**문서 버전**: 1.0  
+**최종 수정일**: 2026년 2월 6일  
+**기반 이미지**: 의료 시스템 UI 참고  
+**적용 프로젝트**: Career Bridge

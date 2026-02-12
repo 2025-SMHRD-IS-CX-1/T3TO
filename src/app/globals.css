@@ -1,26 +1,127 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Primary Colors - Purple Theme */
+  --purple-900: #6B21A8;
+  --purple-800: #7C3AED;
+  --purple-700: #8B5CF6;
+  --purple-600: #9F7AEA;
+  --purple-500: #A78BFA;
+  --purple-400: #C4B5FD;
+  --purple-300: #DDD6FE;
+  --purple-200: #E9E3FF;
+  --purple-100: #F5F3FF;
+
+  /* Accent Colors */
+  --accent-blue-primary: #4A90E2;
+  --accent-blue-hover: #357ABD;
+  --accent-teal-success: #00BFA5;
+  --accent-pink-alert: #FF4081;
+  --accent-orange-warning: #FF9800;
+
+  /* Neutral Colors */
+  --neutral-gray-900: #1F2937;
+  --neutral-gray-800: #374151;
+  --neutral-gray-700: #4B5563;
+  --neutral-gray-600: #6B7280;
+  --neutral-gray-500: #9CA3AF;
+  --neutral-gray-400: #D1D5DB;
+  --neutral-gray-300: #E5E7EB;
+  --neutral-gray-200: #F3F4F6;
+  --neutral-gray-100: #F9FAFB;
+  --neutral-white: #FFFFFF;
+
+  /* Semantic Colors */
+  --semantic-success: #10B981;
+  --semantic-warning: #F59E0B;
+  --semantic-error: #EF4444;
+  --semantic-info: #3B82F6;
+
+  /* Base Application Colors */
+  --background: var(--neutral-white);
+  --foreground: var(--neutral-gray-900);
+  
+  --primary: var(--purple-700);
+  --primary-foreground: var(--neutral-white);
+  
+  --secondary: var(--neutral-white);
+  --secondary-foreground: var(--purple-700);
+  
+  --muted: var(--neutral-gray-100);
+  --muted-foreground: var(--neutral-gray-500);
+  
+  --accent: var(--neutral-gray-100);
+  --accent-foreground: var(--neutral-gray-900);
+  
+  --destructive: var(--semantic-error);
+  --destructive-foreground: var(--neutral-white);
+
+  --border: var(--neutral-gray-300);
+  --input: var(--neutral-gray-300);
+  --ring: var(--purple-700);
+  
+  --radius: 0.5rem; /* 8px */
 }
 
 @theme inline {
+  --color-purple-900: var(--purple-900);
+  --color-purple-800: var(--purple-800);
+  --color-purple-700: var(--purple-700);
+  --color-purple-600: var(--purple-600);
+  --color-purple-500: var(--purple-500);
+  --color-purple-400: var(--purple-400);
+  --color-purple-300: var(--purple-300);
+  --color-purple-200: var(--purple-200);
+  --color-purple-100: var(--purple-100);
+
+  --color-gray-900: var(--neutral-gray-900);
+  --color-gray-800: var(--neutral-gray-800);
+  --color-gray-700: var(--neutral-gray-700);
+  --color-gray-600: var(--neutral-gray-600);
+  --color-gray-500: var(--neutral-gray-500);
+  --color-gray-400: var(--neutral-gray-400);
+  --color-gray-300: var(--neutral-gray-300);
+  --color-gray-200: var(--neutral-gray-200);
+  --color-gray-100: var(--neutral-gray-100);
+  
+  --color-success: var(--semantic-success);
+  --color-warning: var(--semantic-warning);
+  --color-error: var(--semantic-error);
+  --color-info: var(--semantic-info);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-primary), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-secondary: var(--font-secondary);
+  --font-mono: var(--font-mono);
+  
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
