@@ -5,6 +5,7 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-secondary",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -28,7 +29,8 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
         style={
           {
-            "--font-primary": '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            // Lovable 스타일: Inter를 기본 본문 폰트로 사용
+            "--font-primary": "var(--font-secondary)",
           } as React.CSSProperties
         }
       >
