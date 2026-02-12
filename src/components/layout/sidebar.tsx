@@ -2,8 +2,19 @@
 
 import Link from "next/link"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, LogOut, MessageSquare, UserCog, Shield } from "lucide-react"
+import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, LogOut, MessageSquare, UserCog, Shield, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useState } from "react"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { deleteAccount } from "@/app/(auth)/actions"
 import {
     Select,
     SelectContent,
@@ -37,6 +48,8 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const router = useRouter()
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const clientId = searchParams.get('clientId')
     const counselorId = searchParams.get('counselorId')
     const isAdmin = adminContext?.role === 'admin'
@@ -218,7 +231,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                     </div>
                 </nav>
             </div>
-            <div className="border-t p-4">
+            <div className="border-t p-4 space-y-2">
                 <button
                     onClick={async () => {
                         const { createClient } = await import('@/lib/supabase/client')
@@ -231,7 +244,54 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                     <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                     로그아웃
                 </button>
+                <button
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 hover:text-red-700"
+                >
+                    <Trash2 className="mr-3 h-5 w-5 text-red-400 group-hover:text-red-500" />
+                    회원탈퇴
+                </button>
             </div>
+
+            {/* 회원탈퇴 확인 다이얼로그 */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>회원탈퇴</DialogTitle>
+                        <DialogDescription>
+                            정말로 회원탈퇴를 하시겠습니까? 이 작업은 되돌릴 수 없으며, 모든 데이터가 삭제됩니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDeleteDialogOpen(false)}
+                            disabled={isDeleting}
+                        >
+                            취소
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={async () => {
+                                setIsDeleting(true)
+                                const result = await deleteAccount()
+                                
+                                if (result.error) {
+                                    alert(`회원탈퇴 실패: ${result.error}`)
+                                    setIsDeleting(false)
+                                    setIsDeleteDialogOpen(false)
+                                } else {
+                                    // 성공 시 로그인 페이지로 이동
+                                    window.location.href = '/login'
+                                }
+                            }}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? '처리 중...' : '회원탈퇴'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

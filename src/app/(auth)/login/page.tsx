@@ -42,22 +42,37 @@ export default function LoginPage() {
         setError(null)
 
         const email = formData.get('email') as string
-        const result = await login(formData)
+        
+        try {
+            const result = await login(formData)
 
-        if (result?.error) {
-            setError(result.error)
-            setLoading(false)
-        } else {
-            // Save account on success if rememberMe is on
-            if (rememberMe) {
-                const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                    .sort((a, b) => b.lastLogin - a.lastLogin)
-                    .slice(0, 3) // Keep last 3
-                localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                localStorage.setItem('remembered_email', email)
-            } else {
-                localStorage.removeItem('remembered_email')
+            if (result?.error) {
+                setError(result.error)
+                setLoading(false)
+                return
             }
+
+            // 성공 시 계정 저장 및 리다이렉트
+            if (result?.success) {
+                if (rememberMe) {
+                    const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
+                        .sort((a, b) => b.lastLogin - a.lastLogin)
+                        .slice(0, 3) // Keep last 3
+                    localStorage.setItem('saved_accounts', JSON.stringify(updated))
+                    localStorage.setItem('remembered_email', email)
+                } else {
+                    localStorage.removeItem('remembered_email')
+                }
+                
+                window.location.href = '/dashboard'
+            }
+        } catch (err: any) {
+            // NEXT_REDIRECT 에러는 무시 (이미 리다이렉트됨)
+            if (err?.message?.includes('NEXT_REDIRECT')) {
+                return
+            }
+            setError(err?.message || '로그인 중 오류가 발생했습니다.')
+            setLoading(false)
         }
     }
 
@@ -137,8 +152,19 @@ export default function LoginPage() {
                         </div>
 
                         {error && (
-                            <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-xs text-red-600 font-medium">
+                            <div className={`p-3 rounded-lg border text-xs font-medium ${
+                                error.includes('이메일 인증') 
+                                    ? 'bg-amber-50 border-amber-200 text-amber-800' 
+                                    : 'bg-red-50 border-red-100 text-red-600'
+                            }`}>
                                 {error}
+                                {error.includes('이메일 인증') && (
+                                    <div className="mt-2 pt-2 border-t border-amber-300">
+                                        <p className="text-[10px] text-amber-700">
+                                            이메일 받은편지함을 확인하시거나, 스팸 폴더를 확인해주세요.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
