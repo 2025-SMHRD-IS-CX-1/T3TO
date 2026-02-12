@@ -73,8 +73,8 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     }
 
     return (
-        <div className="flex w-[280px] flex-col border-r bg-[#FAFBFC]">
-            <div className="flex h-16 items-center px-6 border-b">
+        <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)]">
+            <div className="flex h-16 items-center px-6 border-b border-gray-100">
                 <span className="text-xl font-bold text-purple-900">Career Bridge</span>
             </div>
             <div className="flex-1 overflow-y-auto py-4">
@@ -127,18 +127,20 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                             key={item.name}
                                             href={getHref(item.href)}
                                             className={cn(
-                                                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
+                                                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                                 isActive
-                                                    ? "bg-purple-100 text-purple-900"
-                                                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                                    ? "bg-purple-50 text-purple-900"
+                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                                             )}
                                         >
-                                            <Icon
+                                            <div
                                                 className={cn(
-                                                    "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                                                    isActive ? "text-purple-700" : "text-gray-400 group-hover:text-gray-500"
+                                                    "mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition-colors",
+                                                    isActive && "bg-purple-600 text-white"
                                                 )}
-                                            />
+                                            >
+                                                <Icon className="h-4 w-4" />
+                                            </div>
                                             {item.name}
                                         </Link>
                                     )
@@ -162,18 +164,20 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                             key={item.name}
                                             href={getHref(item.href)}
                                             className={cn(
-                                                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
+                                                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                                 isActive
-                                                    ? "bg-purple-100 text-purple-900"
-                                                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                                    ? "bg-purple-50 text-purple-900"
+                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                                             )}
                                         >
-                                            <Icon
+                                            <div
                                                 className={cn(
-                                                    "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                                                    isActive ? "text-purple-700" : "text-gray-400 group-hover:text-gray-500"
+                                                    "mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition-colors",
+                                                    isActive && "bg-purple-600 text-white"
                                                 )}
-                                            />
+                                            >
+                                                <Icon className="h-4 w-4" />
+                                            </div>
                                             {item.name}
                                         </Link>
                                     )
@@ -200,7 +204,9 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                             key={item.name}
                                             className="flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 cursor-not-allowed"
                                         >
-                                            <Icon className="mr-3 h-5 w-5 text-gray-200" />
+                                            <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-300">
+                                                <Icon className="h-4 w-4" />
+                                            </div>
                                             {item.name}
                                         </div>
                                     )
@@ -211,18 +217,20 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                         key={item.name}
                                         href={getHref(item.href)}
                                         className={cn(
-                                            "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
+                                            "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                             isActive
-                                                ? "bg-purple-100 text-purple-900"
-                                                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                                ? "bg-purple-50 text-purple-900"
+                                                : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                                         )}
                                     >
-                                        <Icon
+                                        <div
                                             className={cn(
-                                                "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                                                isActive ? "text-purple-700" : "text-gray-400 group-hover:text-gray-500"
+                                                "mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition-colors",
+                                                isActive && "bg-purple-600 text-white"
                                             )}
-                                        />
+                                        >
+                                            <Icon className="h-4 w-4" />
+                                        </div>
                                         {item.name}
                                     </Link>
                                 )
@@ -231,7 +239,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                     </div>
                 </nav>
             </div>
-            <div className="border-t p-4 space-y-2">
+            <div className="p-4 bg-white/95 shadow-[0_-1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm space-y-2">
                 <button
                     onClick={async () => {
                         const { createClient } = await import('@/lib/supabase/client')
