@@ -1,19 +1,17 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function getRoadmap(profileId?: string) {
+export async function getRoadmap(profileId?: string, counselorId?: string | null) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return null
 
-    if (!user) return null
-
-    // If profileId is provided, fetch roadmap for that specific client profile
     let query = supabase
         .from('career_roadmaps')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userIdStr)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
 
@@ -33,17 +31,16 @@ export async function getRoadmap(profileId?: string) {
     return data
 }
 
-export async function getClientProfile(profileId: string) {
+export async function getClientProfile(profileId: string, counselorId?: string | null) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return null
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return null
 
     const { data, error } = await supabase
         .from('career_profiles')
         .select('*')
         .eq('profile_id', profileId)
-        .eq('user_id', user.id)
+        .eq('user_id', userIdStr)
         .single()
 
     if (error) {
@@ -54,11 +51,10 @@ export async function getClientProfile(profileId: string) {
     return data
 }
 
-export async function createInitialRoadmap(profileId?: string, clientData?: any) {
+export async function createInitialRoadmap(profileId?: string, clientData?: any, counselorId?: string | null) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return { error: 'Unauthorized' }
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return { error: 'Unauthorized' }
 
     // Generate personalized milestones based on client data
     const rawTargetJob = clientData?.recommended_careers || ''
@@ -182,17 +178,16 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any)
         { type: "교육", name: `${targetJob} 전문가 마스터 클래스`, status: "수료 권장", color: "text-purple-600 bg-purple-50" }
     ]
 
-    // Check if an active roadmap already exists for this profile
     const { data: existingRoadmap } = await supabase
         .from('career_roadmaps')
         .select('roadmap_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userIdStr)
         .eq('profile_id', profileId || null)
         .eq('is_active', true)
         .maybeSingle()
 
     const roadmapData = {
-        user_id: user.id,
+        user_id: userIdStr,
         profile_id: profileId || null,
         target_job: targetJob,
         target_company: targetCompany,

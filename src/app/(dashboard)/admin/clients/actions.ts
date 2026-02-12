@@ -1,31 +1,47 @@
 'use server'
 
-import { createClient as createSupabaseClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function getClients() {
+export async function getClients(counselorId?: string | null) {
     const supabase = await createSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    
+    if (!userIdStr) {
+        console.warn('getClients: userIdStr이 null입니다. counselorId:', counselorId)
+        return []
+    }
 
-    if (!user) return []
+    // UUID를 문자열로 변환 (career_profiles.user_id는 VARCHAR(50))
+    const userIdForQuery = typeof userIdStr === 'string' ? userIdStr : String(userIdStr)
 
-    // Fetch from career_profiles filtered by counselor's user_id
     const { data, error } = await supabase
         .from('career_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userIdForQuery)
         .order('created_at', { ascending: false })
 
     if (error) {
-        console.error('Error fetching clients (career_profiles):', error)
+        console.error('Error fetching clients (career_profiles):', error, { userIdStr, counselorId })
         return []
     }
 
     // [검증 로그] DB에서 가져온 첫 번째 데이터의 구조를 출력합니다.
     if (data && data.length > 0) {
-        console.log('✅ DB 연결 확인 - 첫 번째 레코드 구조:', {
-            id: data[0].profile_id,
-            work_experience_years: data[0].work_experience_years,
+        console.log('✅ getClients: 내담자 데이터 조회 성공', {
+            count: data.length,
+            first_id: data[0].profile_id,
+            first_user_id: data[0].user_id,
+            query_user_id: userIdForQuery,
+            match: data[0].user_id === userIdForQuery,
+        })
+    } else {
+        console.log('⚠️ getClients: 내담자 데이터가 없습니다.', { 
+            userIdForQuery, 
+            counselorId, 
+            userIdStr,
+            type_userIdForQuery: typeof userIdForQuery,
+            type_userIdStr: typeof userIdStr
         })
     }
 
@@ -42,7 +58,7 @@ export async function getClients() {
     }))
 }
 
-export async function createClientProfile(formData: FormData) {
+export async function createClientProfile(formData: FormData, counselorId?: string | null) {
     const supabase = await createSupabaseClient()
 
     const name = formData.get('name') as string
@@ -57,18 +73,68 @@ export async function createClientProfile(formData: FormData) {
     const recommendedCareers = formData.get('recommended_careers') as string
     const targetCompany = formData.get('target_company') as string
 
-    // Get current user (Counselor)
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) {
         return { error: 'Unauthorized' }
     }
 
+    // UUID를 문자열로 변환 (public.users.user_id는 VARCHAR(50))
+    const userIdForPublicUsers = typeof userIdStr === 'string' ? userIdStr : String(userIdStr)
+
+    // public.users에 해당 사용자가 있는지 확인하고 없으면 생성
+    const { data: existingUser } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('user_id', userIdForPublicUsers)
+        .single()
+
+    if (!existingUser) {
+        // public.users에 사용자 추가 (role 컬럼이 없을 수 있으므로 먼저 role 없이 시도)
+        const { data: authUser } = await supabase.auth.getUser()
+        const userDataWithoutRole = {
+            user_id: userIdForPublicUsers,
+            email: authUser?.user?.email || email || '',
+            login_id: authUser?.user?.email || email || userIdForPublicUsers,
+            password_hash: 'SUPABASE_AUTH',
+        }
+
+        // 먼저 role 없이 시도
+        let { error: userError } = await supabase
+            .from('users')
+            .upsert([userDataWithoutRole], {
+                onConflict: 'user_id'
+            })
+
+        // role 컬럼 관련 에러가 아니면 그대로 사용
+        // role 컬럼 에러면 role을 포함해서 다시 시도 (role 컬럼이 있는 경우)
+        if (userError && (userError.message?.includes('role') || userError.message?.includes('column') || userError.code === '42703')) {
+            const userDataWithRole = {
+                ...userDataWithoutRole,
+                role: 'counselor',
+            }
+            const retryResult = await supabase
+                .from('users')
+                .upsert([userDataWithRole], {
+                    onConflict: 'user_id'
+                })
+            // role 포함해서도 실패하면 원래 에러 반환
+            if (retryResult.error) {
+                console.error('Error syncing user to public.users (with role):', retryResult.error)
+                return { error: `사용자 동기화 실패: ${retryResult.error.message}` }
+            }
+        } else if (userError) {
+            console.error('Error syncing user to public.users:', userError)
+            return { error: `사용자 동기화 실패: ${userError.message}` }
+        }
+    }
+
+    console.log('createClientProfile: 내담자 추가 시도', { userIdForPublicUsers, name, email })
+    
     const { data: newProfile, error } = await supabase
         .from('career_profiles')
         .insert([
             {
-                user_id: user.id,
+                user_id: userIdForPublicUsers,
                 client_name: name,
                 client_email: email,
                 gender: gender || null,
@@ -90,27 +156,45 @@ export async function createClientProfile(formData: FormData) {
         return { error: error.message }
     }
 
+    console.log('createClientProfile: 내담자 추가 성공', { profile_id: newProfile?.profile_id, user_id: newProfile?.user_id })
+
     // Automatically create initial roadmap for the new client
     if (newProfile) {
         const { createInitialRoadmap } = await import('../../roadmap/actions')
-        await createInitialRoadmap(newProfile.profile_id, newProfile)
+        await createInitialRoadmap(newProfile.profile_id, newProfile, counselorId)
     }
 
+    // 관련 페이지들 캐시 무효화
     revalidatePath('/admin/clients')
+    revalidatePath('/dashboard')
     return { success: true }
 }
 
-export async function deleteClient(id: string) {
+export async function deleteClient(id: string, counselorId?: string | null) {
     const supabase = await createSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    
+    if (!userIdStr) {
+        return { error: 'Unauthorized' }
+    }
 
-    if (!user) return { error: 'Unauthorized' }
+    // 먼저 해당 내담자가 존재하고 권한이 있는지 확인
+    const { data: profile } = await supabase
+        .from('career_profiles')
+        .select('profile_id, user_id')
+        .eq('profile_id', id)
+        .eq('user_id', userIdStr)
+        .single()
+
+    if (!profile) {
+        return { error: '내담자를 찾을 수 없거나 권한이 없습니다.' }
+    }
 
     const { error } = await supabase
         .from('career_profiles')
         .delete()
         .eq('profile_id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', userIdStr)
 
     if (error) {
         console.error('Error deleting client:', error)
@@ -121,11 +205,13 @@ export async function deleteClient(id: string) {
     return { success: true }
 }
 
-export async function updateClientProfile(id: string, formData: FormData) {
+export async function updateClientProfile(id: string, formData: FormData, counselorId?: string | null) {
     const supabase = await createSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return { error: 'Unauthorized' }
+    const userIdStr = await getEffectiveUserId(counselorId)
+    
+    if (!userIdStr) {
+        return { error: 'Unauthorized' }
+    }
 
     const name = formData.get('name') as string
     const email = formData.get('email') as string
@@ -138,6 +224,18 @@ export async function updateClientProfile(id: string, formData: FormData) {
     const skillVector = formData.get('skill_vector') as string
     const recommendedCareers = formData.get('recommended_careers') as string
     const targetCompany = formData.get('target_company') as string
+
+    // 먼저 해당 내담자가 존재하고 권한이 있는지 확인
+    const { data: profile } = await supabase
+        .from('career_profiles')
+        .select('profile_id, user_id')
+        .eq('profile_id', id)
+        .eq('user_id', userIdStr)
+        .single()
+
+    if (!profile) {
+        return { error: '내담자를 찾을 수 없거나 권한이 없습니다.' }
+    }
 
     const { error } = await supabase
         .from('career_profiles')
@@ -155,7 +253,7 @@ export async function updateClientProfile(id: string, formData: FormData) {
             target_company: targetCompany || null,
         })
         .eq('profile_id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', userIdStr)
 
     if (error) {
         console.error('Error updating client:', error)
