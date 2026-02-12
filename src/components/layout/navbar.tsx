@@ -26,21 +26,56 @@ export function Navbar() {
     const [userEmail, setUserEmail] = useState("")
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [hasNotification, setHasNotification] = useState(false)
+    const [latestChange, setLatestChange] = useState<string | null>(null)
+    const [notifDetail, setNotifDetail] = useState<{
+        roadmapUpdated: boolean
+        resumeUpdated: boolean
+        calendarUpdated: boolean
+        consultationUpdated: boolean
+    } | null>(null)
 
     useEffect(() => {
-        const fetchUser = async () => {
+        const fetchUserAndNotifications = async () => {
             const supabase = createClient()
             const { data: { user } } = await supabase.auth.getUser()
             if (user?.email) {
                 setUserEmail(user.email)
                 setUserInitial(user.email.substring(0, 2).toUpperCase())
             }
+
+            // 클라이언트에서만 localStorage 접근
+            if (typeof window === "undefined") return
+
+            const lastSeen = window.localStorage.getItem("cb_last_seen_notification_at")
+            const params = new URLSearchParams()
+            if (lastSeen) params.set("lastSeen", lastSeen)
+
+            try {
+                const res = await fetch(`/api/notifications?${params.toString()}`)
+                if (!res.ok) return
+                const data = await res.json()
+                if (data.latestChange) {
+                    setLatestChange(data.latestChange)
+                }
+                if (data.hasUpdates) {
+                    setHasNotification(true)
+                }
+                setNotifDetail({
+                    roadmapUpdated: !!data.roadmapUpdated,
+                    resumeUpdated: !!data.resumeUpdated,
+                    calendarUpdated: !!data.calendarUpdated,
+                    consultationUpdated: !!data.consultationUpdated,
+                })
+            } catch {
+                // 알림 조회 실패는 UI에 치명적이지 않으므로 조용히 무시
+            }
         }
-        fetchUser()
+        fetchUserAndNotifications()
     }, [])
 
     return (
-        <div className="flex h-16 items-center justify-between border-b bg-white px-6">
+        <div className="flex h-16 items-center justify-between bg-white/90 px-6 shadow-[0_1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm">
             <div className="flex items-center flex-1">
                 {/* Breadcrumb removed as requested */}
             </div>
@@ -48,15 +83,59 @@ export function Navbar() {
             <div className="flex items-center space-x-4">
 
 
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="relative group"
-                    onClick={() => alert("현재 새로운 알림이 없습니다.")}
-                >
-                    <Bell className="h-5 w-5 text-gray-600 transition-colors group-hover:text-purple-600" />
-                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="relative group"
+                        >
+                            <Bell className="h-5 w-5 text-gray-600 transition-colors group-hover:text-purple-600" />
+                            {hasNotification && (
+                                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
+                            )}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="end"
+                        className="w-72"
+                        onInteractOutside={() => {
+                            if (hasNotification) {
+                                if (typeof window !== "undefined") {
+                                    window.localStorage.setItem(
+                                        "cb_last_seen_notification_at",
+                                        latestChange || new Date().toISOString()
+                                    )
+                                }
+                                setHasNotification(false)
+                            }
+                        }}
+                    >
+                        <div className="px-3 py-2 border-b">
+                            <p className="text-xs font-semibold text-gray-500">알림</p>
+                        </div>
+                        {notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated) ? (
+                            <div className="py-2 text-sm text-gray-700">
+                                {notifDetail.calendarUpdated && (
+                                    <div className="px-3 py-1.5 hover:bg-gray-50">새 상담 일정이 생성/변경되었습니다.</div>
+                                )}
+                                {notifDetail.roadmapUpdated && (
+                                    <div className="px-3 py-1.5 hover:bg-gray-50">로드맵 내용이 업데이트되었습니다.</div>
+                                )}
+                                {notifDetail.resumeUpdated && (
+                                    <div className="px-3 py-1.5 hover:bg-gray-50">자기소개서 초안이 작성/수정되었습니다.</div>
+                                )}
+                                {notifDetail.consultationUpdated && (
+                                    <div className="px-3 py-1.5 hover:bg-gray-50">상담 기록이 추가/수정되었습니다.</div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="px-3 py-3 text-xs text-gray-500">
+                                새로운 알림이 없습니다.
+                            </div>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>

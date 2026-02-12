@@ -59,7 +59,7 @@ export async function getCurrentUserRole(): Promise<'admin' | 'user' | null> {
         })
         return null
     }
-    
+
     if (!data) {
         console.warn('[getCurrentUserRole] users 테이블에 레코드가 없습니다:', {
             userId: user.id,
