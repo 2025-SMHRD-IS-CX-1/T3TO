@@ -40,11 +40,11 @@ export default function SignupPage() {
                 return
             }
 
-            // 성공 시 대시보드로 리다이렉트
+            // 성공 시 로그인 페이지로 리다이렉트
             if (result?.success) {
-                console.log('Signup successful, redirecting to dashboard...')
+                console.log('Signup successful, redirecting to login page...')
                 setTimeout(() => {
-                    window.location.href = '/dashboard'
+                    window.location.href = '/login?signup=success'
                 }, 300)
             } else {
                 // 성공하지 않았는데 에러도 없는 경우
