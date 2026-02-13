@@ -27,6 +27,7 @@ import {
 import { usePathname, useSearchParams } from "next/navigation"
 import { getConsultations, createConsultation, updateConsultation, deleteConsultation } from "./actions"
 import { useAdminContext } from "@/components/layout/shell"
+import { notifyNotificationCheck } from "@/lib/utils"
 
 export default function ConsultationsPage() {
     const [consultations, setConsultations] = useState<any[]>([])
@@ -67,6 +68,7 @@ export default function ConsultationsPage() {
         const formData = new FormData(e.currentTarget)
         const result = await createConsultation(formData)
         if (result.success) {
+            notifyNotificationCheck()
             await fetchConsultations()
             setIsAddOpen(false)
         } else {
@@ -120,6 +122,7 @@ export default function ConsultationsPage() {
             clientId: (formData.get('clientId') as string) || null,
         })
         if (result.success) {
+            notifyNotificationCheck()
             await fetchData()
             setIsEditOpen(false)
             setEditingConsultation(null)
@@ -135,6 +138,7 @@ export default function ConsultationsPage() {
 
         const result = await deleteConsultation(id)
         if (result.success) {
+            notifyNotificationCheck()
             fetchData()
         } else {
             alert("삭제에 실패했습니다: " + result.error)

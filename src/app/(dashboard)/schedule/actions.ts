@@ -30,8 +30,8 @@ export async function getEvents(counselorId?: string | null) {
             mentor: "담당 멘토",
             date: dateObj,
             time: event.start_time ? event.start_time.substring(0, 5) : dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            type: event.event_type || 'online',
-            content: event.event_description || '',
+            type: 'online',
+            content: event.event_content || '',
             status: 'confirmed'
         }
     })
@@ -75,10 +75,9 @@ export async function createEvent(formData: FormData) {
             {
                 user_id: user.id,
                 event_title: title,
-                event_description: content || '',
+                event_content: content || '',
                 event_date: dateStr, // YYYY-MM-DD
                 start_time: timeStr,  // HH:mm
-                event_type: 'online',
                 profile_id: profileId || null
             }
         ])
@@ -88,6 +87,40 @@ export async function createEvent(formData: FormData) {
         if (error.code === '23503') {
             return { error: '사용자 정보 연동 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
         }
+        return { error: error.message }
+    }
+
+    revalidatePath('/schedule')
+    return { success: true }
+}
+
+export async function updateEvent(eventId: string, formData: FormData, counselorId?: string | null) {
+    const supabase = await createClient()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return { error: 'Unauthorized' }
+
+    const title = formData.get('title') as string
+    const content = formData.get('content') as string
+    const dateStr = formData.get('date') as string
+    const timeStr = formData.get('time') as string
+
+    if (!title || !dateStr || !timeStr) {
+        return { error: '모든 필드를 입력해주세요.' }
+    }
+
+    const { error } = await supabase
+        .from('calendar_events')
+        .update({
+            event_title: title,
+            event_content: content || '',
+            event_date: dateStr,
+            start_time: timeStr,
+        })
+        .eq('event_id', eventId)
+        .eq('user_id', userIdStr)
+
+    if (error) {
+        console.error('Error updating event:', error)
         return { error: error.message }
     }
 

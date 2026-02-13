@@ -98,10 +98,9 @@ export default function LoginPage() {
         <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
             <Card className="w-full max-w-[400px] shadow-2xl border-none ring-1 ring-slate-200">
                 <CardHeader className="space-y-1 pb-6 text-center">
-                    <div className="mx-auto bg-purple-100 h-12 w-12 rounded-xl flex items-center justify-center mb-4">
-                        <User className="h-6 w-6 text-purple-700" />
+                    <div className="mx-auto mb-4 flex items-center justify-center">
+                        <img src="/logo.png" alt="Career Bridge" className="h-24 w-auto object-contain mix-blend-multiply" />
                     </div>
-                    <CardTitle className="text-2xl font-bold tracking-tight">Career Bridge</CardTitle>
                     <CardDescription>계정에 로그인하여 상담 업무를 시작하세요</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -141,10 +140,7 @@ export default function LoginPage() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="password">비밀번호</Label>
-                                    <button type="button" className="text-xs text-purple-700 hover:underline">비밀번호 찾기</button>
-                                </div>
+                                <Label htmlFor="password">비밀번호</Label>
                                 <Input id="password" name="password" type="password" placeholder="••••••••" required className="h-11" />
                             </div>
                         </div>

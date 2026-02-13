@@ -5,10 +5,11 @@ import { useSearchParams } from "next/navigation"
 import { RoadmapTimeline, type RoadmapStep } from "@/components/roadmap/timeline"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Download, Share2, Loader2, Sparkles, User, RefreshCw } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Download, Loader2, Sparkles, User, RefreshCw, Printer } from "lucide-react"
 import { getRoadmap, createInitialRoadmap, getClientProfile } from "./actions"
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { motion } from "motion/react"
 import { useAdminContext } from "@/components/layout/shell"
 
@@ -25,6 +26,21 @@ export default function RoadmapPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [hasRoadmap, setHasRoadmap] = useState(false)
     const [clientData, setClientData] = useState<any>(null)
+    const [roadmapViewMonth, setRoadmapViewMonth] = useState<Date>(() => new Date())
+
+    // 로드맵 구간: 오늘 기준 단기 1~3개월, 중기 3~12개월, 장기 1년+
+    const roadmapRef = new Date()
+    roadmapRef.setHours(0, 0, 0, 0)
+    const roadmapRefTime = roadmapRef.getTime()
+    const roadmapThreeMo = new Date(roadmapRef.getFullYear(), roadmapRef.getMonth() + 3, roadmapRef.getDate())
+    const roadmapTwelveMo = new Date(roadmapRef.getFullYear(), roadmapRef.getMonth() + 12, roadmapRef.getDate())
+    const getRoadmapPeriod = (d: Date) => {
+        const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+        if (t < roadmapRefTime) return null
+        if (t < roadmapThreeMo.getTime()) return 'short'
+        if (t < roadmapTwelveMo.getTime()) return 'mid'
+        return 'long'
+    }
 
     useEffect(() => {
         const fetchData = async () => {
@@ -54,6 +70,7 @@ export default function RoadmapPage() {
         setIsLoading(true)
         const result = await createInitialRoadmap(clientId || undefined, clientData, counselorId || undefined)
         if (result.success) {
+            notifyNotificationCheck()
             const data = await getRoadmap(clientId || undefined, counselorId || undefined)
             if (data && data.milestones) {
                 setSteps(JSON.parse(data.milestones))
@@ -65,14 +82,8 @@ export default function RoadmapPage() {
         setIsLoading(false)
     }
 
-    const handleShare = async () => {
-        const url = window.location.href
-        try {
-            await navigator.clipboard.writeText(url)
-            alert('로드맵 링크가 클립보드에 복사되었습니다!')
-        } catch (err) {
-            alert('링크 복사에 실패했습니다.')
-        }
+    const handlePrint = () => {
+        window.print()
     }
 
     const handleDownload = () => {
@@ -124,69 +135,69 @@ export default function RoadmapPage() {
                     <CardHeader>
                         <CardTitle className="text-base flex items-center gap-2">
                             <User className="h-4 w-4" />
-                            내담자 정보
+                            {clientData.client_name}님 정보
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-3 gap-4 text-sm">
                             <div>
                                 <p className="text-muted-foreground">이름</p>
                                 <p className="font-medium">{clientData.client_name}</p>
+                                {clientData.major && (
+                                    <div className="mt-4">
+                                        <p className="text-muted-foreground">전공</p>
+                                        <p className="font-medium">{clientData.major}</p>
+                                    </div>
+                                )}
                             </div>
                             <div>
-                                <p className="text-muted-foreground">이메일</p>
-                                <p className="font-medium">{clientData.client_email}</p>
+                                {clientData.age_group && (
+                                    <>
+                                        <p className="text-muted-foreground">연령대</p>
+                                        <p className="font-medium">{clientData.age_group}</p>
+                                    </>
+                                )}
+                                <div className="mt-4">
+                                    <p className="text-muted-foreground">이메일</p>
+                                    <p className="font-medium">{clientData.client_email}</p>
+                                </div>
                             </div>
-                            {clientData.age_group && (
-                                <div>
-                                    <p className="text-muted-foreground">연령대</p>
-                                    <p className="font-medium">{clientData.age_group}</p>
-                                </div>
-                            )}
-                            {clientData.education_level && (
-                                <div>
-                                    <p className="text-muted-foreground">학력</p>
-                                    <p className="font-medium">{clientData.education_level}</p>
-                                </div>
-                            )}
-                            {clientData.major && (
-                                <div>
-                                    <p className="text-muted-foreground">전공</p>
-                                    <p className="font-medium">{clientData.major}</p>
-                                </div>
-                            )}
+                            <div>
+                                {clientData.education_level && (
+                                    <>
+                                        <p className="text-muted-foreground">학력</p>
+                                        <p className="font-medium">{clientData.education_level}</p>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-                        {clientData ? `${clientData.client_name} 님의 커리어 로드맵` : "나의 커리어 로드맵"}
-                    </h1>
-                    <p className="text-muted-foreground mt-1">
-                        {hasRoadmap ? "상담 기반 맞춤형 커리어 패스" : "아직 생성된 로드맵이 없습니다."}
-                    </p>
-                </div>
+            <div className="flex flex-row items-center justify-between gap-4">
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900 whitespace-nowrap">
+                    {clientData ? `${clientData.client_name}님의 커리어 로드맵` : "나의 커리어 로드맵"}
+                </h1>
                 {hasRoadmap && (
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <Button
                             variant="outline"
                             size="sm"
+                            className="h-8 px-2.5 text-xs gap-1"
                             onClick={handleGenerateRoadmap}
                             title="최신 상담 및 프로필 데이터로 로드맵 갱신"
                             disabled={isLoading}
                         >
-                            <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
+                            <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
                             AI 갱신
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleShare}>
-                            <Share2 className="mr-2 h-4 w-4" />
-                            공유
+                        <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrint}>
+                            <Printer className="h-3.5 w-3.5" />
+                            출력
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleDownload}>
-                            <Download className="mr-2 h-4 w-4" />
+                        <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handleDownload}>
+                            <Download className="h-3.5 w-3.5" />
                             저장
                         </Button>
                     </div>
@@ -195,48 +206,93 @@ export default function RoadmapPage() {
 
             {hasRoadmap ? (
                 <div className="space-y-12">
-                    {/* Milestone Layout */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {[
-                            { term: "단기 (1-3개월)", color: "bg-blue-50 border-blue-200 text-blue-700", steps: steps.slice(0, 1) },
-                            { term: "중기 (3-12개월)", color: "bg-purple-50 border-purple-200 text-purple-700", steps: steps.slice(1, 2) },
-                            { term: "장기 (1년 이상)", color: "bg-amber-50 border-amber-200 text-amber-700", steps: steps.slice(2) }
-                        ].map((milestone, idx) => (
-                            <Card key={idx} className={cn("border-2 shadow-sm", milestone.color)}>
-                                <CardHeader className="pb-3 text-center border-b border-inherit bg-white/50">
-                                    <Badge variant="outline" className={cn("mb-2 mx-auto", milestone.color)}>{milestone.term}</Badge>
-                                    <CardTitle className="text-lg">목표 단계</CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-6 space-y-4">
-                                    {milestone.steps.map((step) => (
-                                        <div key={step.id} className="p-4 bg-white rounded-lg border shadow-sm">
-                                            <h4 className="font-bold text-gray-900 mb-1">{step.title}</h4>
-                                            <p className="text-xs text-gray-600 line-clamp-3">{step.description}</p>
-                                            {step.actionItems && step.actionItems.length > 0 && (
-                                                <div className="mt-3 pt-3 border-t border-gray-100">
-                                                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">구체적 방안</p>
-                                                    <ul className="space-y-1.5">
-                                                        {step.actionItems.map((item, i) => (
-                                                            <li key={i} className="text-xs text-gray-700 flex gap-2">
-                                                                <span className="text-purple-500 mt-0.5">•</span>
-                                                                <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                            <div className="mt-3 flex items-center justify-between">
-                                                <Badge variant={step.status === 'completed' ? 'success' : step.status === 'in-progress' ? 'purple' : 'secondary'} className="text-[10px]">
-                                                    {step.status === 'completed' ? '완료' : step.status === 'in-progress' ? '진행중' : '대기'}
-                                                </Badge>
-                                                {step.date && <span className="text-[10px] text-gray-400">{step.date}</span>}
+                    {/* 커리어 로드맵 - 실제 캘린더 + 단기·중기·장기 구간 표시 */}
+                    <Card className="overflow-hidden border-2 border-gray-200 shadow-lg">
+                        <CardHeader className="bg-gray-50/80 border-b py-4">
+                            <CardTitle className="text-center text-xl font-bold text-gray-900">
+                                커리어 로드맵 캘린더
+                            </CardTitle>
+                            {/* 캘린더 위 [단기] [중기] [장기] 표시 */}
+                            <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 border border-blue-200 text-blue-800 font-semibold text-sm">
+                                    단기
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-100 border border-purple-200 text-purple-800 font-semibold text-sm">
+                                    중기
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 border border-amber-200 text-amber-800 font-semibold text-sm">
+                                    장기
+                                </span>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-8 items-start">
+                                {/* 왼쪽: 실제 캘린더 (구간별 색상) */}
+                                <div className="flex flex-col items-center">
+                                    <Calendar
+                                        mode="single"
+                                        month={roadmapViewMonth}
+                                        onMonthChange={setRoadmapViewMonth}
+                                        className="rounded-lg border border-gray-200 bg-white"
+                                        modifiers={{
+                                            term_short: (d) => getRoadmapPeriod(d) === 'short',
+                                            term_mid: (d) => getRoadmapPeriod(d) === 'mid',
+                                            term_long: (d) => getRoadmapPeriod(d) === 'long',
+                                        }}
+                                        modifiersClassNames={{
+                                            term_short: "bg-blue-50/80 border border-blue-100",
+                                            term_mid: "bg-purple-50/80 border border-purple-100",
+                                            term_long: "bg-amber-50/80 border border-amber-100",
+                                        }}
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-2 text-center">오늘 기준 구간별 색상</p>
+                                </div>
+                                {/* 오른쪽: 단기·중기·장기 세부 내용 */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
+                                    {[
+                                        { term: "단기", range: "1~3개월", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1) },
+                                        { term: "중기", range: "3~12개월", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2) },
+                                        { term: "장기", range: "1년 이상", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2) }
+                                    ].map((milestone, idx) => (
+                                        <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col", milestone.color)}>
+                                            <div className="font-bold text-sm mb-1">{milestone.term}</div>
+                                            <div className="text-xs opacity-90 mb-3">{milestone.range}</div>
+                                            <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
+                                                {milestone.steps.length === 0 ? (
+                                                    <p className="text-xs text-gray-500">해당 구간 목표 없음</p>
+                                                ) : (
+                                                    milestone.steps.map((step, stepIdx) => (
+                                                        <div key={step.id} className={cn("rounded-lg border p-3 text-left", milestone.stepColor)}>
+                                                            <div className="flex items-start justify-between gap-2 mb-1">
+                                                                <span className="text-[10px] font-semibold text-gray-500 uppercase">
+                                                                    {step.date || `단계 ${stepIdx + 1}`}
+                                                                </span>
+                                                                <Badge variant={step.status === 'completed' ? 'success' : step.status === 'in-progress' ? 'purple' : 'secondary'} className="text-[10px] shrink-0">
+                                                                    {step.status === 'completed' ? '완료' : step.status === 'in-progress' ? '진행중' : '대기'}
+                                                                </Badge>
+                                                            </div>
+                                                            <h4 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h4>
+                                                            <p className="text-xs text-gray-600 line-clamp-3">{step.description}</p>
+                                                            {step.actionItems && step.actionItems.length > 0 && (
+                                                                <ul className="mt-2 pt-2 border-t border-gray-200/60 space-y-1">
+                                                                    {step.actionItems.slice(0, 3).map((item, i) => (
+                                                                        <li key={i} className="text-[11px] text-gray-700 flex gap-1.5">
+                                                                            <span className="text-purple-500 shrink-0">•</span>
+                                                                            <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            )}
+                                                        </div>
+                                                    ))
+                                                )}
                                             </div>
                                         </div>
                                     ))}
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {/* Detailed Analysis Sections */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
