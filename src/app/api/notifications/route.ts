@@ -47,19 +47,33 @@ export async function GET(req: NextRequest) {
     return value ? new Date(value) : null
   }
 
-  const [roadmapTs, resumeTs, calendarTs, consultationTs] = await Promise.all([
+  const [roadmapTs, resumeTs, calendarTs, consultationTs, clientsTs] = await Promise.all([
     getLatestTimestamp("career_roadmaps"),
     getLatestTimestamp("resume_drafts"),
     getLatestTimestamp("calendar_events"),
     getLatestTimestamp("consultations"),
+    getLatestTimestamp("career_profiles"),
   ])
 
-  const timestamps = [roadmapTs, resumeTs, calendarTs, consultationTs].filter(
+  const timestamps = [roadmapTs, resumeTs, calendarTs, consultationTs, clientsTs].filter(
     (d): d is Date => d !== null
   )
 
   if (timestamps.length === 0) {
-    return NextResponse.json({ hasUpdates: false })
+    return NextResponse.json({
+      hasUpdates: false,
+      latestChange: null,
+      roadmapUpdated: false,
+      resumeUpdated: false,
+      calendarUpdated: false,
+      consultationUpdated: false,
+      clientsUpdated: false,
+      roadmapLatest: null,
+      resumeLatest: null,
+      calendarLatest: null,
+      consultationLatest: null,
+      clientsLatest: null,
+    })
   }
 
   const latestChange = new Date(
@@ -76,9 +90,10 @@ export async function GET(req: NextRequest) {
   const resumeUpdated = isAfter(resumeTs, base)
   const calendarUpdated = isAfter(calendarTs, base)
   const consultationUpdated = isAfter(consultationTs, base)
+  const clientsUpdated = isAfter(clientsTs, base)
 
   const hasUpdates =
-    roadmapUpdated || resumeUpdated || calendarUpdated || consultationUpdated
+    roadmapUpdated || resumeUpdated || calendarUpdated || consultationUpdated || clientsUpdated
 
   // lastSeen이 없으면, 데이터가 하나라도 있으면 hasUpdates true
   // (isAfter 로직에서 base가 null일 때 ts가 존재하면 true)
@@ -90,6 +105,12 @@ export async function GET(req: NextRequest) {
     resumeUpdated,
     calendarUpdated,
     consultationUpdated,
+    clientsUpdated,
+    roadmapLatest: roadmapTs?.toISOString() ?? null,
+    resumeLatest: resumeTs?.toISOString() ?? null,
+    calendarLatest: calendarTs?.toISOString() ?? null,
+    consultationLatest: consultationTs?.toISOString() ?? null,
+    clientsLatest: clientsTs?.toISOString() ?? null,
   })
 }
 

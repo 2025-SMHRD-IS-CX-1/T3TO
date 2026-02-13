@@ -74,8 +74,10 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
 
     return (
         <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)]">
-            <div className="flex h-16 items-center px-6 border-b border-gray-100">
-                <span className="text-xl font-bold text-purple-900">Career Bridge</span>
+            <div className="flex h-16 items-center px-4 border-b border-gray-100">
+                <Link href="/dashboard" className="flex items-center justify-center">
+                    <img src="/logo.png" alt="Career Bridge" className="h-12 w-auto object-contain mix-blend-multiply" />
+                </Link>
             </div>
             <div className="flex-1 overflow-y-auto py-4">
                 {isAdmin && counselors.length > 0 && (

@@ -20,16 +20,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useSearchParams } from "next/navigation"
-import { getEvents, createEvent, deleteEvent } from "./actions"
+import { getEvents, createEvent, deleteEvent, updateEvent } from "./actions"
 import { getClients } from "../admin/clients/actions"
 import { useAdminContext } from "@/components/layout/shell"
+import { notifyNotificationCheck } from "@/lib/utils"
 
 export default function SchedulePage() {
     const [date, setDate] = useState<Date | undefined>(new Date())
+    const [viewMonth, setViewMonth] = useState<Date>(() => new Date())
     const [selectedDate, setSelectedDate] = useState<string>("")
     const [events, setEvents] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+    const [detailEvent, setDetailEvent] = useState<any>(null)
+    const [eventToEdit, setEventToEdit] = useState<any>(null)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [ampm, setAmpm] = useState<"오전" | "오후">("오전")
     const [hours, setHours] = useState("09")
@@ -61,8 +65,8 @@ export default function SchedulePage() {
     const handleDateSelect = (newDate: Date | undefined) => {
         setDate(newDate)
         if (newDate) {
-            // Format date as YYYY-MM-DD for input field
-            const formatted = newDate.toLocaleDateString('en-CA') // YYYY-MM-DD in local time
+            setViewMonth(new Date(newDate.getFullYear(), newDate.getMonth(), 1))
+            const formatted = newDate.toLocaleDateString('en-CA')
             setSelectedDate(formatted)
         }
     }
@@ -76,6 +80,7 @@ export default function SchedulePage() {
         try {
             const result = await createEvent(formData)
             if (result.success) {
+                notifyNotificationCheck()
                 await fetchEvents()
                 setIsAddDialogOpen(false)
                 form?.reset()
@@ -94,10 +99,57 @@ export default function SchedulePage() {
 
         const result = await deleteEvent(eventId)
         if (result.success) {
+            notifyNotificationCheck()
             await fetchEvents()
         } else {
             alert(result.error || "일정 삭제에 실패했습니다.")
         }
+    }
+
+    const openEditFromDetail = (event: any) => {
+        setDetailEvent(null)
+        setEventToEdit(event)
+        if (event.time) {
+            const [hStr, mStr] = event.time.split(':')
+            const h = parseInt(hStr || '9', 10)
+            const m = parseInt(mStr || '0', 10)
+            setMinutes(m.toString().padStart(2, '0'))
+            if (h === 0) {
+                setAmpm('오전')
+                setHours('12')
+            } else if (h < 12) {
+                setAmpm('오전')
+                setHours(h.toString().padStart(2, '0'))
+            } else if (h === 12) {
+                setAmpm('오후')
+                setHours('12')
+            } else {
+                setAmpm('오후')
+                setHours((h - 12).toString().padStart(2, '0'))
+            }
+        }
+    }
+
+    const handleUpdateEvent = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        if (!eventToEdit) return
+        setIsSubmitting(true)
+        const form = e.currentTarget
+        const formData = new FormData(form)
+        try {
+            const result = await updateEvent(eventToEdit.id, formData, counselorId || undefined)
+            if (result.success) {
+                notifyNotificationCheck()
+                await fetchEvents()
+                setEventToEdit(null)
+            } else {
+                alert(result.error || '일정 수정에 실패했습니다.')
+            }
+        } catch (err: any) {
+            console.error(err)
+            alert(err.message || '알 수 없는 오류가 발생했습니다.')
+        }
+        setIsSubmitting(false)
     }
 
     // Filter events for selected date
@@ -127,10 +179,19 @@ export default function SchedulePage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">일정 관리</h1>
-                    <p className="text-muted-foreground">멘토링 일정과 주요 커리어 이벤트를 확인하세요.</p>
                 </div>
 
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <Dialog
+                    open={isAddDialogOpen}
+                    onOpenChange={(open) => {
+                        setIsAddDialogOpen(open)
+                        if (open) {
+                            setHours("09")
+                            setMinutes("00")
+                            setAmpm("오전")
+                        }
+                    }}
+                >
                     <DialogTrigger asChild>
                         <Button>+ 새 일정 추가</Button>
                     </DialogTrigger>
@@ -194,7 +255,8 @@ export default function SchedulePage() {
                                                 value={hours}
                                                 onChange={(e) => {
                                                     const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
-                                                    if (val === "" || (parseInt(val) >= 1 && parseInt(val) <= 12)) {
+                                                    const num = parseInt(val, 10);
+                                                    if (val === "" || (val.length && !isNaN(num) && num >= 0 && num <= 12)) {
                                                         setHours(val);
                                                     }
                                                 }}
@@ -209,7 +271,8 @@ export default function SchedulePage() {
                                                 value={minutes}
                                                 onChange={(e) => {
                                                     const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
-                                                    if (val === "" || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                                                    const num = parseInt(val, 10);
+                                                    if (val === "" || (val.length && !isNaN(num) && num >= 0 && num <= 59)) {
                                                         setMinutes(val);
                                                     }
                                                 }}
@@ -240,6 +303,160 @@ export default function SchedulePage() {
                         </form>
                     </DialogContent>
                 </Dialog>
+
+                {/* 일정 세부사항 팝업 (확정된 일정) */}
+                <Dialog open={!!detailEvent} onOpenChange={(open) => !open && setDetailEvent(null)}>
+                    <DialogContent className="sm:max-w-[420px]">
+                        <DialogHeader>
+                            <DialogTitle className="pr-6">일정 세부사항</DialogTitle>
+                        </DialogHeader>
+                        {detailEvent && (
+                            <>
+                                <div className="space-y-3 py-2 text-left">
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500">제목</p>
+                                        <p className="text-sm font-medium text-gray-900">{detailEvent.title}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-4">
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-500">날짜</p>
+                                            <p className="text-sm text-gray-900">
+                                                {detailEvent.date instanceof Date
+                                                    ? `${detailEvent.date.getFullYear()}년 ${detailEvent.date.getMonth() + 1}월 ${detailEvent.date.getDate()}일`
+                                                    : String(detailEvent.date)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-500">시간</p>
+                                            <p className="text-sm text-gray-900">{detailEvent.time}</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500">상태</p>
+                                        <p className="text-sm text-gray-900">{detailEvent.status === 'confirmed' ? '확정됨' : '대기 중'}</p>
+                                    </div>
+                                    {detailEvent.content && (
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-500">상세 내용</p>
+                                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailEvent.content}</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <DialogFooter className="flex-row gap-2 pt-2">
+                                    <Button variant="outline" onClick={() => openEditFromDetail(detailEvent)}>
+                                        편집
+                                    </Button>
+                                    <Button variant="outline" onClick={() => setDetailEvent(null)}>닫기</Button>
+                                </DialogFooter>
+                            </>
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                {/* 일정 편집 팝업 */}
+                <Dialog open={!!eventToEdit} onOpenChange={(open) => !open && setEventToEdit(null)}>
+                    <DialogContent className="sm:max-w-[420px]">
+                        <DialogHeader>
+                            <DialogTitle>일정 세부사항 편집</DialogTitle>
+                            <DialogDescription>제목, 날짜, 시간, 상세 내용을 수정할 수 있습니다.</DialogDescription>
+                        </DialogHeader>
+                        {eventToEdit && (
+                            <form onSubmit={handleUpdateEvent} className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-title">제목</Label>
+                                    <Input
+                                        id="edit-title"
+                                        name="title"
+                                        defaultValue={eventToEdit.title}
+                                        placeholder="일정 제목"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-content">상세 내용</Label>
+                                    <Textarea
+                                        id="edit-content"
+                                        name="content"
+                                        defaultValue={eventToEdit.content || ''}
+                                        placeholder="상세 내용"
+                                        className="h-24"
+                                    />
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-date">날짜</Label>
+                                        <Input
+                                            id="edit-date"
+                                            name="date"
+                                            type="date"
+                                            defaultValue={
+                                                eventToEdit.date instanceof Date
+                                                    ? eventToEdit.date.toISOString().slice(0, 10)
+                                                    : String(eventToEdit.date).slice(0, 10)
+                                            }
+                                            required
+                                            className="w-full max-w-[200px]"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>시간</Label>
+                                        <div className="flex items-center gap-2 w-full max-w-[200px]">
+                                            <select
+                                                value={ampm}
+                                                onChange={(e) => setAmpm(e.target.value as "오전" | "오후")}
+                                                className="w-16 flex h-10 shrink-0 rounded-md border border-input bg-background px-2 py-2 text-sm"
+                                            >
+                                                <option value="오전">오전</option>
+                                                <option value="오후">오후</option>
+                                            </select>
+                                            <Input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={hours}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2)
+                                                    const num = parseInt(val, 10)
+                                                    if (val === "" || (val.length && !isNaN(num) && num >= 0 && num <= 12)) setHours(val)
+                                                }}
+                                                className="w-12 shrink-0 text-center"
+                                                maxLength={2}
+                                            />
+                                            <span className="shrink-0">:</span>
+                                            <Input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={minutes}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 2)
+                                                    const num = parseInt(val, 10)
+                                                    if (val === "" || (val.length && !isNaN(num) && num >= 0 && num <= 59)) setMinutes(val)
+                                                }}
+                                                className="w-12 shrink-0 text-center"
+                                                maxLength={2}
+                                            />
+                                        </div>
+                                        <input
+                                            type="hidden"
+                                            name="time"
+                                            value={`${(() => {
+                                                let h = parseInt(hours || "0", 10)
+                                                if (ampm === "오후" && h < 12) h += 12
+                                                if (ampm === "오전" && h === 12) h = 0
+                                                return h.toString().padStart(2, "0") + ":" + (minutes || "00").padStart(2, "0")
+                                            })()}`}
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button type="button" variant="outline" onClick={() => setEventToEdit(null)}>취소</Button>
+                                    <Button type="submit" disabled={isSubmitting}>
+                                        {isSubmitting ? "저장 중..." : "저장"}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -251,14 +468,13 @@ export default function SchedulePage() {
                                 <CalendarIcon className="h-6 w-6 text-purple-600" />
                                 멘토링 캘린더
                             </CardTitle>
-                            <CardDescription className="text-center text-muted-foreground mt-1">
-                                날짜를 선택하여 실시간 일정을 관리하세요
-                            </CardDescription>
                         </CardHeader>
                         <CardContent className="p-10 flex justify-center bg-white">
                             <div className="w-full max-w-3xl">
                                 <Calendar
                                     mode="single"
+                                    month={viewMonth}
+                                    onMonthChange={setViewMonth}
                                     selected={date}
                                     onSelect={handleDateSelect}
                                     className="w-full"
@@ -328,9 +544,9 @@ export default function SchedulePage() {
                                     </div>
                                     <div className="flex flex-wrap gap-2 sm:justify-end flex-1">
                                         <Button
-                                            variant="ghost"
+                                            variant="outline"
                                             size="sm"
-                                            className="text-gray-400 hover:text-red-600 h-8 w-8 p-0 shrink-0"
+                                            className="h-8 w-8 p-0 shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
                                             onClick={() => handleDeleteEvent(event.id)}
                                             title="일정 삭제"
                                         >
@@ -340,9 +556,9 @@ export default function SchedulePage() {
                                             variant="outline"
                                             size="sm"
                                             className="text-xs sm:text-sm h-8"
-                                            onClick={() => alert(`[상세 내용]\n${event.content || '등록된 상세 내용이 없습니다.'}`)}
+                                            onClick={() => setDetailEvent(event)}
                                         >
-                                            자료 확인
+                                            세부사항
                                         </Button>
                                         <Button
                                             variant="secondary"

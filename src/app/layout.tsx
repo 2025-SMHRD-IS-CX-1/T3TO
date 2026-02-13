@@ -25,15 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
-        style={
-          {
-            // Lovable 스타일: Inter를 기본 본문 폰트로 사용
-            "--font-primary": "var(--font-secondary)",
-          } as React.CSSProperties
-        }
-      >
+      <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
         {children}
       </body>
     </html>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, Search, User, LogOut, Settings, Trash2 } from "lucide-react"
+import { Bell, Search, User, LogOut, Settings, Trash2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -21,6 +21,8 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { deleteAccount } from "@/app/(auth)/actions"
 
+const NOTIFICATION_EVENT = "cb-notification-check"
+
 export function Navbar() {
     const [userInitial, setUserInitial] = useState("JD")
     const [userEmail, setUserEmail] = useState("")
@@ -33,45 +35,98 @@ export function Navbar() {
         resumeUpdated: boolean
         calendarUpdated: boolean
         consultationUpdated: boolean
+        clientsUpdated: boolean
+        roadmapLatest: string | null
+        resumeLatest: string | null
+        calendarLatest: string | null
+        consultationLatest: string | null
+        clientsLatest: string | null
     } | null>(null)
+    const [readAt, setReadAt] = useState<Record<string, string>>({})
+
+    const markAllAsRead = () => {
+        if (typeof window === "undefined" || !notifDetail) return
+        const next: Record<string, string> = {
+            ...(notifDetail.roadmapLatest && { roadmap: notifDetail.roadmapLatest }),
+            ...(notifDetail.resumeLatest && { resume: notifDetail.resumeLatest }),
+            ...(notifDetail.calendarLatest && { calendar: notifDetail.calendarLatest }),
+            ...(notifDetail.consultationLatest && { consultation: notifDetail.consultationLatest }),
+            ...(notifDetail.clientsLatest && { clients: notifDetail.clientsLatest }),
+        }
+        const stored = window.localStorage.getItem("cb_notification_read")
+        const prev = stored ? (() => { try { return JSON.parse(stored) as Record<string, string> } catch { return {} } })() : {}
+        const merged = { ...prev, ...next }
+        window.localStorage.setItem("cb_notification_read", JSON.stringify(merged))
+        setReadAt(() => merged)
+        window.localStorage.setItem("cb_last_seen_notification_at", latestChange || new Date().toISOString())
+        setHasNotification(false)
+    }
+
+    const isUnread = (key: string, latest: string | null) => {
+        if (!latest) return false
+        const read = readAt[key]
+        return !read || new Date(latest).getTime() > new Date(read).getTime()
+    }
+
+
+    const fetchNotifications = async () => {
+        if (typeof window === "undefined") return
+        const lastSeen = window.localStorage.getItem("cb_last_seen_notification_at")
+        const readRaw = window.localStorage.getItem("cb_notification_read")
+        const readObj = readRaw ? (() => { try { return JSON.parse(readRaw) as Record<string, string> } catch { return {} } })() : {}
+        setReadAt(readObj)
+        const params = new URLSearchParams()
+        if (lastSeen) params.set("lastSeen", lastSeen)
+        try {
+            const res = await fetch(`/api/notifications?${params.toString()}`)
+            const data = res.ok ? await res.json() : {}
+            if (data.latestChange) setLatestChange(data.latestChange)
+            if (data.hasUpdates) setHasNotification(true)
+            setNotifDetail({
+                roadmapUpdated: !!data.roadmapUpdated,
+                resumeUpdated: !!data.resumeUpdated,
+                calendarUpdated: !!data.calendarUpdated,
+                consultationUpdated: !!data.consultationUpdated,
+                clientsUpdated: !!data.clientsUpdated,
+                roadmapLatest: data.roadmapLatest ?? null,
+                resumeLatest: data.resumeLatest ?? null,
+                calendarLatest: data.calendarLatest ?? null,
+                consultationLatest: data.consultationLatest ?? null,
+                clientsLatest: data.clientsLatest ?? null,
+            })
+        } catch {
+            setNotifDetail({
+                roadmapUpdated: false,
+                resumeUpdated: false,
+                calendarUpdated: false,
+                consultationUpdated: false,
+                clientsUpdated: false,
+                roadmapLatest: null,
+                resumeLatest: null,
+                calendarLatest: null,
+                consultationLatest: null,
+                clientsLatest: null,
+            })
+        }
+    }
 
     useEffect(() => {
-        const fetchUserAndNotifications = async () => {
-            const supabase = createClient()
+        const supabase = createClient()
+        const init = async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (user?.email) {
                 setUserEmail(user.email)
                 setUserInitial(user.email.substring(0, 2).toUpperCase())
             }
-
-            // 클라이언트에서만 localStorage 접근
-            if (typeof window === "undefined") return
-
-            const lastSeen = window.localStorage.getItem("cb_last_seen_notification_at")
-            const params = new URLSearchParams()
-            if (lastSeen) params.set("lastSeen", lastSeen)
-
-            try {
-                const res = await fetch(`/api/notifications?${params.toString()}`)
-                if (!res.ok) return
-                const data = await res.json()
-                if (data.latestChange) {
-                    setLatestChange(data.latestChange)
-                }
-                if (data.hasUpdates) {
-                    setHasNotification(true)
-                }
-                setNotifDetail({
-                    roadmapUpdated: !!data.roadmapUpdated,
-                    resumeUpdated: !!data.resumeUpdated,
-                    calendarUpdated: !!data.calendarUpdated,
-                    consultationUpdated: !!data.consultationUpdated,
-                })
-            } catch {
-                // 알림 조회 실패는 UI에 치명적이지 않으므로 조용히 무시
-            }
+            fetchNotifications()
         }
-        fetchUserAndNotifications()
+        init()
+    }, [])
+
+    useEffect(() => {
+        const handler = () => { fetchNotifications() }
+        window.addEventListener(NOTIFICATION_EVENT, handler)
+        return () => window.removeEventListener(NOTIFICATION_EVENT, handler)
     }, [])
 
     return (
@@ -98,39 +153,48 @@ export function Navbar() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                         align="end"
-                        className="w-72"
+                        className="w-80 p-0"
                         onInteractOutside={() => {
-                            if (hasNotification) {
-                                if (typeof window !== "undefined") {
-                                    window.localStorage.setItem(
-                                        "cb_last_seen_notification_at",
-                                        latestChange || new Date().toISOString()
-                                    )
-                                }
-                                setHasNotification(false)
+                            if (hasNotification && typeof window !== "undefined" && notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated)) {
+                                markAllAsRead()
                             }
                         }}
                     >
-                        <div className="px-3 py-2 border-b">
-                            <p className="text-xs font-semibold text-gray-500">알림</p>
+                        {/* 헤더 + 구분선 */}
+                        <div className="px-3 py-3 shadow-[0_1px_0_rgba(148,163,184,0.12)]">
+                            <p className="text-sm font-semibold text-gray-800">알림</p>
                         </div>
-                        {notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated) ? (
-                            <div className="py-2 text-sm text-gray-700">
+                        {/* 액션: 모두 읽음만 */}
+                        <div className="flex items-center justify-end px-3 py-2.5 bg-slate-50/60 shadow-[0_1px_0_rgba(148,163,184,0.1)]">
+                            <button
+                                type="button"
+                                className="flex items-center gap-1.5 text-xs text-purple-600 hover:underline"
+                                onClick={markAllAsRead}
+                            >
+                                <Check className="h-3.5 w-3.5" />
+                                모두 읽음
+                            </button>
+                        </div>
+                        {notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated) ? (
+                            <div key={`read-${JSON.stringify(readAt)}`} className="text-sm text-gray-700 max-h-80 overflow-y-auto">
+                                {notifDetail.clientsUpdated && (
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("clients", notifDetail.clientsLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>내담자가 추가/변경되었습니다.</div>
+                                )}
                                 {notifDetail.calendarUpdated && (
-                                    <div className="px-3 py-1.5 hover:bg-gray-50">새 상담 일정이 생성/변경되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("calendar", notifDetail.calendarLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>새 상담 일정이 생성/변경되었습니다.</div>
                                 )}
                                 {notifDetail.roadmapUpdated && (
-                                    <div className="px-3 py-1.5 hover:bg-gray-50">로드맵 내용이 업데이트되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("roadmap", notifDetail.roadmapLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>로드맵 내용이 업데이트되었습니다.</div>
                                 )}
                                 {notifDetail.resumeUpdated && (
-                                    <div className="px-3 py-1.5 hover:bg-gray-50">자기소개서 초안이 작성/수정되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("resume", notifDetail.resumeLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>자기소개서 초안이 작성/수정되었습니다.</div>
                                 )}
                                 {notifDetail.consultationUpdated && (
-                                    <div className="px-3 py-1.5 hover:bg-gray-50">상담 기록이 추가/수정되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("consultation", notifDetail.consultationLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>상담 기록이 추가/수정되었습니다.</div>
                                 )}
                             </div>
                         ) : (
-                            <div className="px-3 py-3 text-xs text-gray-500">
+                            <div className="px-3 py-6 text-xs text-gray-500 text-center">
                                 새로운 알림이 없습니다.
                             </div>
                         )}

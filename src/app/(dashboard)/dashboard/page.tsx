@@ -25,9 +25,10 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { getClients, createClientProfile } from "../admin/clients/actions"
+import { getClients, createClientProfile, deleteClient } from "../admin/clients/actions"
 import { getLatestEvent } from "../schedule/actions"
 import { useAdminContext } from "@/components/layout/shell"
+import { notifyNotificationCheck } from "@/lib/utils"
 
 export default function DashboardPage() {
     const [clients, setClients] = useState<any[]>([])
@@ -37,6 +38,8 @@ export default function DashboardPage() {
     const [upcomingEvent, setUpcomingEvent] = useState<any>(null)
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -96,7 +99,7 @@ export default function DashboardPage() {
         if (result.success) {
             setIsAddDialogOpen(false)
             form?.reset()
-            // 데이터 새로고침 (약간의 지연 후)
+            notifyNotificationCheck()
             setTimeout(async () => {
                 await fetchClients()
                 router.refresh()
@@ -105,6 +108,25 @@ export default function DashboardPage() {
             alert("내담자 추가에 실패했습니다: " + result.error)
         }
         setIsSubmitting(false)
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!selectedClientId) return
+        setIsDeleting(true)
+        const result = await deleteClient(selectedClientId, counselorId || undefined)
+        setIsDeleting(false)
+        setDeleteConfirmOpen(false)
+        if (result.success) {
+            notifyNotificationCheck()
+            await fetchClients()
+            setSelectedClientId("")
+            setSelectedClient(null)
+            const params = new URLSearchParams()
+            if (counselorId) params.set("counselorId", counselorId)
+            router.push(params.toString() ? `/dashboard?${params.toString()}` : "/dashboard")
+        } else {
+            alert("삭제에 실패했습니다: " + result.error)
+        }
     }
 
     if (loading) {
@@ -271,6 +293,15 @@ export default function DashboardPage() {
                                 </form>
                             </DialogContent>
                         </Dialog>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                            disabled={!selectedClientId}
+                            onClick={() => setDeleteConfirmOpen(true)}
+                        >
+                            삭제
+                        </Button>
                         {selectedClient && (
                             <Button asChild>
                                 <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
@@ -281,6 +312,36 @@ export default function DashboardPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* 내담자 삭제 확인 다이얼로그 */}
+            <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>내담자 삭제</DialogTitle>
+                        <DialogDescription className="pt-1">
+                            정말로 이 내담자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 해당 내담자의 모든 데이터가 삭제됩니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0 pt-4">
+                        <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={isDeleting}>
+                            취소
+                        </Button>
+                        <Button
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            onClick={handleConfirmDelete}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 삭제 중...
+                                </>
+                            ) : (
+                                "삭제"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {!selectedClient ? (
                 <Card className="border-dashed">
@@ -303,7 +364,7 @@ export default function DashboardPage() {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">내담자 정보</CardTitle>
+                                <CardTitle className="text-sm font-medium">{selectedClient.name}님 정보</CardTitle>
                                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
                                     <User className="h-4 w-4" />
                                 </div>
