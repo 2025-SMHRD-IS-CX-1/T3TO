@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { RoadmapTimeline, type RoadmapStep } from "@/components/roadmap/timeline"
+import { type RoadmapStep } from "@/components/roadmap/timeline"
+import { RoadmapGantt } from "@/components/roadmap/roadmap-gantt"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar } from "@/components/ui/calendar"
 import { Download, Loader2, Sparkles, User, RefreshCw, Printer } from "lucide-react"
-import { getRoadmap, createInitialRoadmap, getClientProfile } from "./actions"
+import { getRoadmap, createInitialRoadmap, getClientProfile, getExamSchedules, generateAIRoadmap } from "./actions"
 import { Badge } from "@/components/ui/badge"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { motion } from "motion/react"
 import { useAdminContext } from "@/components/layout/shell"
+import { ExamSchedule } from "@/lib/roadmap-data"
 
 export default function RoadmapPage() {
     const searchParams = useSearchParams()
@@ -23,78 +24,119 @@ export default function RoadmapPage() {
     const [steps, setSteps] = useState<RoadmapStep[]>([])
     const [skills, setSkills] = useState<any[]>([])
     const [certs, setCerts] = useState<any[]>([])
+    const [examSchedules, setExamSchedules] = useState<ExamSchedule[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [hasRoadmap, setHasRoadmap] = useState(false)
     const [clientData, setClientData] = useState<any>(null)
     const [roadmapViewMonth, setRoadmapViewMonth] = useState<Date>(() => new Date())
 
-    // 로드맵 구간: 오늘 기준 단기 1~3개월, 중기 3~12개월, 장기 1년+
-    const roadmapRef = new Date()
-    roadmapRef.setHours(0, 0, 0, 0)
-    const roadmapRefTime = roadmapRef.getTime()
-    const roadmapThreeMo = new Date(roadmapRef.getFullYear(), roadmapRef.getMonth() + 3, roadmapRef.getDate())
-    const roadmapTwelveMo = new Date(roadmapRef.getFullYear(), roadmapRef.getMonth() + 12, roadmapRef.getDate())
-    const getRoadmapPeriod = (d: Date) => {
-        const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-        if (t < roadmapRefTime) return null
-        if (t < roadmapThreeMo.getTime()) return 'short'
-        if (t < roadmapTwelveMo.getTime()) return 'mid'
-        return 'long'
-    }
+    const [loadingText, setLoadingText] = useState("데이터를 불러오고 있습니다...")
 
     useEffect(() => {
         const fetchData = async () => {
-            if (clientId) {
-                const profile = await getClientProfile(clientId, counselorId || undefined)
-                setClientData(profile)
-            }
-            const data = await getRoadmap(clientId || undefined, counselorId || undefined)
-            if (data && data.milestones) {
-                try {
-                    setSteps(JSON.parse(data.milestones))
-                    if (data.required_skills) setSkills(JSON.parse(data.required_skills))
-                    if (data.certifications) setCerts(JSON.parse(data.certifications))
-                    setHasRoadmap(true)
-                } catch (e) {
-                    console.error("Failed to parse roadmap data", e)
+            setLoadingText("데이터를 불러오고 있습니다...")
+            try {
+                if (clientId) {
+                    const profile = await getClientProfile(clientId, counselorId || undefined)
+                    setClientData(profile)
                 }
-            } else {
-                setHasRoadmap(false)
+                const data = await getRoadmap(clientId || undefined, counselorId || undefined)
+                if (data && data.milestones) {
+                    try {
+                        setSteps(JSON.parse(data.milestones))
+                        if (data.required_skills) setSkills(JSON.parse(data.required_skills))
+                        if (data.certifications) setCerts(JSON.parse(data.certifications))
+                        setHasRoadmap(true)
+                    } catch (e) {
+                        console.error("Failed to parse roadmap data", e)
+                    }
+                } else {
+                    setHasRoadmap(false)
+                }
+
+                // Fetch exam schedules safely
+                try {
+                    const schedules = await getExamSchedules()
+                    setExamSchedules(schedules)
+                } catch (e) {
+                    console.error("Failed to fetch exam schedules", e)
+                }
+
+            } catch (error) {
+                console.error("Error fetching initial data", error)
+            } finally {
+                setIsLoading(false)
             }
-            setIsLoading(false)
         }
         fetchData()
     }, [clientId, counselorId])
 
-    const handleGenerateRoadmap = async () => {
+    const handleCreateRoadmap = async () => {
         setIsLoading(true)
-        const result = await createInitialRoadmap(clientId || undefined, clientData, counselorId || undefined)
-        if (result.success) {
-            notifyNotificationCheck()
-            const data = await getRoadmap(clientId || undefined, counselorId || undefined)
-            if (data && data.milestones) {
-                setSteps(JSON.parse(data.milestones))
-                if (data.required_skills) setSkills(JSON.parse(data.required_skills))
-                if (data.certifications) setCerts(JSON.parse(data.certifications))
-                setHasRoadmap(true)
+        setLoadingText("기본 로드맵 템플릿을 생성하고 있습니다...")
+        try {
+            const result = await createInitialRoadmap(clientId || undefined, clientData, counselorId || undefined)
+
+            if (result.success) {
+                // Refresh data
+                const data = await getRoadmap(clientId || undefined, counselorId || undefined)
+                if (data && data.milestones) {
+                    setSteps(JSON.parse(data.milestones))
+                    setSkills(JSON.parse(data.required_skills || '[]'))
+                    setCerts(JSON.parse(data.certifications || '[]'))
+                    setHasRoadmap(true)
+                    notifyNotificationCheck() // Simple feedback
+                }
+            } else {
+                console.error("Create Initial Roadmap failed:", result.error)
+                alert(`기본 로드맵 생성 실패: ${result.error}`)
             }
+        } catch (error) {
+            console.error(error)
+            alert("로드맵 생성 중 오류가 발생했습니다.")
         }
         setIsLoading(false)
     }
 
-    const handlePrint = () => {
-        window.print()
+    const handleAIRoadmap = async () => {
+        setIsLoading(true)
+        setLoadingText("AI가 고객님의 프로필을 분석하여 맞춤형 커리어 로드맵을 설계 중입니다...\\n(최대 1분 정도 소요될 수 있습니다)")
+        try {
+            console.log("Generating AI Roadmap...");
+            const result = await generateAIRoadmap(clientId || undefined, counselorId || undefined)
+            console.log("AI Result:", result);
+
+            if (result && result.success) {
+                // Refresh data
+                const data = await getRoadmap(clientId || undefined, counselorId || undefined)
+                if (data && data.milestones) {
+                    setSteps(JSON.parse(data.milestones))
+                    setSkills(JSON.parse(data.required_skills || '[]'))
+                    setCerts(JSON.parse(data.certifications || '[]'))
+                    setHasRoadmap(true)
+                }
+                if (result.examSchedules) {
+                    setExamSchedules(result.examSchedules)
+                }
+                alert("AI 로드맵 생성이 완료되었습니다!")
+            } else {
+                console.error("AI Roadmap generation failed", result?.error)
+                alert(`AI 로드맵 생성 실패: ${result?.error || '알 수 없는 오류'}`)
+            }
+        } catch (error) {
+            console.error("Error generating AI roadmap", error)
+            alert(`AI 로드맵 생성 중 오류 발생: ${error}`)
+        }
+        setIsLoading(false)
     }
 
     const handleDownload = () => {
-        // Create a text representation of the roadmap
         const roadmapText = steps.map((step, index) => {
             return `${index + 1}. ${step.title}\n   ${step.description}\n   상태: ${step.status}\n   ${step.date ? `날짜: ${step.date}` : ''}\n`
         }).join('\n')
 
         const fullText = `커리어 로드맵\n${'='.repeat(50)}\n\n${roadmapText}`
 
-        // Create blob and download
         const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -106,10 +148,15 @@ export default function RoadmapPage() {
         URL.revokeObjectURL(url)
     }
 
+
+
+    // ... (rest of handlers)
+
     if (isLoading) {
         return (
-            <div className="flex h-[50vh] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+            <div className="flex flex-col h-[50vh] items-center justify-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-purple-600" />
+                <p className="text-gray-500 font-medium text-center whitespace-pre-line">{loadingText}</p>
             </div>
         )
     }
@@ -128,7 +175,7 @@ export default function RoadmapPage() {
                     </div>
                 </div>
             )}
-            
+
             {/* Client Info Card */}
             {clientData && (
                 <Card className="bg-purple-50 border-purple-200">
@@ -185,114 +232,92 @@ export default function RoadmapPage() {
                             variant="outline"
                             size="sm"
                             className="h-8 px-2.5 text-xs gap-1"
-                            onClick={handleGenerateRoadmap}
+                            onClick={handleAIRoadmap}
                             title="최신 상담 및 프로필 데이터로 로드맵 갱신"
                             disabled={isLoading}
                         >
                             <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
                             AI 갱신
                         </Button>
-                        <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrint}>
-                            <Printer className="h-3.5 w-3.5" />
-                            출력
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handleDownload}>
-                            <Download className="h-3.5 w-3.5" />
-                            저장
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={handleAIRoadmap}
+                                className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200"
+                                disabled={isLoading}
+                            >
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                AI 맞춤 로드맵 {hasRoadmap ? '재설계' : '설계'}
+                            </Button>
+                            <Button variant="outline" onClick={() => window.print()}>
+                                <Printer className="w-4 h-4 mr-2" />
+                                인쇄
+                            </Button>
+                            <Button variant="outline" onClick={handleDownload}>
+                                <Download className="w-4 h-4 mr-2" />
+                                다운로드
+                            </Button>
+                        </div>
                     </div>
                 )}
             </div>
-
             {hasRoadmap ? (
                 <div className="space-y-12">
-                    {/* 커리어 로드맵 - 실제 캘린더 + 단기·중기·장기 구간 표시 */}
+                    {/* 커리어 로드맵 - Gantt Chart View */}
                     <Card className="overflow-hidden border-2 border-gray-200 shadow-lg">
                         <CardHeader className="bg-gray-50/80 border-b py-4">
                             <CardTitle className="text-center text-xl font-bold text-gray-900">
                                 커리어 로드맵 캘린더
                             </CardTitle>
-                            {/* 캘린더 위 [단기] [중기] [장기] 표시 */}
-                            <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 border border-blue-200 text-blue-800 font-semibold text-sm">
-                                    단기
-                                </span>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-100 border border-purple-200 text-purple-800 font-semibold text-sm">
-                                    중기
-                                </span>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 border border-amber-200 text-amber-800 font-semibold text-sm">
-                                    장기
-                                </span>
-                            </div>
                         </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-8 items-start">
-                                {/* 왼쪽: 실제 캘린더 (구간별 색상) */}
-                                <div className="flex flex-col items-center">
-                                    <Calendar
-                                        mode="single"
-                                        month={roadmapViewMonth}
-                                        onMonthChange={setRoadmapViewMonth}
-                                        className="rounded-lg border border-gray-200 bg-white"
-                                        modifiers={{
-                                            term_short: (d) => getRoadmapPeriod(d) === 'short',
-                                            term_mid: (d) => getRoadmapPeriod(d) === 'mid',
-                                            term_long: (d) => getRoadmapPeriod(d) === 'long',
-                                        }}
-                                        modifiersClassNames={{
-                                            term_short: "bg-blue-50/80 border border-blue-100",
-                                            term_mid: "bg-purple-50/80 border border-purple-100",
-                                            term_long: "bg-amber-50/80 border border-amber-100",
-                                        }}
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-2 text-center">오늘 기준 구간별 색상</p>
-                                </div>
-                                {/* 오른쪽: 단기·중기·장기 세부 내용 */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-                                    {[
-                                        { term: "단기", range: "1~3개월", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1) },
-                                        { term: "중기", range: "3~12개월", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2) },
-                                        { term: "장기", range: "1년 이상", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2) }
-                                    ].map((milestone, idx) => (
-                                        <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col", milestone.color)}>
-                                            <div className="font-bold text-sm mb-1">{milestone.term}</div>
-                                            <div className="text-xs opacity-90 mb-3">{milestone.range}</div>
-                                            <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
-                                                {milestone.steps.length === 0 ? (
-                                                    <p className="text-xs text-gray-500">해당 구간 목표 없음</p>
-                                                ) : (
-                                                    milestone.steps.map((step, stepIdx) => (
-                                                        <div key={step.id} className={cn("rounded-lg border p-3 text-left", milestone.stepColor)}>
-                                                            <div className="flex items-start justify-between gap-2 mb-1">
-                                                                <span className="text-[10px] font-semibold text-gray-500 uppercase">
-                                                                    {step.date || `단계 ${stepIdx + 1}`}
-                                                                </span>
-                                                                <Badge variant={step.status === 'completed' ? 'success' : step.status === 'in-progress' ? 'purple' : 'secondary'} className="text-[10px] shrink-0">
-                                                                    {step.status === 'completed' ? '완료' : step.status === 'in-progress' ? '진행중' : '대기'}
-                                                                </Badge>
-                                                            </div>
-                                                            <h4 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h4>
-                                                            <p className="text-xs text-gray-600 line-clamp-3">{step.description}</p>
-                                                            {step.actionItems && step.actionItems.length > 0 && (
-                                                                <ul className="mt-2 pt-2 border-t border-gray-200/60 space-y-1">
-                                                                    {step.actionItems.slice(0, 3).map((item, i) => (
-                                                                        <li key={i} className="text-[11px] text-gray-700 flex gap-1.5">
-                                                                            <span className="text-purple-500 shrink-0">•</span>
-                                                                            <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            )}
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                        <CardContent className="p-0">
+                            <RoadmapGantt steps={steps} year={roadmapViewMonth.getFullYear()} />
                         </CardContent>
                     </Card>
+
+                    {/* 구간별 상세 카드 (단기·중기·장기) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
+                        {[
+                            { term: "단기", range: "1~3개월", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1) },
+                            { term: "중기", range: "3~12개월", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2) },
+                            { term: "장기", range: "1년 이상", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2) }
+                        ].map((milestone, idx) => (
+                            <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col", milestone.color)}>
+                                <div className="font-bold text-sm mb-1">{milestone.term}</div>
+                                <div className="text-xs opacity-90 mb-3">{milestone.range}</div>
+                                <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
+                                    {milestone.steps.length === 0 ? (
+                                        <p className="text-xs text-gray-500">해당 구간 목표 없음</p>
+                                    ) : (
+                                        milestone.steps.map((step, stepIdx) => (
+                                            <div key={step.id} className={cn("rounded-lg border p-3 text-left", milestone.stepColor)}>
+                                                <div className="flex items-start justify-between gap-2 mb-1">
+                                                    <span className="text-[10px] font-semibold text-gray-500 uppercase">
+                                                        {step.date || `단계 ${stepIdx + 1}`}
+                                                    </span>
+                                                    <Badge variant={step.status === 'completed' ? 'success' : step.status === 'in-progress' ? 'purple' : 'secondary'} className="text-[10px] shrink-0">
+                                                        {step.status === 'completed' ? '완료' : step.status === 'in-progress' ? '진행중' : '대기'}
+                                                    </Badge>
+                                                </div>
+                                                <h4 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h4>
+                                                <p className="text-xs text-gray-600 line-clamp-3">{step.description}</p>
+                                                {step.actionItems && step.actionItems.length > 0 && (
+                                                    <ul className="mt-2 pt-2 border-t border-gray-200/60 space-y-1">
+                                                        {step.actionItems.slice(0, 3).map((item, i) => (
+                                                            <li key={i} className="text-[11px] text-gray-700 flex gap-1.5">
+                                                                <span className="text-purple-500 shrink-0">•</span>
+                                                                <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
 
                     {/* Detailed Analysis Sections */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -365,17 +390,21 @@ export default function RoadmapPage() {
                     </div>
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-dashed shadow-sm text-center">
-                    <div className="rounded-full bg-purple-100 p-4 mb-4">
-                        <Sparkles className="h-8 w-8 text-purple-600" />
+                <div className="text-center py-12">
+                    <div className="bg-gray-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <Sparkles className="w-8 h-8 text-gray-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">아직 로드맵이 없습니다</h3>
-                    <p className="text-gray-500 max-w-md mb-6">
-                        AI 분석을 통해 {clientData ? `${clientData.client_name} 님` : "나"}에게 딱 맞는 맞춤형 커리어 로드맵을 생성해보세요.
-                    </p>
-                    <Button onClick={handleGenerateRoadmap}>
-                        로드맵 생성하기
-                    </Button>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">아직 생성된 로드맵이 없습니다</h3>
+                    <p className="text-gray-500 mb-6">AI가 분석한 맞춤형 커리어 로드맵을 받아보세요.</p>
+                    <div className="flex gap-4 justify-center">
+                        <Button onClick={handleCreateRoadmap} variant="outline">
+                            기본 템플릿 생성
+                        </Button>
+                        <Button onClick={handleAIRoadmap} className="bg-purple-600 hover:bg-purple-700">
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            AI 로드맵 설계
+                        </Button>
+                    </div>
                 </div>
             )}
         </div>
