@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Copy, Save, Sparkles, RefreshCw, FileEdit, Check, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { saveDraft, deleteDraft, generateAIDrafts } from "@/app/(dashboard)/cover-letter/actions"
 import {
     DropdownMenu,
@@ -57,6 +57,7 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
         const title = drafts.find(d => d.id === selectedDraftId)?.title || "새로운 자기소개서"
         const result = await saveDraft(selectedDraftId, content, title, clientId)
         if (result.success) {
+            notifyNotificationCheck()
             setIsEditing(false)
             alert("저장되었습니다.")
         } else {
@@ -74,6 +75,7 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
         setIsGenerating(true)
         const result = await generateAIDrafts(clientId)
         if (result.success) {
+            notifyNotificationCheck()
             alert("3가지 버전의 AI 초안이 생성되었습니다.")
         } else {
             alert(result.error || "생성에 실패했습니다.")
@@ -185,6 +187,7 @@ ${content.replace(/\n/g, '\\par\n')}
         if (confirm("정말로 이 자기소개서를 삭제하시겠습니까?")) {
             const result = await deleteDraft(draftId)
             if (result.success) {
+                notifyNotificationCheck()
                 if (selectedDraftId === draftId) {
                     setSelectedDraftId("")
                     setContent("")

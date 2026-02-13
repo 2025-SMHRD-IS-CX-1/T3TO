@@ -5,6 +5,7 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-secondary",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -24,14 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
-        style={
-          {
-            "--font-primary": '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          } as React.CSSProperties
-        }
-      >
+      <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
         {children}
       </body>
     </html>
