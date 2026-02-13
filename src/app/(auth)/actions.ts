@@ -271,9 +271,12 @@ export async function signup(formData: FormData) {
 
         console.log('Signup successful for user:', data.user?.email)
 
+        // 회원가입 후 자동 로그인 방지: 세션 종료
+        await supabase.auth.signOut()
+
         revalidatePath('/', 'layout')
 
-        // 성공 상태 반환 - 이메일 인증 없이 바로 로그인 가능
+        // 성공 상태 반환 - 로그인 페이지로 리다이렉트
         return { 
             success: true, 
             needsEmailVerification: false 
@@ -310,67 +313,50 @@ export async function signInWithSocial(provider: 'google' | 'kakao' | 'naver') {
     }
 }
 
-/** 회원탈퇴: auth.users와 public.users 모두 삭제 */
+/** 회원탈퇴: RPC로 auth.users 삭제(회원탈퇴 버튼 시에만 권한 사용) → 트리거로 public.users·하위 데이터 삭제 */
 export async function deleteAccount() {
     try {
         const supabase = await createClient()
-        
-        // 현재 사용자 확인
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        
+
         if (userError || !user) {
             console.error('DeleteAccount: 사용자 확인 실패:', userError)
             return { error: '사용자 인증에 실패했습니다.' }
         }
-        
+
         const userId = user.id
-        
-        console.log('DeleteAccount: 회원탈퇴 시작', {
-            userId,
-            email: user.email
-        })
-        
-        // 1. RPC 함수를 통해 auth.users 삭제 (트리거가 public.users도 자동 삭제)
-        // setup_account_deletion.sql에서 생성한 delete_auth_user 함수 사용
+        const userIdStr = typeof userId === 'string' ? userId : String(userId)
+        console.log('DeleteAccount: 회원탈퇴 시작', { userId, email: user.email })
+
+        // 1. RPC 호출 (회원탈퇴 버튼 클릭 시에만 예외적으로 auth.users 삭제 권한 사용)
+        // 본인 계정만 삭제 가능, 트리거가 public.users 및 하위 데이터 자동 삭제
         const { error: rpcError } = await supabase.rpc('delete_auth_user', {
             user_id_param: userId
         })
-        
-        if (rpcError) {
-            console.error('DeleteAccount: RPC 함수 실행 실패:', rpcError)
-            
-            // RPC 함수가 없는 경우 수동으로 public.users만 삭제
-            const userIdStr = typeof userId === 'string' ? userId : String(userId)
-            const { error: deletePublicError } = await supabase
-                .from('users')
-                .delete()
-                .eq('user_id', userIdStr)
-            
-            if (deletePublicError) {
-                console.error('DeleteAccount: public.users 삭제 실패:', deletePublicError)
-                return { 
-                    error: `회원탈퇴 실패: ${rpcError.message}. public.users 삭제도 실패했습니다. setup_account_deletion.sql을 실행해주세요.` 
-                }
-            }
-            
-            // public.users만 삭제된 경우, auth.users는 수동으로 삭제 필요
-            console.warn('DeleteAccount: public.users만 삭제됨. auth.users는 Supabase 대시보드에서 수동 삭제 필요')
-            return { 
-                error: 'public.users는 삭제되었지만, auth.users 삭제를 위해 setup_account_deletion.sql을 실행해주세요.' 
+
+        if (!rpcError) {
+            console.log('DeleteAccount: RPC 성공 → auth.users 삭제, 트리거로 public.users·하위 데이터 삭제')
+            await supabase.auth.signOut()
+            return { success: true }
+        }
+
+        // 2. RPC 실패 시: public.users 삭제 시도 → 트리거가 auth.users 삭제
+        console.log('DeleteAccount: RPC 실패, public.users 삭제로 시도:', rpcError.message)
+        const { error: deletePublicError, data: deletePublicData } = await supabase
+            .from('users')
+            .delete()
+            .eq('user_id', userIdStr)
+            .select()
+
+        if (deletePublicError) {
+            console.error('DeleteAccount: public.users 삭제 실패:', deletePublicError)
+            return {
+                error: `회원탈퇴 실패: ${deletePublicError.message}. setup_auto_deletion.sql을 한 번 실행해주세요.`
             }
         }
-        
-        console.log('DeleteAccount: RPC 함수 실행 성공 (auth.users 및 public.users 삭제 완료)')
-        
-        // 2. 세션 종료 및 로그아웃
-        const { error: signOutError } = await supabase.auth.signOut()
-        
-        if (signOutError) {
-            console.error('DeleteAccount: 로그아웃 실패:', signOutError)
-        }
-        
-        console.log('DeleteAccount: 회원탈퇴 완료')
-        
+
+        console.log('DeleteAccount: public.users 삭제 성공, 트리거가 auth.users 삭제')
+        await supabase.auth.signOut()
         return { success: true }
     } catch (err: any) {
         console.error('DeleteAccount: 예상치 못한 에러:', err)
