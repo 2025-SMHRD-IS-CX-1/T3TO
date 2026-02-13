@@ -425,7 +425,20 @@ export default function DashboardPage() {
                                         "새 목표 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
                                     </p>
                                     <Button variant="outline" asChild>
-                                        <Link href="/roadmap">로드맵 페이지로 이동 <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                                        <Link
+                                            href={
+                                                (() => {
+                                                    const params = new URLSearchParams()
+                                                    const cid = selectedClientId || urlClientId
+                                                    if (cid) params.set("clientId", cid)
+                                                    if (counselorId) params.set("counselorId", counselorId)
+                                                    const qs = params.toString()
+                                                    return qs ? `/roadmap?${qs}` : "/roadmap"
+                                                })()
+                                            }
+                                        >
+                                            로드맵 페이지로 이동 <ArrowRight className="ml-2 h-4 w-4" />
+                                        </Link>
                                     </Button>
                                 </div>
                             </CardContent>

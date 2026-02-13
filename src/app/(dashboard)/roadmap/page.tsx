@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { RoadmapTimeline, type RoadmapStep } from "@/components/roadmap/timeline"
+import type { RoadmapStep } from "@/components/roadmap/timeline"
+import { RoadmapGantt } from "@/components/roadmap/roadmap-gantt"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar } from "@/components/ui/calendar"
 import { Download, Loader2, Sparkles, User, RefreshCw, Printer } from "lucide-react"
 import { getRoadmap, createInitialRoadmap, getClientProfile } from "./actions"
 import { Badge } from "@/components/ui/badge"
@@ -26,21 +26,7 @@ export default function RoadmapPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [hasRoadmap, setHasRoadmap] = useState(false)
     const [clientData, setClientData] = useState<any>(null)
-    const [roadmapViewMonth, setRoadmapViewMonth] = useState<Date>(() => new Date())
-
-    // 로드맵 구간: 오늘 기준 단기 1~3개월, 중기 3~12개월, 장기 1년+
-    const roadmapRef = new Date()
-    roadmapRef.setHours(0, 0, 0, 0)
-    const roadmapRefTime = roadmapRef.getTime()
-    const roadmapThreeMo = new Date(roadmapRef.getFullYear(), roadmapRef.getMonth() + 3, roadmapRef.getDate())
-    const roadmapTwelveMo = new Date(roadmapRef.getFullYear(), roadmapRef.getMonth() + 12, roadmapRef.getDate())
-    const getRoadmapPeriod = (d: Date) => {
-        const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-        if (t < roadmapRefTime) return null
-        if (t < roadmapThreeMo.getTime()) return 'short'
-        if (t < roadmapTwelveMo.getTime()) return 'mid'
-        return 'long'
-    }
+    const [roadmapViewMonth] = useState<Date>(() => new Date())
 
     useEffect(() => {
         const fetchData = async () => {
@@ -206,93 +192,56 @@ export default function RoadmapPage() {
 
             {hasRoadmap ? (
                 <div className="space-y-12">
-                    {/* 커리어 로드맵 - 실제 캘린더 + 단기·중기·장기 구간 표시 */}
+                    {/* 커리어 로드맵 - 가로 타임라인(분기) + 카테고리 그리드 */}
                     <Card className="overflow-hidden border-2 border-gray-200 shadow-lg">
-                        <CardHeader className="bg-gray-50/80 border-b py-4">
-                            <CardTitle className="text-center text-xl font-bold text-gray-900">
-                                커리어 로드맵 캘린더
-                            </CardTitle>
-                            {/* 캘린더 위 [단기] [중기] [장기] 표시 */}
-                            <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 border border-blue-200 text-blue-800 font-semibold text-sm">
-                                    단기
-                                </span>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-100 border border-purple-200 text-purple-800 font-semibold text-sm">
-                                    중기
-                                </span>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 border border-amber-200 text-amber-800 font-semibold text-sm">
-                                    장기
-                                </span>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-8 items-start">
-                                {/* 왼쪽: 실제 캘린더 (구간별 색상) */}
-                                <div className="flex flex-col items-center">
-                                    <Calendar
-                                        mode="single"
-                                        month={roadmapViewMonth}
-                                        onMonthChange={setRoadmapViewMonth}
-                                        className="rounded-lg border border-gray-200 bg-white"
-                                        modifiers={{
-                                            term_short: (d) => getRoadmapPeriod(d) === 'short',
-                                            term_mid: (d) => getRoadmapPeriod(d) === 'mid',
-                                            term_long: (d) => getRoadmapPeriod(d) === 'long',
-                                        }}
-                                        modifiersClassNames={{
-                                            term_short: "bg-blue-50/80 border border-blue-100",
-                                            term_mid: "bg-purple-50/80 border border-purple-100",
-                                            term_long: "bg-amber-50/80 border border-amber-100",
-                                        }}
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-2 text-center">오늘 기준 구간별 색상</p>
-                                </div>
-                                {/* 오른쪽: 단기·중기·장기 세부 내용 */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-                                    {[
-                                        { term: "단기", range: "1~3개월", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1) },
-                                        { term: "중기", range: "3~12개월", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2) },
-                                        { term: "장기", range: "1년 이상", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2) }
-                                    ].map((milestone, idx) => (
-                                        <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col", milestone.color)}>
-                                            <div className="font-bold text-sm mb-1">{milestone.term}</div>
-                                            <div className="text-xs opacity-90 mb-3">{milestone.range}</div>
-                                            <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
-                                                {milestone.steps.length === 0 ? (
-                                                    <p className="text-xs text-gray-500">해당 구간 목표 없음</p>
-                                                ) : (
-                                                    milestone.steps.map((step, stepIdx) => (
-                                                        <div key={step.id} className={cn("rounded-lg border p-3 text-left", milestone.stepColor)}>
-                                                            <div className="flex items-start justify-between gap-2 mb-1">
-                                                                <span className="text-[10px] font-semibold text-gray-500 uppercase">
-                                                                    {step.date || `단계 ${stepIdx + 1}`}
-                                                                </span>
-                                                                <Badge variant={step.status === 'completed' ? 'success' : step.status === 'in-progress' ? 'purple' : 'secondary'} className="text-[10px] shrink-0">
-                                                                    {step.status === 'completed' ? '완료' : step.status === 'in-progress' ? '진행중' : '대기'}
-                                                                </Badge>
-                                                            </div>
-                                                            <h4 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h4>
-                                                            <p className="text-xs text-gray-600 line-clamp-3">{step.description}</p>
-                                                            {step.actionItems && step.actionItems.length > 0 && (
-                                                                <ul className="mt-2 pt-2 border-t border-gray-200/60 space-y-1">
-                                                                    {step.actionItems.slice(0, 3).map((item, i) => (
-                                                                        <li key={i} className="text-[11px] text-gray-700 flex gap-1.5">
-                                                                            <span className="text-purple-500 shrink-0">•</span>
-                                                                            <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            )}
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                        <CardContent className="p-0">
+                            <RoadmapGantt steps={steps} year={roadmapViewMonth.getFullYear()} />
                         </CardContent>
                     </Card>
+
+                    {/* 구간별 상세 카드 (단기·중기·장기) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
+                        {[
+                            { term: "단기", range: "1~3개월", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1) },
+                            { term: "중기", range: "3~12개월", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2) },
+                            { term: "장기", range: "1년 이상", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2) }
+                        ].map((milestone, idx) => (
+                            <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col", milestone.color)}>
+                                <div className="font-bold text-sm mb-1">{milestone.term}</div>
+                                <div className="text-xs opacity-90 mb-3">{milestone.range}</div>
+                                <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
+                                    {milestone.steps.length === 0 ? (
+                                        <p className="text-xs text-gray-500">해당 구간 목표 없음</p>
+                                    ) : (
+                                        milestone.steps.map((step, stepIdx) => (
+                                            <div key={step.id} className={cn("rounded-lg border p-3 text-left", milestone.stepColor)}>
+                                                <div className="flex items-start justify-between gap-2 mb-1">
+                                                    <span className="text-[10px] font-semibold text-gray-500 uppercase">
+                                                        {step.date || `단계 ${stepIdx + 1}`}
+                                                    </span>
+                                                    <Badge variant={step.status === 'completed' ? 'success' : step.status === 'in-progress' ? 'purple' : 'secondary'} className="text-[10px] shrink-0">
+                                                        {step.status === 'completed' ? '완료' : step.status === 'in-progress' ? '진행중' : '대기'}
+                                                    </Badge>
+                                                </div>
+                                                <h4 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h4>
+                                                <p className="text-xs text-gray-600 line-clamp-3">{step.description}</p>
+                                                {step.actionItems && step.actionItems.length > 0 && (
+                                                    <ul className="mt-2 pt-2 border-t border-gray-200/60 space-y-1">
+                                                        {step.actionItems.slice(0, 3).map((item, i) => (
+                                                            <li key={i} className="text-[11px] text-gray-700 flex gap-1.5">
+                                                                <span className="text-purple-500 shrink-0">•</span>
+                                                                <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
 
                     {/* Detailed Analysis Sections */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
