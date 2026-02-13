@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { cn } from "@/lib/utils"
+import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,6 +37,8 @@ export default function ClientsPage() {
     const [selectedClient, setSelectedClient] = useState<any>(null)
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientId = searchParams.get('clientId')
@@ -101,7 +103,7 @@ export default function ClientsPage() {
             form?.reset()
             setSelectedClient(null)
             setIsEditing(false)
-            // 데이터 새로고침 (약간의 지연 후)
+            notifyNotificationCheck()
             setTimeout(async () => {
                 await fetchClientsData()
                 router.refresh()
@@ -147,13 +149,25 @@ export default function ClientsPage() {
         router.push(`/dashboard?${queryWithContext(clientId)}`)
     }
 
-    const handleDeleteClient = async (e: React.MouseEvent, id: string) => {
+    const handleOpenDeleteConfirm = (e: React.MouseEvent, id: string) => {
         e.stopPropagation()
-        if (!confirm("정말 삭제하시겠습니까?")) return
+        setDeleteConfirmId(id)
+    }
 
-        const result = await deleteClient(id, counselorId || undefined)
+    const handleConfirmDelete = async () => {
+        if (!deleteConfirmId) return
+        setIsDeleting(true)
+        const result = await deleteClient(deleteConfirmId, counselorId || undefined)
+        setIsDeleting(false)
+        setDeleteConfirmId(null)
         if (result.success) {
+            notifyNotificationCheck()
             await fetchClientsData()
+            if (deleteConfirmId === clientId) {
+                const params = new URLSearchParams(searchParams.toString())
+                params.delete("clientId")
+                router.push(params.toString() ? `/admin/clients?${params.toString()}` : "/admin/clients")
+            }
         } else {
             alert("삭제에 실패했습니다: " + result.error)
         }
@@ -167,13 +181,15 @@ export default function ClientsPage() {
                     <p className="text-muted-foreground">상담 중인 내담자의 진척도와 상태를 관리합니다.</p>
                 </div>
 
-                <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-                    setIsAddDialogOpen(open)
-                    if (!open) {
-                        setSelectedClient(null)
-                        setIsEditing(false)
-                    }
-                }}>
+                <div className="flex flex-nowrap items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+                        setIsAddDialogOpen(open)
+                        if (!open) {
+                            setSelectedClient(null)
+                            setIsEditing(false)
+                        }
+                    }}>
                     <Button onClick={handleOpenAddDialog}>
                         <Plus className="mr-2 h-4 w-4" /> 신규 내담자 등록
                     </Button>
@@ -282,6 +298,17 @@ export default function ClientsPage() {
                         </form>
                     </DialogContent>
                 </Dialog>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                        disabled={!clientId}
+                        onClick={(e) => clientId && handleOpenDeleteConfirm(e, clientId)}
+                    >
+                        삭제
+                    </Button>
+                </div>
 
                 {/* Detail Dialog */}
                 <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
@@ -380,6 +407,36 @@ export default function ClientsPage() {
                                 }}
                             >
                                 상담 일지 작성하기
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* 내담자 삭제 확인 다이얼로그 */}
+                <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+                    <DialogContent className="sm:max-w-[400px]">
+                        <DialogHeader>
+                            <DialogTitle>내담자 삭제</DialogTitle>
+                            <DialogDescription className="pt-1">
+                                정말로 이 내담자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 해당 내담자의 모든 데이터가 삭제됩니다.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="gap-2 sm:gap-0 pt-4">
+                            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={isDeleting}>
+                                취소
+                            </Button>
+                            <Button
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                                onClick={handleConfirmDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 삭제 중...
+                                    </>
+                                ) : (
+                                    "삭제"
+                                )}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -496,7 +553,7 @@ export default function ClientsPage() {
                                             <DropdownMenuItem onClick={(e) => handleOpenEditDialog(e, client)}>프로필 수정</DropdownMenuItem>
                                             <DropdownMenuItem
                                                 className="text-red-600"
-                                                onClick={(e) => handleDeleteClient(e, client.id)}
+                                                onClick={(e) => handleOpenDeleteConfirm(e, client.id)}
                                             >
                                                 삭제
                                             </DropdownMenuItem>
