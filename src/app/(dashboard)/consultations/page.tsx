@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/select"
 import { usePathname, useSearchParams } from "next/navigation"
 import { getConsultations, createConsultation, updateConsultation, deleteConsultation } from "./actions"
+import { useAdminContext } from "@/components/layout/shell"
+import { notifyNotificationCheck } from "@/lib/utils"
 
 export default function ConsultationsPage() {
     const [consultations, setConsultations] = useState<any[]>([])
@@ -35,17 +37,20 @@ export default function ConsultationsPage() {
     const [submitting, setSubmitting] = useState(false)
 
     const searchParams = useSearchParams()
+    const adminContext = useAdminContext()
     const clientId = searchParams.get('clientId')
+    const counselorId = searchParams.get('counselorId')
+    const isAdmin = adminContext?.role === 'admin'
 
     useEffect(() => {
         fetchData()
-    }, [clientId])
+    }, [clientId, counselorId])
 
     const fetchData = async () => {
         setLoading(true)
         const [consultationData, clientData] = await Promise.all([
-            getConsultations(clientId || undefined),
-            import('../admin/clients/actions').then(m => m.getClients())
+            getConsultations(clientId || undefined, counselorId || undefined),
+            import('../admin/clients/actions').then(m => m.getClients(counselorId || undefined))
         ])
         setConsultations(consultationData)
         setClients(clientData)
@@ -53,7 +58,7 @@ export default function ConsultationsPage() {
     }
 
     const fetchConsultations = async () => {
-        const data = await getConsultations(clientId || undefined)
+        const data = await getConsultations(clientId || undefined, counselorId || undefined)
         setConsultations(data)
     }
 
@@ -63,6 +68,7 @@ export default function ConsultationsPage() {
         const formData = new FormData(e.currentTarget)
         const result = await createConsultation(formData)
         if (result.success) {
+            notifyNotificationCheck()
             await fetchConsultations()
             setIsAddOpen(false)
         } else {
@@ -116,6 +122,7 @@ export default function ConsultationsPage() {
             clientId: (formData.get('clientId') as string) || null,
         })
         if (result.success) {
+            notifyNotificationCheck()
             await fetchData()
             setIsEditOpen(false)
             setEditingConsultation(null)
@@ -131,6 +138,7 @@ export default function ConsultationsPage() {
 
         const result = await deleteConsultation(id)
         if (result.success) {
+            notifyNotificationCheck()
             fetchData()
         } else {
             alert("삭제에 실패했습니다: " + result.error)
@@ -147,6 +155,19 @@ export default function ConsultationsPage() {
 
     return (
         <div className="space-y-6">
+            {/* 관리자가 상담사를 선택하지 않았을 때 안내 */}
+            {isAdmin && !counselorId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                    <div className="flex items-start gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <div>
+                            <p className="font-semibold mb-1">상담사를 선택해주세요</p>
+                            <p className="text-xs">왼쪽 사이드바에서 상담사를 선택하면 해당 상담사의 상담 기록을 확인할 수 있습니다.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">상담 관리</h1>
@@ -429,7 +450,7 @@ export default function ConsultationsPage() {
                                                 <CardTitle className="text-sm">핵심 가치관</CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-4 text-sm text-gray-700">
-                                                {analysis.values}
+                                                {analysis.career_values}
                                             </CardContent>
                                         </Card>
                                         <Card>
