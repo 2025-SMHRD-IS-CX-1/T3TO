@@ -358,6 +358,17 @@ ${content.replace(/\n/g, '\\par\n')}
                     </div>
                 </Card>
                 <div className="flex justify-end gap-2 pt-3 shrink-0">
+                    {selectedDraftId && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                            onClick={(e) => handleDelete(e, selectedDraftId)}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            삭제
+                        </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={handleCopy}>
                         <Copy className="mr-2 h-4 w-4" />
                         복사
