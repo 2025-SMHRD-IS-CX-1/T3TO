@@ -1,12 +1,10 @@
 "use client"
 
-"use client"
-
 import { useState, useEffect } from "react"
+import * as Diff from "diff"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Copy, Save, Sparkles, RefreshCw, FileEdit, Check, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
+import { Copy, Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { saveDraft, deleteDraft, generateAIDrafts } from "@/app/(dashboard)/cover-letter/actions"
 import {
@@ -50,6 +48,7 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
         setSelectedDraftId(draft.id)
         setContent(draft.content)
         setIsEditing(false)
+        setHighlightChunks(null)
     }
 
     const handleSave = async () => {
@@ -161,25 +160,31 @@ ${content.replace(/\n/g, '\\par\n')}
     }
 
     const [isPolishing, setIsPolishing] = useState(false)
+    /** 다듬기 후 원문 대비 변경된 구간 표시용 (added 청크만 하이라이트) */
+    const [highlightChunks, setHighlightChunks] = useState<Diff.Change[] | null>(null)
 
     const handleAiPolish = async () => {
         if (!content) return
         setIsPolishing(true)
+        const originalContent = content
 
         // Simulate AI processing delay
         await new Promise(resolve => setTimeout(resolve, 2000))
 
         const polishedContent = content + "\n\n(AI가 문맥을 매끄럽게 다듬고, 설득력 있는 표현으로 수정했습니다.)"
+        const chunks = Diff.diffWords(originalContent, polishedContent)
         setContent(polishedContent)
+        setHighlightChunks(chunks)
 
         setIsPolishing(false)
-        alert('AI 윤문이 완료되었습니다.')
+        alert('AI 다듬기가 완료되었습니다.')
     }
 
     const handleCreateNew = () => {
         setSelectedDraftId("")
         setContent("")
         setIsEditing(true)
+        setHighlightChunks(null)
     }
 
     const handleDelete = async (e: React.MouseEvent, draftId: string) => {
@@ -269,33 +274,32 @@ ${content.replace(/\n/g, '\\par\n')}
             {/* Right Content: Editor */}
             <div className="lg:col-span-9 flex flex-col h-full">
                 <Card className="flex-1 flex flex-col overflow-hidden shadow-sm border-gray-200">
-                    <div className="border-b p-4 flex items-center justify-between bg-gray-50">
-                        <div className="flex items-center gap-3">
-                            <Badge variant="purple" className="rounded-md">AI 생성됨</Badge>
-                            <span className="text-sm font-medium text-gray-600">
-                                {isEditing ? "편집 모드" : "미리보기 모드"}
-                            </span>
-                        </div>
+                    <div className="border-b p-4 flex items-center justify-end bg-gray-50">
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setIsEditing(!isEditing)}
+                                onClick={() => {
+                                setIsEditing(!isEditing)
+                                setHighlightChunks(null)
+                            }}
                             >
                                 <FileEdit className="mr-2 h-4 w-4" />
                                 {isEditing ? "완료" : "직접 수정"}
                             </Button>
-                            <Button variant="outline" size="sm" onClick={handleAiPolish} disabled={isPolishing || !content}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                title="문장을 자연스럽게 다듬고 표현을 정리합니다"
+                                onClick={handleAiPolish}
+                                disabled={isPolishing || !content}
+                            >
                                 {isPolishing ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
                                     <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
                                 )}
-                                AI 윤문
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={handleCopy}>
-                                <Copy className="mr-2 h-4 w-4" />
-                                복사
+                                AI 다듬기
                             </Button>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -317,35 +321,52 @@ ${content.replace(/\n/g, '\\par\n')}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                저장
-                            </Button>
                         </div>
                     </div>
 
                     <div className="flex-1 p-6 overflow-hidden bg-white">
                         {isEditing ? (
                             <textarea
-                                className="w-full h-full resize-none focus:outline-none text-base leading-relaxed text-gray-800 font-medium font-sans"
+                                className="w-full h-full resize-none focus:outline-none text-base leading-relaxed text-gray-800 font-medium font-sans min-h-0"
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
                                 placeholder="자기소개서 내용을 작성하세요..."
                             />
                         ) : (
                             <div className="h-full overflow-y-auto pr-2 prose prose-sm max-w-none text-gray-800 leading-relaxed whitespace-pre-line">
-                                {content || "등록된 내용이 없습니다."}
+                                {content
+                                    ? highlightChunks != null
+                                        ? highlightChunks.map((part, i) => {
+                                            if (part.added) {
+                                                return (
+                                                    <mark key={i} className="bg-amber-200/80 text-inherit rounded px-0.5">
+                                                        {part.value}
+                                                    </mark>
+                                                )
+                                            }
+                                            if (part.removed) return null
+                                            return <span key={i}>{part.value}</span>
+                                        })
+                                        : content
+                                    : "등록된 내용이 없습니다."}
                             </div>
                         )}
                     </div>
 
                     <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
                         <span>글자수: {content.length}자 (공백 포함)</span>
-                        <div className="flex items-center gap-2">
-                            <Check className="h-3 w-3 text-green-500" /> 자동 저장됨 (14:32)
-                        </div>
                     </div>
                 </Card>
+                <div className="flex justify-end gap-2 pt-3 shrink-0">
+                    <Button variant="outline" size="sm" onClick={handleCopy}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        복사
+                    </Button>
+                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        저장
+                    </Button>
+                </div>
             </div>
         </div>
     )
