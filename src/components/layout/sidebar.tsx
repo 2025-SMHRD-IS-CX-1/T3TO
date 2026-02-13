@@ -1,11 +1,36 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
-import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, LogOut, MessageSquare } from "lucide-react"
+import { usePathname, useSearchParams, useRouter } from "next/navigation"
+import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, LogOut, MessageSquare, UserCog, Shield, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useState } from "react"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { deleteAccount } from "@/app/(auth)/actions"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
-const globalNavigation = [
+// 상담사(user) 전용 메뉴
+const counselorNavigation = [
+    { name: "내담자 관리", href: "/dashboard", icon: Users },
+    { name: "일정 관리", href: "/schedule", icon: Calendar },
+]
+
+// 관리자(admin) 전용 메뉴
+const adminNavigation = [
     { name: "내담자 관리", href: "/admin/clients", icon: Users },
     { name: "일정 관리", href: "/schedule", icon: Calendar },
 ]
@@ -17,57 +42,153 @@ const clientSpecificNavigation = [
     { name: "자기소개서", href: "/cover-letter", icon: FileText },
 ]
 
-export function Sidebar() {
+type AdminContext = { role: 'admin' | 'user' | null; counselors: { id: string; email: string | null }[] }
+
+export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
+    const router = useRouter()
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const clientId = searchParams.get('clientId')
+    const counselorId = searchParams.get('counselorId')
+    const isAdmin = adminContext?.role === 'admin'
+    const counselors = adminContext?.counselors ?? []
 
     const getHref = (href: string) => {
-        if (!clientId || href.startsWith('/admin') || href === '/settings') return href
-        return `${href}?clientId=${clientId}`
+        const params = new URLSearchParams()
+        // 관리자가 상담사를 선택했을 때 counselorId 유지
+        if (isAdmin && counselorId) params.set('counselorId', counselorId)
+        // clientId는 /admin 경로가 아닌 경우에만 추가
+        if (clientId && !href.startsWith('/admin') && href !== '/settings') params.set('clientId', clientId)
+        const qs = params.toString()
+        return qs ? `${href}?${qs}` : href
+    }
+
+    const onCounselorChange = (value: string) => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (value) params.set('counselorId', value)
+        else params.delete('counselorId')
+        router.push(`${pathname}?${params.toString()}`)
     }
 
     return (
-        <div className="flex w-[280px] flex-col border-r bg-[#FAFBFC]">
-            <div className="flex h-16 items-center px-6 border-b">
-                <span className="text-xl font-bold text-purple-900">Career Bridge</span>
+        <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)]">
+            <div className="flex h-16 items-center px-4 border-b border-gray-100">
+                <Link href="/dashboard" className="flex items-center justify-center">
+                    <img src="/logo.png" alt="Career Bridge" className="h-12 w-auto object-contain mix-blend-multiply" />
+                </Link>
             </div>
             <div className="flex-1 overflow-y-auto py-4">
-                <nav className="space-y-6 px-3">
-                    {/* Global Menu */}
-                    <div>
-                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                            상시 메뉴
-                        </h3>
-                        <div className="space-y-1">
-                            {globalNavigation.map((item) => {
-                                const isActive = pathname === item.href
-                                const Icon = item.icon
-                                return (
-                                    <Link
-                                        key={item.name}
-                                        href={getHref(item.href)}
-                                        className={cn(
-                                            "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
-                                            isActive
-                                                ? "bg-purple-100 text-purple-900"
-                                                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                                        )}
-                                    >
-                                        <Icon
-                                            className={cn(
-                                                "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                                                isActive ? "text-purple-700" : "text-gray-400 group-hover:text-gray-500"
-                                            )}
-                                        />
-                                        {item.name}
-                                    </Link>
-                                )
-                            })}
+                {isAdmin && counselors.length > 0 && (
+                    <div className="px-3 mb-4">
+                        <label className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                            상담사 선택
+                        </label>
+                        <Select value={counselorId || ''} onValueChange={onCounselorChange}>
+                            <SelectTrigger className="w-full bg-white">
+                                <UserCog className="mr-2 h-4 w-4 text-gray-500" />
+                                <SelectValue placeholder="상담사를 선택하세요" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {counselors.map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                        {c.email || c.id.slice(0, 8)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {!counselorId && (
+                            <p className="px-3 mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                                ⚠️ 상담사를 선택하면 해당 상담사의 내담자 목록이 표시됩니다.
+                            </p>
+                        )}
+                    </div>
+                )}
+                {isAdmin && counselors.length === 0 && (
+                    <div className="px-3 mb-4">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                            ⚠️ 등록된 상담사가 없습니다. 상담사를 먼저 등록해주세요.
                         </div>
                     </div>
+                )}
+                <nav className="space-y-6 px-3">
+                    {/* 관리자 전용 메뉴 섹션 */}
+                    {isAdmin && (
+                        <div>
+                            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Shield className="h-3 w-3" />
+                                관리자 메뉴
+                            </h3>
+                            <div className="space-y-1">
+                                {adminNavigation.map((item) => {
+                                    const isActive = pathname === item.href
+                                    const Icon = item.icon
+                                    return (
+                                        <Link
+                                            key={item.name}
+                                            href={getHref(item.href)}
+                                            className={cn(
+                                                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
+                                                isActive
+                                                    ? "bg-purple-50 text-purple-900"
+                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                            )}
+                                        >
+                                            <div
+                                                className={cn(
+                                                    "mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition-colors",
+                                                    isActive && "bg-purple-600 text-white"
+                                                )}
+                                            >
+                                                <Icon className="h-4 w-4" />
+                                            </div>
+                                            {item.name}
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
 
-                    {/* Client Context Menu */}
+                    {/* 상담사 전용 메뉴 섹션 */}
+                    {!isAdmin && (
+                        <div>
+                            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                상시 메뉴
+                            </h3>
+                            <div className="space-y-1">
+                                {counselorNavigation.map((item) => {
+                                    const isActive = pathname === item.href
+                                    const Icon = item.icon
+                                    return (
+                                        <Link
+                                            key={item.name}
+                                            href={getHref(item.href)}
+                                            className={cn(
+                                                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
+                                                isActive
+                                                    ? "bg-purple-50 text-purple-900"
+                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                            )}
+                                        >
+                                            <div
+                                                className={cn(
+                                                    "mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition-colors",
+                                                    isActive && "bg-purple-600 text-white"
+                                                )}
+                                            >
+                                                <Icon className="h-4 w-4" />
+                                            </div>
+                                            {item.name}
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 내담자별 관리 - 상담사는 항상 접근 가능, 관리자는 상담사 선택 후 접근 가능 */}
                     <div>
                         <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                             내담자별 관리
@@ -77,13 +198,17 @@ export function Sidebar() {
                                 const isActive = pathname === item.href
                                 const Icon = item.icon
 
-                                if (!clientId) {
+                                // 관리자는 상담사 선택 없이도 접근 가능 (자신의 데이터는 없지만 페이지는 볼 수 있음)
+                                // 상담사는 clientId 없으면 비활성화
+                                if (!isAdmin && !clientId) {
                                     return (
                                         <div
                                             key={item.name}
                                             className="flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 cursor-not-allowed"
                                         >
-                                            <Icon className="mr-3 h-5 w-5 text-gray-200" />
+                                            <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-300">
+                                                <Icon className="h-4 w-4" />
+                                            </div>
                                             {item.name}
                                         </div>
                                     )
@@ -94,18 +219,20 @@ export function Sidebar() {
                                         key={item.name}
                                         href={getHref(item.href)}
                                         className={cn(
-                                            "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
+                                            "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                             isActive
-                                                ? "bg-purple-100 text-purple-900"
-                                                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                                ? "bg-purple-50 text-purple-900"
+                                                : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                                         )}
                                     >
-                                        <Icon
+                                        <div
                                             className={cn(
-                                                "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                                                isActive ? "text-purple-700" : "text-gray-400 group-hover:text-gray-500"
+                                                "mr-3 flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition-colors",
+                                                isActive && "bg-purple-600 text-white"
                                             )}
-                                        />
+                                        >
+                                            <Icon className="h-4 w-4" />
+                                        </div>
                                         {item.name}
                                     </Link>
                                 )
@@ -114,7 +241,7 @@ export function Sidebar() {
                     </div>
                 </nav>
             </div>
-            <div className="border-t p-4">
+            <div className="p-4 bg-white/95 shadow-[0_-1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm space-y-2">
                 <button
                     onClick={async () => {
                         const { createClient } = await import('@/lib/supabase/client')
@@ -127,7 +254,54 @@ export function Sidebar() {
                     <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                     로그아웃
                 </button>
+                <button
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 hover:text-red-700"
+                >
+                    <Trash2 className="mr-3 h-5 w-5 text-red-400 group-hover:text-red-500" />
+                    회원탈퇴
+                </button>
             </div>
+
+            {/* 회원탈퇴 확인 다이얼로그 */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>회원탈퇴</DialogTitle>
+                        <DialogDescription>
+                            정말로 회원탈퇴를 하시겠습니까? 이 작업은 되돌릴 수 없으며, 모든 데이터가 삭제됩니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDeleteDialogOpen(false)}
+                            disabled={isDeleting}
+                        >
+                            취소
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={async () => {
+                                setIsDeleting(true)
+                                const result = await deleteAccount()
+                                
+                                if (result.error) {
+                                    alert(`회원탈퇴 실패: ${result.error}`)
+                                    setIsDeleting(false)
+                                    setIsDeleteDialogOpen(false)
+                                } else {
+                                    // 성공 시 로그인 페이지로 이동
+                                    window.location.href = '/login'
+                                }
+                            }}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? '처리 중...' : '회원탈퇴'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

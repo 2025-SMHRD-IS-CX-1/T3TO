@@ -20,22 +20,23 @@ function Calendar({
         <DayPicker
             showOutsideDays={showOutsideDays}
             locale={ko}
+            navLayout="around"
             className={cn("p-3", className)}
             classNames={{
                 months: "flex flex-col space-y-4 w-full",
-                month: "space-y-4 w-full",
-                month_caption: "flex justify-center pt-1 relative items-center mb-6",
+                month: "grid w-full gap-4 grid-cols-[auto_1fr_auto] grid-rows-[auto_auto]",
+                month_caption: "flex justify-center pt-1 items-center",
+                month_grid: "w-full border-collapse col-span-3",
                 caption_label: "text-lg font-bold text-gray-900 px-4 py-1.5 bg-purple-50 rounded-full",
                 nav: "flex items-center gap-1 absolute inset-x-0 justify-between pointer-events-none px-2",
                 button_previous: cn(
                     buttonVariants({ variant: "ghost" }),
-                    "h-9 w-9 p-0 opacity-50 hover:opacity-100 pointer-events-auto text-purple-600"
+                    "h-9 w-9 p-0 opacity-80 hover:opacity-100 pointer-events-auto text-purple-600 shrink-0"
                 ),
                 button_next: cn(
                     buttonVariants({ variant: "ghost" }),
-                    "h-9 w-9 p-0 opacity-50 hover:opacity-100 pointer-events-auto text-purple-600"
+                    "h-9 w-9 p-0 opacity-80 hover:opacity-100 pointer-events-auto text-purple-600 shrink-0"
                 ),
-                month_grid: "w-full border-collapse",
                 weekdays: "flex w-full mb-4",
                 weekday:
                     "text-purple-400 w-full font-bold text-[0.9rem] flex items-center justify-center uppercase tracking-wider",
