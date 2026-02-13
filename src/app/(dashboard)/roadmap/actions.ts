@@ -2,6 +2,9 @@
 
 import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { EXAM_SCHEDULES } from '@/lib/roadmap-data'
+import { getIntegratedExamSchedules } from '@/lib/qnet'
+import { generateRoadmapWithAI } from '@/lib/ai-roadmap'
 
 export async function getRoadmap(profileId?: string, counselorId?: string | null) {
     const supabase = await createClient()
@@ -223,4 +226,178 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
 
     revalidatePath('/roadmap')
     return { success: true }
+}
+
+export async function getExamSchedules() {
+    // 1. Try to fetch real data from Q-Net
+    try {
+        const targetQuals = ["정보처리기사", "의공기사"];
+        const dynamicSchedules = await getIntegratedExamSchedules(targetQuals);
+
+        if (dynamicSchedules.length > 0) {
+            return dynamicSchedules;
+        }
+    } catch (e) {
+        console.error("Failed to fetch Q-Net data:", e);
+    }
+
+    // 2. Fallback to static data if API fails or returns empty
+    return EXAM_SCHEDULES
+}
+
+export async function generateAIRoadmap(clientId?: string, counselorId?: string | null) {
+    const supabase = await createClient()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    console.log(`[generateAIRoadmap] Start for user: ${userIdStr}, client: ${clientId}`);
+
+    if (!userIdStr) return { error: 'Unauthorized' }
+
+    let profileData = null;
+
+    if (clientId) {
+        profileData = await getClientProfile(clientId, counselorId)
+    } else {
+        const { data } = await supabase
+            .from('career_profiles')
+            .select('*')
+            .eq('user_id', userIdStr)
+            .limit(1) // Removed .single() to avoid error if multiple/none, handled below
+            // Actually .single() is fine if we expect one. Let's use maybeSingle()
+            .maybeSingle()
+        profileData = data;
+    }
+
+    if (!profileData) {
+        console.error("[generateAIRoadmap] Profile not found");
+        return { error: 'Profile not found' }
+    }
+    console.log("[generateAIRoadmap] Profile found:", profileData.client_name);
+
+    const existingRoadmap = await getRoadmap(clientId, counselorId)
+
+    const aiResult = await generateRoadmapWithAI(profileData, existingRoadmap)
+
+    if (!aiResult.success || !aiResult.plan) {
+        console.error(`[generateAIRoadmap] AI generation failed: ${aiResult.error || 'Plan is undefined'}`);
+        return { error: aiResult.error || 'Failed to generate roadmap with AI' }
+    }
+    console.log("[generateAIRoadmap] AI generated successfully, processing certs...");
+
+    const allCerts = new Set<string>();
+    const allEducation = new Set<string>();
+
+    const invalidValues = ['없음', '해당없음', '미정', 'TBD', 'None', 'N/A', 'null', 'undefined', '', '-'];
+
+    // Helper to check if a value is valid
+    const isValidItem = (item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        const cleanItem = item.trim();
+        return cleanItem.length > 1 && !invalidValues.includes(cleanItem) && !/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]*$/.test(cleanItem);
+    };
+
+    aiResult.plan.forEach((step: any) => {
+        if (step.certifications && Array.isArray(step.certifications)) {
+            step.certifications.forEach((cert: string) => {
+                if (isValidItem(cert)) allCerts.add(cert.trim());
+            });
+        }
+        if (step.education && Array.isArray(step.education)) {
+            step.education.forEach((edu: string) => {
+                if (isValidItem(edu)) allEducation.add(edu.trim());
+            });
+        }
+    });
+
+    if (allCerts.size === 0) {
+        // Only add default if absolutely nothing was found and user is likely IT/Engineering
+        // But for now, let's leave it empty if AI didn't suggest anything, or keep the fallback if strictly needed.
+        // allCerts.add('정보처리기사'); // Removed forced default to respect AI's decision if it returns nothing
+    }
+
+    const certArray = Array.from(allCerts);
+    const eduArray = Array.from(allEducation);
+
+    // Fetch exam schedules with a timeout to prevent blocking
+    let examSchedules: any[] = [];
+    try {
+        const schedulePromise = getIntegratedExamSchedules(certArray);
+        const timeoutPromise = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 5000));
+        examSchedules = await Promise.race([schedulePromise, timeoutPromise]);
+    } catch (e) {
+        console.error("Exam schedule fetch failed or timed out", e);
+        examSchedules = [];
+    }
+
+    const milestones = aiResult.plan.map((step: any, idx: number) => ({
+        id: `step-${idx + 1}`,
+        title: `${step.step_name}: ${step.job_roles.join(', ')} 준비`,
+        description: step.description || `추천 활동: ${step.activities.join(', ')}`,
+        status: idx === 0 ? 'in-progress' : 'locked',
+        date: '',
+        quizScore: 0,
+        resources: [],
+        actionItems: [
+            ...step.activities,
+            ...(step.certifications || []).map((c: string) => `${c} 자격증 취득 준비`),
+            ...(step.education || []).map((e: string) => `${e} 수강 및 이수`)
+        ],
+    }));
+
+    const skills = [
+        { title: "AI 추천 역량", desc: "AI가 분석한 주요 필요 역량", level: 80 },
+        ...new Set(aiResult.plan.flatMap((p: any) => p.competencies)).values()
+    ].map((skill: any, i: number) => {
+        if (typeof skill === 'string') return { title: skill, desc: "AI 추천 역량", level: 70 + (i * 2) % 20 };
+        return skill;
+    }).slice(0, 5);
+
+    const certItems = certArray.map(name => ({
+        type: "자격증",
+        name: name,
+        status: "준비 권장",
+        color: "text-blue-600 bg-blue-50"
+    }));
+
+    const eduItems = eduArray.map(name => ({
+        type: "교육",
+        name: name,
+        status: "수강 권장",
+        color: "text-green-600 bg-green-50"
+    }));
+
+    const certifications = [...certItems, ...eduItems];
+
+    const roadmapData = {
+        user_id: userIdStr,
+        profile_id: profileData.profile_id,
+        target_job: profileData.recommended_careers || 'AI 추천 직무',
+        target_company: profileData.target_company || '',
+        roadmap_stage: 'planning',
+        milestones: JSON.stringify(milestones),
+        required_skills: JSON.stringify(skills),
+        certifications: JSON.stringify(certifications),
+        timeline_months: 6,
+        is_active: true,
+        updated_at: new Date().toISOString()
+    }
+
+    let result;
+    if (existingRoadmap && existingRoadmap.roadmap_id) {
+        result = await supabase
+            .from('career_roadmaps')
+            .update(roadmapData)
+            .eq('roadmap_id', existingRoadmap.roadmap_id)
+    } else {
+        result = await supabase
+            .from('career_roadmaps')
+            .insert([roadmapData])
+    }
+
+    if (result.error) {
+        console.error("DB Save Error:", result.error)
+        return { error: result.error.message }
+    }
+
+    revalidatePath('/roadmap')
+    return { success: true, examSchedules }
 }
