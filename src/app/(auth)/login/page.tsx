@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Link from "next/link"
 import { login } from "../actions"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -22,7 +22,9 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [rememberMe, setRememberMe] = useState(false)
     const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([])
+    const [signupSuccess, setSignupSuccess] = useState(false)
     const router = useRouter()
+    const searchParams = useSearchParams()
 
     useEffect(() => {
         // Load saved accounts and remember me preference
@@ -35,7 +37,14 @@ export default function LoginPage() {
             // Pre-fill email if needed, or just set rememberMe
             setRememberMe(true)
         }
-    }, [])
+        
+        // 회원가입 성공 메시지 확인
+        if (searchParams.get('signup') === 'success') {
+            setSignupSuccess(true)
+            // URL에서 쿼리 파라미터 제거 (새로고침 시 메시지가 다시 나타나지 않도록)
+            router.replace('/login')
+        }
+    }, [searchParams, router])
 
     async function handleSubmit(formData: FormData) {
         setLoading(true)
@@ -150,6 +159,13 @@ export default function LoginPage() {
                                 계정 저장하기
                             </Label>
                         </div>
+
+                        {signupSuccess && (
+                            <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-xs font-medium">
+                                <p className="font-semibold mb-1">회원가입이 완료되었습니다!</p>
+                                <p>이메일과 비밀번호를 입력하여 로그인해주세요.</p>
+                            </div>
+                        )}
 
                         {error && (
                             <div className={`p-3 rounded-lg border text-xs font-medium ${
