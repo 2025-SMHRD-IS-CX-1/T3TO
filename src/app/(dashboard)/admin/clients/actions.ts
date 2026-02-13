@@ -15,16 +15,51 @@ export async function getClients(counselorId?: string | null) {
     // UUID를 문자열로 변환 (career_profiles.user_id는 VARCHAR(50))
     const userIdForQuery = typeof userIdStr === 'string' ? userIdStr : String(userIdStr)
 
-    const { data, error } = await supabase
+    // 먼저 모든 내담자 조회
+    const { data: profiles, error: profilesError } = await supabase
         .from('career_profiles')
         .select('*')
         .eq('user_id', userIdForQuery)
         .order('created_at', { ascending: false })
 
-    if (error) {
-        console.error('Error fetching clients (career_profiles):', error, { userIdStr, counselorId })
+    if (profilesError) {
+        console.error('Error fetching clients (career_profiles):', profilesError, { userIdStr, counselorId })
         return []
     }
+
+    if (!profiles || profiles.length === 0) {
+        console.log('⚠️ getClients: 내담자 데이터가 없습니다.', { 
+            userIdForQuery, 
+            counselorId, 
+            userIdStr,
+        })
+        return []
+    }
+
+    // 각 내담자별로 활성화된 로드맵 조회
+    const profileIds = profiles.map((p: any) => p.profile_id)
+    const { data: roadmaps, error: roadmapsError } = await supabase
+        .from('career_roadmaps')
+        .select('roadmap_id, profile_id, is_active, target_job, target_company, updated_at')
+        .in('profile_id', profileIds)
+        .eq('is_active', true)
+        .eq('user_id', userIdForQuery)
+
+    if (roadmapsError) {
+        console.warn('Error fetching roadmaps (non-critical):', roadmapsError)
+    }
+
+    // 로드맵을 profile_id로 그룹화
+    const roadmapMap = new Map()
+    if (roadmaps) {
+        roadmaps.forEach((r: any) => {
+            if (r.profile_id) {
+                roadmapMap.set(r.profile_id, r)
+            }
+        })
+    }
+
+    const data = profiles
 
     // [검증 로그] DB에서 가져온 첫 번째 데이터의 구조를 출력합니다.
     if (data && data.length > 0) {
@@ -33,29 +68,28 @@ export async function getClients(counselorId?: string | null) {
             first_id: data[0].profile_id,
             first_user_id: data[0].user_id,
             query_user_id: userIdForQuery,
-            match: data[0].user_id === userIdForQuery,
-        })
-    } else {
-        console.log('⚠️ getClients: 내담자 데이터가 없습니다.', { 
-            userIdForQuery, 
-            counselorId, 
-            userIdStr,
-            type_userIdForQuery: typeof userIdForQuery,
-            type_userIdStr: typeof userIdStr
+            roadmap_count: roadmapMap.size,
         })
     }
 
-    // Map DB fields to UI
-    return data.map((profile: any) => ({
-        ...profile,
-        id: profile.profile_id,
-        name: profile.client_name || '이름 없음',
-        email: profile.client_email || '-',
-        status: 'active',
-        progress: '0%',
-        lastActive: new Date(profile.created_at).toLocaleDateString(),
-        plan: 'Basic'
-    }))
+    // Map DB fields to UI with roadmap information
+    return data.map((profile: any) => {
+        // 로드맵 정보 추출 (활성화된 로드맵만)
+        const activeRoadmap = roadmapMap.get(profile.profile_id) || null
+        
+        return {
+            ...profile,
+            id: profile.profile_id,
+            name: profile.client_name || '이름 없음',
+            email: profile.client_email || '-',
+            status: 'active',
+            progress: '0%',
+            lastActive: new Date(profile.created_at).toLocaleDateString(),
+            plan: 'Basic',
+            hasRoadmap: !!activeRoadmap,
+            roadmap: activeRoadmap
+        }
+    })
 }
 
 export async function createClientProfile(formData: FormData, counselorId?: string | null) {

@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { getClients, createClientProfile, deleteClient } from "../admin/clients/actions"
 import { getLatestEvent } from "../schedule/actions"
+import { getRoadmap } from "../roadmap/actions"
 import { useAdminContext } from "@/components/layout/shell"
 import { notifyNotificationCheck } from "@/lib/utils"
 
@@ -36,6 +37,7 @@ export default function DashboardPage() {
     const [selectedClient, setSelectedClient] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [upcomingEvent, setUpcomingEvent] = useState<any>(null)
+    const [roadmapData, setRoadmapData] = useState<any>(null)
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -58,6 +60,16 @@ export default function DashboardPage() {
         }
     }, [clients, urlClientId])
 
+    // URL에서 clientId가 변경되면 로드맵 다시 가져오기
+    useEffect(() => {
+        if (urlClientId && selectedClientId) {
+            fetchRoadmap(urlClientId)
+        } else {
+            setRoadmapData(null)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [urlClientId, counselorId, selectedClientId])
+
     const fetchClients = async () => {
         setLoading(true)
         console.log('fetchClients: 내담자 목록 조회 시작', { counselorId })
@@ -72,11 +84,21 @@ export default function DashboardPage() {
         setUpcomingEvent(event)
     }
 
+    const fetchRoadmap = async (clientId: string) => {
+        const roadmap = await getRoadmap(clientId, counselorId || undefined)
+        setRoadmapData(roadmap)
+    }
+
     const handleClientSelect = (clientId: string) => {
         setSelectedClientId(clientId)
         const client = clients.find(c => c.id === clientId)
         setSelectedClient(client)
-        if (clientId) fetchUpcomingEvent(clientId)
+        if (clientId) {
+            fetchUpcomingEvent(clientId)
+            fetchRoadmap(clientId)
+        } else {
+            setRoadmapData(null)
+        }
 
         // URL 동기화: 선택 시 URL 파라미터를 업데이트하여 사이드바 등과 세션 유지
         const params = new URLSearchParams()
@@ -381,7 +403,18 @@ export default function DashboardPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                {roadmapData && roadmapData.milestones ? (() => {
+                                    try {
+                                        const milestones = JSON.parse(roadmapData.milestones)
+                                        const completed = milestones.filter((m: any) => m.status === 'completed' || m.status === 'in-progress').length
+                                        const total = milestones.length
+                                        return <div className="text-2xl font-bold text-gray-900">{completed}/{total} 단계</div>
+                                    } catch {
+                                        return <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                    }
+                                })() : (
+                                    <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                )}
                             </CardContent>
                         </Card>
                         <Card>
@@ -416,31 +449,100 @@ export default function DashboardPage() {
                                 <CardTitle>추천 로드맵</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex flex-col items-center justify-center py-8 text-center">
-                                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
-                                        <Map className="h-6 w-6" />
+                                {roadmapData && roadmapData.milestones ? (() => {
+                                    try {
+                                        const milestones = JSON.parse(roadmapData.milestones)
+                                        const firstStep = milestones[0]
+                                        return (
+                                            <div className="space-y-4">
+                                                <div className="border-l-4 border-purple-600 pl-4">
+                                                    <h3 className="font-semibold text-gray-900 mb-2">{firstStep?.title || '로드맵'}</h3>
+                                                    <p className="text-sm text-gray-600 line-clamp-2">{firstStep?.description || ''}</p>
+                                                    {roadmapData.target_job && (
+                                                        <div className="mt-2 flex items-center gap-2">
+                                                            <Badge variant="outline" className="text-xs">
+                                                                목표: {roadmapData.target_job}
+                                                                {roadmapData.target_company && ` @ ${roadmapData.target_company}`}
+                                                            </Badge>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 pt-2 border-t">
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link
+                                                            href={
+                                                                (() => {
+                                                                    const params = new URLSearchParams()
+                                                                    const cid = selectedClientId || urlClientId
+                                                                    if (cid) params.set("clientId", cid)
+                                                                    if (counselorId) params.set("counselorId", counselorId)
+                                                                    const qs = params.toString()
+                                                                    return qs ? `/roadmap?${qs}` : "/roadmap"
+                                                                })()
+                                                            }
+                                                        >
+                                                            전체 로드맵 보기 <ArrowRight className="ml-2 h-4 w-4" />
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )
+                                    } catch {
+                                        return (
+                                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
+                                                    <Map className="h-6 w-6" />
+                                                </div>
+                                                <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
+                                                <p className="text-xs text-muted-foreground mt-2 mb-4">
+                                                    "새 목표 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
+                                                </p>
+                                                <Button variant="outline" asChild>
+                                                    <Link
+                                                        href={
+                                                            (() => {
+                                                                const params = new URLSearchParams()
+                                                                const cid = selectedClientId || urlClientId
+                                                                if (cid) params.set("clientId", cid)
+                                                                if (counselorId) params.set("counselorId", counselorId)
+                                                                const qs = params.toString()
+                                                                return qs ? `/roadmap?${qs}` : "/roadmap"
+                                                            })()
+                                                        }
+                                                    >
+                                                        로드맵 페이지로 이동 <ArrowRight className="ml-2 h-4 w-4" />
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        )
+                                    }
+                                })() : (
+                                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
+                                            <Map className="h-6 w-6" />
+                                        </div>
+                                        <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
+                                        <p className="text-xs text-muted-foreground mt-2 mb-4">
+                                            "새 목표 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
+                                        </p>
+                                        <Button variant="outline" asChild>
+                                            <Link
+                                                href={
+                                                    (() => {
+                                                        const params = new URLSearchParams()
+                                                        const cid = selectedClientId || urlClientId
+                                                        if (cid) params.set("clientId", cid)
+                                                        if (counselorId) params.set("counselorId", counselorId)
+                                                        const qs = params.toString()
+                                                        return qs ? `/roadmap?${qs}` : "/roadmap"
+                                                    })()
+                                                }
+                                            >
+                                                로드맵 페이지로 이동 <ArrowRight className="ml-2 h-4 w-4" />
+                                            </Link>
+                                        </Button>
                                     </div>
-                                    <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
-                                    <p className="text-xs text-muted-foreground mt-2 mb-4">
-                                        "새 목표 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
-                                    </p>
-                                    <Button variant="outline" asChild>
-                                        <Link
-                                            href={
-                                                (() => {
-                                                    const params = new URLSearchParams()
-                                                    const cid = selectedClientId || urlClientId
-                                                    if (cid) params.set("clientId", cid)
-                                                    if (counselorId) params.set("counselorId", counselorId)
-                                                    const qs = params.toString()
-                                                    return qs ? `/roadmap?${qs}` : "/roadmap"
-                                                })()
-                                            }
-                                        >
-                                            로드맵 페이지로 이동 <ArrowRight className="ml-2 h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                </div>
+                                )}
                             </CardContent>
                         </Card>
                         <Card className="col-span-3">

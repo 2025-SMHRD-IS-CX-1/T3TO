@@ -506,8 +506,20 @@ export default function ClientsPage() {
                                     <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                                         {client.name}
                                         {client.plan === 'Premium' && <Crown className="h-3 w-3 text-yellow-500" />}
+                                        {client.hasRoadmap && (
+                                            <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 bg-blue-50 flex items-center gap-1">
+                                                <Map className="h-3 w-3" />
+                                                로드맵
+                                            </Badge>
+                                        )}
                                     </h3>
                                     <p className="text-sm text-gray-500">{client.email}</p>
+                                    {client.roadmap && (
+                                        <p className="text-xs text-gray-600 mt-1">
+                                            목표: {client.roadmap.target_job || '미정'}
+                                            {client.roadmap.target_company && ` @ ${client.roadmap.target_company}`}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
