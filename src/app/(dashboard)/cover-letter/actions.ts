@@ -4,6 +4,31 @@ import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createInitialRoadmap } from '../roadmap/actions'
 
+/** RAG API 미사용 시 쓰는 기본 템플릿 3종 */
+function getTemplateVersions(
+    profile: { client_name: string; major?: string },
+    targetJob: string,
+    insights: string
+): { type: string; title: string; content: string }[] {
+    return [
+        {
+            type: 'Version 1',
+            title: `${targetJob} - 역량 중심`,
+            content: `안녕하세요, ${targetJob} 지원자 ${profile.client_name}입니다.\n\n[역량 중심 초안]\n저는 ${profile.major} 전공을 통해 다져온 기초 지식과 ${insights ? insights.split('\n')[0] : '실무 역량'}을 바탕으로 팀에 기여하고 싶습니다. 특히 복잡한 문제를 논리적으로 해결하는 것에 강점이 있으며...`
+        },
+        {
+            type: 'Version 2',
+            title: `${targetJob} - 경험 중심`,
+            content: `안녕하세요, ${profile.client_name}입니다.\n\n[경험 중심 초안]\n저는 다양한 프로젝트와 실제 ${insights ? '분석된 강점' : '실무 경험'}을 통해 성취를 이뤄왔습니다. 사용자의 피드백을 반영하여 서비스를 개선했던 경험은 저에게 가장 큰 자산이며...`
+        },
+        {
+            type: 'Version 3',
+            title: `${targetJob} - 가치관 중심`,
+            content: `함께 성장하는 즐거움을 아는 ${profile.client_name}입니다.\n\n[가치관 중심 초안]\n저의 핵심 가치관은 ${insights ? insights.split('\n')[1] : '책임감과 소통'}입니다. 기술적인 완성도뿐만 아니라 동료와의 원활한 협업을 통해 시너지를 내는 것을 중요하게 생각합니다...`
+        }
+    ]
+}
+
 export async function getDrafts(profileId?: string, counselorId?: string | null) {
     const supabase = await createClient()
     const userIdStr = await getEffectiveUserId(counselorId)
@@ -126,41 +151,55 @@ export async function generateAIDrafts(clientId: string) {
 
     const targetJob = roadmap.target_job || '프론트엔드 개발자'
 
-    // 3. Define 3 Versions
-    const versions = [
-        {
-            type: 'Version 1',
-            title: `${targetJob} - 역량 중심`,
-            content: `안녕하세요, ${targetJob} 지원자 ${profile.client_name}입니다.\n\n[역량 중심 초안]\n저는 ${profile.major} 전공을 통해 다져온 기초 지식과 ${insights ? insights.split('\n')[0] : '실무 역량'}을 바탕으로 팀에 기여하고 싶습니다. 특히 복잡한 문제를 논리적으로 해결하는 것에 강점이 있으며...`
-        },
-        {
-            type: 'Version 2',
-            title: `${targetJob} - 경험 중심`,
-            content: `안녕하세요, ${profile.client_name}입니다.\n\n[경험 중심 초안]\n저는 다양한 프로젝트와 실제 ${insights ? '분석된 강점' : '실무 경험'}을 통해 성취를 이뤄왔습니다. 사용자의 피드백을 반영하여 서비스를 개선했던 경험은 저에게 가장 큰 자산이며...`
-        },
-        {
-            type: 'Version 3',
-            title: `${targetJob} - 가치관 중심`,
-            content: `함께 성장하는 즐거움을 아는 ${profile.client_name}입니다.\n\n[가치관 중심 초안]\n저의 핵심 가치관은 ${insights ? insights.split('\n')[1] : '책임감과 소통'}입니다. 기술적인 완성도뿐만 아니라 동료와의 원활한 협업을 통해 시너지를 내는 것을 중요하게 생각합니다...`
-        }
-    ]
+    // 3. RAG API가 설정되어 있으면 호출, 없으면 템플릿 사용
+    const ragApiUrl = process.env.RAG_COVER_LETTER_API_URL
+    let versions: { type: string; title: string; content: string }[]
 
-    // 4. Batch Insert (user_id 컬럼이 없을 수 있는 스키마 대응)
+    if (ragApiUrl) {
+        try {
+            const res = await fetch(ragApiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client_name: profile.client_name,
+                    major: profile.major ?? '',
+                    target_job: targetJob,
+                    insights,
+                    age_group: profile.age_group,
+                    education_level: profile.education_level,
+                }),
+            })
+            if (!res.ok) throw new Error(`RAG API ${res.status}`)
+            const data = await res.json()
+            if (data?.drafts && Array.isArray(data.drafts) && data.drafts.length >= 3) {
+                versions = data.drafts.slice(0, 3).map((d: { type?: string; title?: string; content?: string }) => ({
+                    type: d.type ?? 'Version',
+                    title: d.title ?? targetJob,
+                    content: d.content ?? '',
+                }))
+            } else {
+                versions = getTemplateVersions(profile, targetJob, insights)
+            }
+        } catch (e) {
+            console.error('RAG API 호출 실패, 템플릿 사용:', e)
+            versions = getTemplateVersions(profile, targetJob, insights)
+        }
+    } else {
+        versions = getTemplateVersions(profile, targetJob, insights)
+    }
+
+    // 4. Batch Insert (resume_drafts에는 user_id 컬럼 없음. version_type은 initial/revised/final/custom만 허용)
+    const versionTypeMap: Record<string, string> = { 'Version 1': 'initial', 'Version 2': 'revised', 'Version 3': 'final' }
     const rows = versions.map(v => ({
-        user_id: user.id,
+        draft_id: crypto.randomUUID(),
         roadmap_id: roadmap.roadmap_id,
         profile_id: clientId,
         target_position: v.title,
-        version_type: v.type,
+        version_type: versionTypeMap[v.type] ?? 'custom',
         draft_content: v.content,
         is_selected: false
     }))
-    let { error } = await supabase.from('resume_drafts').insert(rows)
-    if (error?.code === '42703') {
-        const withoutUserId = rows.map(({ user_id: _, ...r }) => r)
-        const res = await supabase.from('resume_drafts').insert(withoutUserId)
-        error = res.error ?? null
-    }
+    const { error } = await supabase.from('resume_drafts').insert(rows)
     if (error) return { error: error.message }
 
     revalidatePath('/cover-letter')
@@ -196,18 +235,15 @@ export async function saveDraft(draftId: string | null, content: string, title: 
             .eq('user_id', userIdStr)
             .single()
         if (!roadmap) return { error: '로드맵 정보가 필요합니다.' }
-        const insertRow: Record<string, unknown> = {
+        const insertRow = {
+            draft_id: crypto.randomUUID(),
             roadmap_id: roadmap.roadmap_id,
             profile_id: roadmap.profile_id,
             target_position: title,
-            version_type: 'Manual',
+            version_type: 'custom',
             draft_content: content
         }
-        let { error } = await supabase.from('resume_drafts').insert([{ ...insertRow, user_id: userIdStr }])
-        if (error?.code === '42703') {
-            const res = await supabase.from('resume_drafts').insert([insertRow])
-            error = res.error ?? null
-        }
+        const { error } = await supabase.from('resume_drafts').insert([insertRow])
         if (error) return { error: error.message }
     }
 
