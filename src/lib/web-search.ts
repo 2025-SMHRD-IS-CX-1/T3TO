@@ -34,11 +34,12 @@ export interface JobInfo {
  */
 async function searchWeb(query: string, maxResults = 5): Promise<SearchResult[]> {
     if (!TAVILY_API_KEY) {
-        console.warn('TAVILY_API_KEY not set, skipping web search')
+        console.warn('[Tavily API] TAVILY_API_KEY가 없어 웹 검색을 건너뜁니다')
         return []
     }
 
     try {
+        console.log(`[Tavily API] 웹 검색 시작 - 쿼리: "${query}", 최대 결과: ${maxResults}`)
         const res = await fetch('https://api.tavily.com/search', {
             method: 'POST',
             headers: {
@@ -55,7 +56,8 @@ async function searchWeb(query: string, maxResults = 5): Promise<SearchResult[]>
         })
 
         if (!res.ok) {
-            console.error(`Tavily API error: ${res.status}`)
+            const errorText = await res.text().catch(() => '')
+            console.error(`[Tavily API] 응답 실패 - 상태: ${res.status}, 내용: ${errorText.slice(0, 200)}`)
             return []
         }
 
@@ -76,9 +78,13 @@ async function searchWeb(query: string, maxResults = 5): Promise<SearchResult[]>
             })
         }
 
+        console.log(`[Tavily API] 웹 검색 완료 - 결과 수: ${results.length}, 요약: ${data.answer ? '있음' : '없음'}`)
         return results
     } catch (e) {
-        console.error('Web search error:', e)
+        console.error('[Tavily API] 웹 검색 에러:', e)
+        if (e instanceof Error) {
+            console.error('[Tavily API] 에러 메시지:', e.message)
+        }
         return []
     }
 }
@@ -87,7 +93,15 @@ async function searchWeb(query: string, maxResults = 5): Promise<SearchResult[]>
  * 목표 기업 정보 검색 (채용 공고, 인재상, 기술 스택)
  */
 export async function searchCompanyInfo(companyNames: string[]): Promise<CompanyInfo[]> {
-    if (!companyNames.length || !TAVILY_API_KEY) return []
+    if (!companyNames.length) {
+        console.warn('[Tavily API] 기업명이 없어 검색을 건너뜁니다')
+        return []
+    }
+    if (!TAVILY_API_KEY) {
+        console.warn('[Tavily API] TAVILY_API_KEY가 없어 기업 정보 검색을 건너뜁니다')
+        return []
+    }
+    console.log(`[Tavily API] 기업 정보 검색 시작 - 기업 수: ${companyNames.length}, 기업명: ${companyNames.join(', ')}`)
 
     const results: CompanyInfo[] = []
 
@@ -130,8 +144,10 @@ export async function searchCompanyInfo(companyNames: string[]): Promise<Company
             techStack: techStack || undefined,
             sources: allResults.slice(0, 5),
         })
+        console.log(`[Tavily API] ${company} 정보 수집 완료 - 채용: ${!!recruitmentInfo}, 인재상: ${!!talentProfile}, 기술스택: ${!!techStack}`)
     }
 
+    console.log(`[Tavily API] 기업 정보 검색 완료 - 총 ${results.length}개 기업`)
     return results
 }
 
@@ -139,7 +155,15 @@ export async function searchCompanyInfo(companyNames: string[]): Promise<Company
  * 목표 직무 정보 검색 (요구사항, 트렌드, 역량)
  */
 export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
-    if (!jobTitle || !TAVILY_API_KEY) return null
+    if (!jobTitle) {
+        console.warn('[Tavily API] 직무명이 없어 검색을 건너뜁니다')
+        return null
+    }
+    if (!TAVILY_API_KEY) {
+        console.warn('[Tavily API] TAVILY_API_KEY가 없어 직무 정보 검색을 건너뜁니다')
+        return null
+    }
+    console.log(`[Tavily API] 직무 정보 검색 시작 - 직무: "${jobTitle}"`)
 
     const queries = [
         `${jobTitle} 채용 요구사항 역량`,
@@ -171,11 +195,13 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
         .join('\n\n')
         .slice(0, 1000)
 
-    return {
+    const result = {
         jobTitle,
         requirements: requirements || undefined,
         trends: trends || undefined,
         skills: skills || undefined,
         sources: allResults.slice(0, 5),
     }
+    console.log(`[Tavily API] 직무 정보 검색 완료 - 요구사항: ${!!requirements}, 트렌드: ${!!trends}, 스킬: ${!!skills}`)
+    return result
 }
