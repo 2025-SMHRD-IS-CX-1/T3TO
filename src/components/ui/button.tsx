@@ -53,7 +53,25 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ({ className, variant, size, asChild = false, ...props }, ref) => {
+        // Hydration 에러 방지: asChild 사용 시 클라이언트에서만 렌더링
+        const [mounted, setMounted] = React.useState(false)
+        React.useEffect(() => {
+            setMounted(true)
+        }, [])
+
         const Comp = asChild ? Slot : "button"
+        
+        // 서버 사이드에서는 항상 button 사용 (hydration 에러 방지)
+        if (!mounted && asChild) {
+            return (
+                <button
+                    className={cn(buttonVariants({ variant, size, className }))}
+                    ref={ref}
+                    {...props}
+                />
+            )
+        }
+        
         return (
             <Comp
                 className={cn(buttonVariants({ variant, size, className }))}
