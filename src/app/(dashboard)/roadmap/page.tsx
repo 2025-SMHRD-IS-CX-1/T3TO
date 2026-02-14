@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { RoadmapStep } from "@/components/roadmap/timeline"
 import { RoadmapGantt } from "@/components/roadmap/roadmap-gantt"
@@ -128,24 +128,27 @@ export default function RoadmapPage() {
         window.print()
     }
 
-    const handleDownload = () => {
-        // Create a text representation of the roadmap
-        const roadmapText = steps.map((step, index) => {
-            return `${index + 1}. ${step.title}\n   ${step.description}\n   상태: ${step.status}\n   ${step.date ? `날짜: ${step.date}` : ''}\n`
-        }).join('\n')
+    const roadmapCaptureRef = useRef<HTMLDivElement>(null)
 
-        const fullText = `커리어 로드맵\n${'='.repeat(50)}\n\n${roadmapText}`
-
-        // Create blob and download
-        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `roadmap_${new Date().toISOString().split('T')[0]}.txt`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+    const handleDownload = async () => {
+        const el = roadmapCaptureRef.current
+        if (!el) return
+        try {
+            const { toPng } = await import("html-to-image")
+            const dataUrl = await toPng(el, {
+                pixelRatio: 2,
+                backgroundColor: "#ffffff",
+                cacheBust: true,
+            })
+            const filename = `roadmap_${(clientData?.client_name || "career").replace(/[/\\:*?"<>|]/g, "_")}_${new Date().toISOString().split("T")[0]}.png`
+            const link = document.createElement("a")
+            link.download = filename
+            link.href = dataUrl
+            link.click()
+        } catch (e) {
+            console.error("로드맵 이미지 저장 실패:", e)
+            alert("이미지 저장에 실패했습니다.")
+        }
     }
 
     if (isLoading) {
@@ -235,34 +238,35 @@ export default function RoadmapPage() {
                 </Card>
             )}
 
-            <div className="flex flex-row items-center justify-between gap-4">
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 whitespace-nowrap">
-                    {clientData ? `${clientData.client_name}님의 커리어 로드맵` : "나의 커리어 로드맵"}
-                </h1>
-                {hasRoadmap && (
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-2.5 text-xs gap-1"
-                            onClick={handleRefreshRoadmap}
-                            title="최신 상담 및 프로필 데이터로 로드맵 갱신"
-                            disabled={isLoading || isGenerating}
-                        >
-                            <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || isGenerating) && "animate-spin")} />
-                            AI 갱신
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrint}>
-                            <Printer className="h-3.5 w-3.5" />
-                            출력
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handleDownload}>
-                            <Download className="h-3.5 w-3.5" />
-                            저장
-                        </Button>
-                    </div>
-                )}
-            </div>
+            <div ref={roadmapCaptureRef}>
+                <div className="flex flex-row items-center justify-between gap-4">
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 whitespace-nowrap">
+                        {clientData ? `${clientData.client_name}님의 커리어 로드맵` : "나의 커리어 로드맵"}
+                    </h1>
+                    {hasRoadmap && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2.5 text-xs gap-1"
+                                onClick={handleRefreshRoadmap}
+                                title="최신 상담 및 프로필 데이터로 로드맵 갱신"
+                                disabled={isLoading || isGenerating}
+                            >
+                                <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || isGenerating) && "animate-spin")} />
+                                AI 갱신
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrint}>
+                                <Printer className="h-3.5 w-3.5" />
+                                출력
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handleDownload}>
+                                <Download className="h-3.5 w-3.5" />
+                                저장
+                            </Button>
+                        </div>
+                    )}
+                </div>
 
             {hasRoadmap ? (
                 <div className="space-y-12">
@@ -559,6 +563,7 @@ export default function RoadmapPage() {
                     </Button>
                 </div>
             )}
+            </div>
             </div>
         </>
     )
