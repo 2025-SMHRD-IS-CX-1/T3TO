@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Bell, Search, User, LogOut, Settings, Trash2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { ClientOnly } from "@/components/client-only"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -139,8 +140,16 @@ export function Navbar() {
             </div>
 
             <div className="flex items-center space-x-4">
-
-
+                <ClientOnly
+                    fallback={
+                        <>
+                            <div className="relative flex h-10 w-10 items-center justify-center rounded-md border-0 bg-transparent">
+                                <Bell className="h-5 w-5 text-gray-600" />
+                            </div>
+                            <div className="h-8 w-8 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-xs" />
+                        </>
+                    }
+                >
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
@@ -165,7 +174,7 @@ export function Navbar() {
                     >
                         {/* 헤더 + 구분선 */}
                         <div className="px-3 py-3 shadow-[0_1px_0_rgba(148,163,184,0.12)]">
-                            <p className="text-sm font-semibold text-gray-800">알림</p>
+                            <p className="text-sm font-semibold text-black">알림</p>
                         </div>
                         {/* 액션: 모두 읽음만 */}
                         <div className="flex items-center justify-end px-3 py-2.5 bg-slate-50/60 shadow-[0_1px_0_rgba(148,163,184,0.1)]">
@@ -179,32 +188,32 @@ export function Navbar() {
                             </button>
                         </div>
                         {notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated) ? (
-                            <div key={`read-${JSON.stringify(readAt)}`} className="text-sm text-gray-700 max-h-80 overflow-y-auto">
+                            <div key={`read-${JSON.stringify(readAt)}`} className="text-sm text-black max-h-80 overflow-y-auto">
                                 {notifDetail.clientsUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("clients", notifDetail.clientsLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>내담자가 추가/변경되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("clients", notifDetail.clientsLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>내담자가 추가/변경되었습니다.</div>
                                 )}
                                 {notifDetail.calendarUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("calendar", notifDetail.calendarLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>새 상담 일정이 생성/변경되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("calendar", notifDetail.calendarLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>새 상담 일정이 생성/변경되었습니다.</div>
                                 )}
                                 {notifDetail.roadmapUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("roadmap", notifDetail.roadmapLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>로드맵 내용이 업데이트되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("roadmap", notifDetail.roadmapLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>로드맵 내용이 업데이트되었습니다.</div>
                                 )}
                                 {notifDetail.resumeUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("resume", notifDetail.resumeLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>자기소개서 초안이 작성/수정되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("resume", notifDetail.resumeLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>자기소개서 초안이 작성/수정되었습니다.</div>
                                 )}
                                 {notifDetail.consultationUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("consultation", notifDetail.consultationLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>상담 기록이 추가/수정되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("consultation", notifDetail.consultationLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>상담 기록이 추가/수정되었습니다.</div>
                                 )}
                             </div>
                         ) : (
-                            <div className="px-3 py-6 text-xs text-gray-500 text-center">
+                            <div className="px-3 py-6 text-xs text-black text-center">
                                 새로운 알림이 없습니다.
                             </div>
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <DropdownMenu>
+                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <div className="h-8 w-8 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-xs shadow-sm cursor-pointer hover:bg-purple-200 transition-colors">
                             {userInitial}
@@ -249,7 +258,8 @@ export function Navbar() {
                             <span>회원탈퇴</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenu>
+                </ClientOnly>
             </div>
 
             {/* 회원탈퇴 확인 다이얼로그 */}
