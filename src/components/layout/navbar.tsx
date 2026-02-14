@@ -57,7 +57,7 @@ export function Navbar() {
         const prev = stored ? (() => { try { return JSON.parse(stored) as Record<string, string> } catch { return {} } })() : {}
         const merged = { ...prev, ...next }
         window.localStorage.setItem("cb_notification_read", JSON.stringify(merged))
-        setReadAt(() => merged)
+        setReadAt(merged)
         window.localStorage.setItem("cb_last_seen_notification_at", latestChange || new Date().toISOString())
         setHasNotification(false)
     }
@@ -65,7 +65,10 @@ export function Navbar() {
     const isUnread = (key: string, latest: string | null) => {
         if (!latest) return false
         const read = readAt[key]
-        return !read || new Date(latest).getTime() > new Date(read).getTime()
+        if (!read) return true
+        const tLatest = new Date(latest).getTime()
+        const tRead = new Date(read).getTime()
+        return Number.isNaN(tLatest) || Number.isNaN(tRead) || tLatest > tRead
     }
 
 
@@ -178,19 +181,19 @@ export function Navbar() {
                         {notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated) ? (
                             <div key={`read-${JSON.stringify(readAt)}`} className="text-sm text-gray-700 max-h-80 overflow-y-auto">
                                 {notifDetail.clientsUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("clients", notifDetail.clientsLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>내담자가 추가/변경되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("clients", notifDetail.clientsLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>내담자가 추가/변경되었습니다.</div>
                                 )}
                                 {notifDetail.calendarUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("calendar", notifDetail.calendarLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>새 상담 일정이 생성/변경되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("calendar", notifDetail.calendarLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>새 상담 일정이 생성/변경되었습니다.</div>
                                 )}
                                 {notifDetail.roadmapUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("roadmap", notifDetail.roadmapLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>로드맵 내용이 업데이트되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("roadmap", notifDetail.roadmapLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>로드맵 내용이 업데이트되었습니다.</div>
                                 )}
                                 {notifDetail.resumeUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("resume", notifDetail.resumeLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>자기소개서 초안이 작성/수정되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("resume", notifDetail.resumeLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>자기소개서 초안이 작성/수정되었습니다.</div>
                                 )}
                                 {notifDetail.consultationUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("consultation", notifDetail.consultationLatest) ? "bg-purple-50/80" : "bg-gray-50/60"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>상담 기록이 추가/수정되었습니다.</div>
+                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("consultation", notifDetail.consultationLatest) ? "bg-purple-100" : "bg-slate-100"}`}><span className="text-[10px] text-slate-400 shrink-0">•</span>상담 기록이 추가/수정되었습니다.</div>
                                 )}
                             </div>
                         ) : (
