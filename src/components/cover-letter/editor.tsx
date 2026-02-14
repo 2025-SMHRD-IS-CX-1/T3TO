@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import * as Diff from "diff"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Copy, Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
+import { Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { saveDraft, deleteDraft, generateAIDrafts } from "@/app/(dashboard)/cover-letter/actions"
 import {
@@ -86,15 +86,6 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
             alert(result.error || "생성에 실패했습니다.")
         }
         setIsGenerating(false)
-    }
-
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(content)
-            alert('자기소개서 내용이 클립보드에 복사되었습니다!')
-        } catch (err) {
-            alert('복사에 실패했습니다.')
-        }
     }
 
     // 다운로드용 파일명: 특수문자 제거
@@ -344,10 +335,6 @@ p { white-space: pre-wrap; }
                             삭제
                         </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={handleCopy}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        복사
-                    </Button>
                     <Button size="sm" onClick={handleSave} disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         저장

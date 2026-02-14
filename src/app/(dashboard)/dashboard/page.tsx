@@ -25,9 +25,10 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { getClients, createClientProfile, deleteClient } from "../admin/clients/actions"
+import { getClients, createClientProfile, deleteClient, updateClientProfile } from "../admin/clients/actions"
 import { getLatestEvent } from "../schedule/actions"
 import { getRoadmap } from "../roadmap/actions"
+import { getDrafts } from "../cover-letter/actions"
 import { useAdminContext } from "@/components/layout/shell"
 import { notifyNotificationCheck } from "@/lib/utils"
 
@@ -42,6 +43,9 @@ export default function DashboardPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+    const [isSavingEdit, setIsSavingEdit] = useState(false)
+    const [draftCount, setDraftCount] = useState(0)
 
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -69,6 +73,15 @@ export default function DashboardPage() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [urlClientId, counselorId, selectedClientId])
+
+    // 선택된 내담자의 자기소개서 초안 개수
+    useEffect(() => {
+        if (!selectedClientId) {
+            setDraftCount(0)
+            return
+        }
+        getDrafts(selectedClientId, counselorId || undefined).then((list) => setDraftCount(list.length))
+    }, [selectedClientId, counselorId])
 
     const fetchClients = async () => {
         setLoading(true)
@@ -130,6 +143,27 @@ export default function DashboardPage() {
             alert("내담자 추가에 실패했습니다: " + result.error)
         }
         setIsSubmitting(false)
+    }
+
+    const handleEditProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        if (!selectedClientId) return
+        setIsSavingEdit(true)
+        const form = e.currentTarget
+        const formData = new FormData(form)
+        const result = await updateClientProfile(selectedClientId, formData, counselorId || undefined)
+        setIsSavingEdit(false)
+        if (result.success) {
+            setIsEditDialogOpen(false)
+            notifyNotificationCheck()
+            const updated = await getClients(counselorId || undefined)
+            setClients(updated)
+            const next = updated.find((c: { id: string }) => c.id === selectedClientId)
+            if (next) setSelectedClient(next)
+            router.refresh()
+        } else {
+            alert("수정에 실패했습니다: " + (result as { error?: string }).error)
+        }
     }
 
     const handleConfirmDelete = async () => {
@@ -365,6 +399,109 @@ export default function DashboardPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* 내담자 정보 수정 다이얼로그 */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle>내담자 정보 수정</DialogTitle>
+                        <DialogDescription>
+                            {selectedClient?.name}님의 정보를 수정합니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedClient && (
+                        <form onSubmit={handleEditProfile} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-name">이름 *</Label>
+                                    <Input id="edit-name" name="name" defaultValue={selectedClient.name} placeholder="홍길동" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-email">이메일 *</Label>
+                                    <Input id="edit-email" name="email" type="email" defaultValue={selectedClient.email} placeholder="hong@example.com" required />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-gender">성별</Label>
+                                    <select id="edit-gender" name="gender" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient.gender ?? ''}>
+                                        <option value="">선택 안 함</option>
+                                        <option value="남성">남성</option>
+                                        <option value="여성">여성</option>
+                                        <option value="기타">기타</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-age_group">연령대</Label>
+                                    <select id="edit-age_group" name="age_group" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient.age_group ?? ''}>
+                                        <option value="">선택 안 함</option>
+                                        <option value="10대">10대</option>
+                                        <option value="20대">20대</option>
+                                        <option value="30대">30대</option>
+                                        <option value="40대">40대</option>
+                                        <option value="50대 이상">50대 이상</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-education_level">학력</Label>
+                                    <select id="edit-education_level" name="education_level" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient.education_level ?? ''}>
+                                        <option value="">선택 안 함</option>
+                                        <option value="고등학교 졸업">고등학교 졸업</option>
+                                        <option value="전문대 졸업">전문대 졸업</option>
+                                        <option value="대학교 재학">대학교 재학</option>
+                                        <option value="대학교 졸업">대학교 졸업</option>
+                                        <option value="석사">석사</option>
+                                        <option value="박사">박사</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-major">전공</Label>
+                                    <Input id="edit-major" name="major" defaultValue={selectedClient.major ?? ''} placeholder="컴퓨터공학" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-work_experience">경력 연차 (숫자)</Label>
+                                <Input id="edit-work_experience" name="work_experience" type="text" defaultValue={selectedClient.work_experience_years ?? ''} placeholder="0" />
+                            </div>
+                            <div className="space-y-4 pt-2 border-t mt-4">
+                                <h4 className="text-sm font-bold text-gray-900">추가 분석 정보</h4>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-career_orientation">진로 성향</Label>
+                                    <Textarea id="edit-career_orientation" name="career_orientation" defaultValue={selectedClient.career_orientation ?? ''} placeholder="예: 안정적인 대기업 환경 선호" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-skill_vector">보유 기술 (스택)</Label>
+                                    <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector ?? ''} placeholder="예: React, Node.js, Python" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-recommended_careers">희망 직무</Label>
+                                    <Input id="edit-recommended_careers" name="recommended_careers" defaultValue={selectedClient.recommended_careers ?? ''} placeholder="예: 프론트엔드 개발자" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-target_company">목표 기업</Label>
+                                    <Input id="edit-target_company" name="target_company" defaultValue={selectedClient.target_company ?? ''} placeholder="예: 네이버, 토스" />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                                    취소
+                                </Button>
+                                <Button type="submit" disabled={isSavingEdit}>
+                                    {isSavingEdit ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장 중...
+                                        </>
+                                    ) : (
+                                        "저장"
+                                    )}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
             {!selectedClient ? (
                 <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-16">
@@ -382,9 +519,12 @@ export default function DashboardPage() {
                 </Card>
             ) : (
                 <>
-                    {/* Stats Cards */}
+                    {/* Stats Cards - 클릭 시 수정/조회 페이지로 이동 */}
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
+                        <Card
+                            className="cursor-pointer transition-colors hover:bg-gray-50/80"
+                            onClick={() => setIsEditDialogOpen(true)}
+                        >
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">{selectedClient.name}님 정보</CardTitle>
                                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
@@ -393,54 +533,64 @@ export default function DashboardPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-gray-900">{selectedClient.name}</div>
+                                <p className="text-xs text-muted-foreground mt-1">클릭하여 정보 수정</p>
                             </CardContent>
                         </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">로드맵 진행률</CardTitle>
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                                    <Map className="h-4 w-4" />
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {roadmapData && roadmapData.milestones ? (() => {
-                                    try {
-                                        const milestones = JSON.parse(roadmapData.milestones)
-                                        const completed = milestones.filter((m: any) => m.status === 'completed' || m.status === 'in-progress').length
-                                        const total = milestones.length
-                                        return <div className="text-2xl font-bold text-gray-900">{completed}/{total} 단계</div>
-                                    } catch {
-                                        return <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
-                                    }
-                                })() : (
-                                    <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
-                                )}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">자기소개서</CardTitle>
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                                    <FileText className="h-4 w-4" />
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-gray-900">0개 초안</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">다가오는 일정</CardTitle>
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                                    <Calendar className="h-4 w-4" />
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-xl font-bold text-gray-900 truncate">
-                                    {upcomingEvent ? upcomingEvent.title : "-"}
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
+                            <Card className="cursor-pointer transition-colors hover:bg-gray-50/80">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">로드맵 진행률</CardTitle>
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                        <Map className="h-4 w-4" />
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    {roadmapData && roadmapData.milestones ? (() => {
+                                        try {
+                                            const milestones = JSON.parse(roadmapData.milestones)
+                                            const completed = milestones.filter((m: any) => m.status === 'completed' || m.status === 'in-progress').length
+                                            const total = milestones.length
+                                            return <div className="text-2xl font-bold text-gray-900">{completed}/{total} 단계</div>
+                                        } catch {
+                                            return <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                        }
+                                    })() : (
+                                        <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                    )}
+                                    <p className="text-xs text-muted-foreground mt-1">클릭하여 로드맵 조회</p>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                        <Link href={`/cover-letter?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
+                            <Card className="cursor-pointer transition-colors hover:bg-gray-50/80">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">자기소개서</CardTitle>
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                        <FileText className="h-4 w-4" />
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-gray-900">{draftCount}개 초안</div>
+                                    <p className="text-xs text-muted-foreground mt-1">클릭하여 작성·조회</p>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                        <Link href={`/schedule?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
+                            <Card className="cursor-pointer transition-colors hover:bg-gray-50/80">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">다가오는 일정</CardTitle>
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                        <Calendar className="h-4 w-4" />
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-xl font-bold text-gray-900 truncate">
+                                        {upcomingEvent ? upcomingEvent.title : "-"}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">클릭하여 일정 조회</p>
+                                </CardContent>
+                            </Card>
+                        </Link>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
