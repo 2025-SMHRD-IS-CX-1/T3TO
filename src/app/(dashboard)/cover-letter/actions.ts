@@ -59,7 +59,15 @@ export async function getDrafts(profileId?: string, counselorId?: string | null)
     }
 
     const list = data ?? []
-    return list.map((draft: any) => ({
+    // 최신 3개만 유지, 그 외 예전 버전은 DB에서 삭제
+    const latest = list.slice(0, 3)
+    const toDelete = list.slice(3)
+    if (toDelete.length > 0) {
+        const idsToDelete = toDelete.map((d: { draft_id: string }) => d.draft_id)
+        await supabase.from('resume_drafts').delete().in('draft_id', idsToDelete)
+    }
+
+    return latest.map((draft: any) => ({
         id: draft.draft_id,
         title: draft.target_position || (Array.isArray(draft.career_roadmaps) ? draft.career_roadmaps[0]?.target_job : draft.career_roadmaps?.target_job) || '제목 없음',
         date: new Date(draft.created_at).toLocaleDateString(),
@@ -188,7 +196,14 @@ export async function generateAIDrafts(clientId: string) {
         versions = getTemplateVersions(profile, targetJob, insights)
     }
 
-    // 4. Batch Insert (resume_drafts에는 user_id 컬럼 없음. version_type은 initial/revised/final/custom만 허용)
+    // 4. 해당 내담자(profile_id) + 현재 로드맵의 기존 초안 전부 삭제 후, 새 3종만 삽입 (갱신)
+    const { error: deleteError } = await supabase
+        .from('resume_drafts')
+        .delete()
+        .eq('profile_id', clientId)
+        .eq('roadmap_id', roadmap.roadmap_id)
+    if (deleteError) return { error: '기존 초안 삭제 실패: ' + deleteError.message }
+
     const versionTypeMap: Record<string, string> = { 'Version 1': 'initial', 'Version 2': 'revised', 'Version 3': 'final' }
     const rows = versions.map(v => ({
         draft_id: crypto.randomUUID(),
