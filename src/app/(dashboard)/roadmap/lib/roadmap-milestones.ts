@@ -68,6 +68,20 @@ export function ragPlanToMilestones(
     const extractedKw = extractKeywordsFromAnalysis(analysisList)
     let dynamicCerts = filterRelevantQualifications(qualifications, examSchedule, targetJob, major, extractedKw)
 
+    // Q-Net 시험 일정 조회 헬퍼 함수
+    const findExamDate = (name: string, defaultSchedule: string): string => {
+        const found = examSchedule.find((exam: any) => {
+            const qualName = String(exam.qualName || exam.qualNm || '').trim()
+            return qualName && name.includes(qualName)
+        }) as any
+
+        if (found) {
+            const date = String(found.examDate || found.implYmd || found.docRegStartDt || '').trim()
+            if (date) return `시험일정: ${date} (접수: ${found.docRegStartDt}~${found.docRegEndDt})`
+        }
+        return `시험일정: ${defaultSchedule}`
+    }
+
     if (dynamicCerts.length < 3) {
         const isDevCareer = /개발|엔지니어|소프트웨어|프로그래머/i.test(targetJob)
         const isDataCareer = /데이터|분석|AI|인공지능/i.test(targetJob)
@@ -82,7 +96,7 @@ export function ragPlanToMilestones(
                         written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)',
                         practical: '실기: 100점 만점에 60점 이상',
                         difficulty: '난이도: 중상',
-                        examSchedule: '연 3회 (3월, 7월, 10월)',
+                        examSchedule: findExamDate('정보처리기사', '연 3회 (3월, 7월, 10월)'),
                         description: '정보처리 관련 산업기사 자격을 취득한 자 또는 관련학과 졸업자 등이 응시할 수 있는 국가기술자격증입니다.'
                     }
                 })
@@ -99,44 +113,44 @@ export function ragPlanToMilestones(
 
     if (isDataCareer) {
         dynamicCerts.push(
-            { type: '자격증', name: 'ADsP (데이터분석 준전문가)', status: '취득 권장', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터 분석 기초 지식과 데이터 분석 프로세스에 대한 이해를 인증하는 자격증입니다.' } },
-            { type: '자격증', name: 'SQLD (SQL 개발자)', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터베이스와 데이터 모델링에 대한 지식을 바탕으로 SQL을 작성하고 활용할 수 있는 능력을 인증합니다.' } },
-            { type: '자격증', name: '빅데이터분석기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 상', examSchedule: '연 1회 (10월)', description: '빅데이터 분석 및 활용 능력을 종합적으로 평가하는 국가기술자격증입니다.' } }
+            { type: '자격증', name: 'ADsP (데이터분석 준전문가)', status: '취득 권장', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: findExamDate('데이터분석준전문가', '연 4회 (3월, 6월, 9월, 12월)'), description: '데이터 분석 기초 지식과 데이터 분석 프로세스에 대한 이해를 인증하는 자격증입니다.' } },
+            { type: '자격증', name: 'SQLD (SQL 개발자)', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: findExamDate('SQL개발자', '연 4회 (3월, 6월, 9월, 12월)'), description: '데이터베이스와 데이터 모델링에 대한 지식을 바탕으로 SQL을 작성하고 활용할 수 있는 능력을 인증합니다.' } },
+            { type: '자격증', name: '빅데이터분석기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 상', examSchedule: findExamDate('빅데이터분석기사', '연 1회 (10월)'), description: '빅데이터 분석 및 활용 능력을 종합적으로 평가하는 국가기술자격증입니다.' } }
         )
     } else if (isCivilCareer) {
         dynamicCerts.push(
-            { type: '자격증', name: '토목기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '토목공학에 관한 전문지식과 기술을 바탕으로 토목공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설공학에 관한 전문지식과 기술을 바탕으로 건설공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '측량기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '측량에 관한 전문지식과 기술을 바탕으로 지형측량, 지적측량, 공공측량 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설안전기사', status: '준비 중', color: 'text-red-600 bg-red-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설현장의 안전관리에 관한 전문지식과 기술을 바탕으로 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
+            { type: '자격증', name: '토목기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('토목기사', '연 2회 (4월, 10월)'), description: '토목공학에 관한 전문지식과 기술을 바탕으로 토목공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '건설기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('건설기사', '연 2회 (4월, 10월)'), description: '건설공학에 관한 전문지식과 기술을 바탕으로 건설공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '측량기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: findExamDate('측량기사', '연 2회 (4월, 10월)'), description: '측량에 관한 전문지식과 기술을 바탕으로 지형측량, 지적측량, 공공측량 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '건설안전기사', status: '준비 중', color: 'text-red-600 bg-red-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('건설안전기사', '연 2회 (4월, 10월)'), description: '건설현장의 안전관리에 관한 전문지식과 기술을 바탕으로 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
         )
     } else if (isSafetyCareer) {
         dynamicCerts.push(
-            { type: '자격증', name: '산업안전기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '산업안전에 관한 전문지식과 기술을 바탕으로 산업현장의 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설안전기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설현장의 안전관리에 관한 전문지식과 기술을 바탕으로 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '소방설비기사', status: '준비 중', color: 'text-red-600 bg-red-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '소방설비에 관한 전문지식과 기술을 바탕으로 소방설비 설치, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '위험물기능사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '위험물의 취급 및 저장에 관한 전문지식과 기술을 인증하는 국가기술자격증입니다.' } }
+            { type: '자격증', name: '산업안전기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('산업안전기사', '연 2회 (4월, 10월)'), description: '산업안전에 관한 전문지식과 기술을 바탕으로 산업현장의 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '건설안전기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('건설안전기사', '연 2회 (4월, 10월)'), description: '건설현장의 안전관리에 관한 전문지식과 기술을 바탕으로 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '소방설비기사', status: '준비 중', color: 'text-red-600 bg-red-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('소방설비기사', '연 2회 (4월, 10월)'), description: '소방설비에 관한 전문지식과 기술을 바탕으로 소방설비 설치, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '위험물기능사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: findExamDate('위험물기능사', '연 2회 (4월, 10월)'), description: '위험물의 취급 및 저장에 관한 전문지식과 기술을 인증하는 국가기술자격증입니다.' } }
         )
     } else if (isMechCareer) {
         dynamicCerts.push(
-            { type: '자격증', name: '기계기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '기계공학에 관한 전문지식과 기술을 바탕으로 기계설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '자동차정비기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '자동차 정비에 관한 전문지식과 기술을 바탕으로 자동차 점검, 수리, 정비 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '용접기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '용접에 관한 전문지식과 기술을 바탕으로 용접 작업을 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설기계기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설기계에 관한 전문지식과 기술을 바탕으로 건설기계의 설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
+            { type: '자격증', name: '기계기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('기계기사', '연 2회 (4월, 10월)'), description: '기계공학에 관한 전문지식과 기술을 바탕으로 기계설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '자동차정비기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: findExamDate('자동차정비기사', '연 2회 (4월, 10월)'), description: '자동차 정비에 관한 전문지식과 기술을 바탕으로 자동차 점검, 수리, 정비 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '용접기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: findExamDate('용접기사', '연 2회 (4월, 10월)'), description: '용접에 관한 전문지식과 기술을 바탕으로 용접 작업을 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '건설기계기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('건설기계기사', '연 2회 (4월, 10월)'), description: '건설기계에 관한 전문지식과 기술을 바탕으로 건설기계의 설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
         )
     } else if (isElecCareer) {
         dynamicCerts.push(
-            { type: '자격증', name: '전기기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '전기에 관한 전문지식과 기술을 바탕으로 전기설비 설계, 시공, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '전자기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '전자공학에 관한 전문지식과 기술을 바탕으로 전자설비 설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '전기공사기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '전기공사에 관한 전문지식과 기술을 바탕으로 전기공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '산업계측기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '산업계측에 관한 전문지식과 기술을 바탕으로 계측기기 설계, 설치, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
+            { type: '자격증', name: '전기기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('전기기사', '연 2회 (4월, 10월)'), description: '전기에 관한 전문지식과 기술을 바탕으로 전기설비 설계, 시공, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '전자기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('전자기사', '연 2회 (4월, 10월)'), description: '전자공학에 관한 전문지식과 기술을 바탕으로 전자설비 설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '전기공사기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: findExamDate('전기공사기사', '연 2회 (4월, 10월)'), description: '전기공사에 관한 전문지식과 기술을 바탕으로 전기공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
+            { type: '자격증', name: '산업계측기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: findExamDate('산업계측기사', '연 2회 (4월, 10월)'), description: '산업계측에 관한 전문지식과 기술을 바탕으로 계측기기 설계, 설치, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
         )
     } else {
         dynamicCerts.push(
-            { type: '자격증', name: '정보처리기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 3회 (3월, 7월, 10월)', description: '정보처리 관련 산업기사 자격을 취득한 자 또는 관련학과 졸업자 등이 응시할 수 있는 국가기술자격증입니다.' } },
-            { type: '자격증', name: 'ADsP (데이터분석 준전문가)', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터 분석 기초 지식과 데이터 분석 프로세스에 대한 이해를 인증하는 자격증입니다.' } },
-            { type: '자격증', name: 'SQLD (SQL 개발자)', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터베이스와 데이터 모델링에 대한 지식을 바탕으로 SQL을 작성하고 활용할 수 있는 능력을 인증합니다.' } },
-            { type: '자격증', name: '컴퓨터활용능력 1급', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 70점 이상 (100점 만점)', practical: '실기: 70점 이상 (100점 만점)', difficulty: '난이도: 중', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '컴퓨터 활용 능력을 평가하는 자격증으로, 엑셀, 액세스 등의 활용 능력을 인증합니다.' } }
+            { type: '자격증', name: '정보처리기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: findExamDate('정보처리기사', '연 3회 (3월, 7월, 10월)'), description: '정보처리 관련 산업기사 자격을 취득한 자 또는 관련학과 졸업자 등이 응시할 수 있는 국가기술자격증입니다.' } },
+            { type: '자격증', name: 'ADsP (데이터분석 준전문가)', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: findExamDate('데이터분석준전문가', '연 4회 (3월, 6월, 9월, 12월)'), description: '데이터 분석 기초 지식과 데이터 분석 프로세스에 대한 이해를 인증하는 자격증입니다.' } },
+            { type: '자격증', name: 'SQLD (SQL 개발자)', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: findExamDate('SQL개발자', '연 4회 (3월, 6월, 9월, 12월)'), description: '데이터베이스와 데이터 모델링에 대한 지식을 바탕으로 SQL을 작성하고 활용할 수 있는 능력을 인증합니다.' } },
+            { type: '자격증', name: '컴퓨터활용능력 1급', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 70점 이상 (100점 만점)', practical: '실기: 70점 이상 (100점 만점)', difficulty: '난이도: 중', examSchedule: findExamDate('컴퓨터활용능력', '연 4회 (3월, 6월, 9월, 12월)'), description: '컴퓨터 활용 능력을 평가하는 자격증으로, 엑셀, 액세스 등의 활용 능력을 인증합니다.' } }
         )
     }
 
