@@ -38,21 +38,37 @@ export default function RoadmapPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (clientId) {
-                const profile = await getClientProfile(clientId, counselorId || undefined)
-                setClientData(profile)
+            if (!clientId) {
+                setSteps([])
+                setSkills([])
+                setCerts([])
+                setHasRoadmap(false)
+                setClientData(null)
+                setIsLoading(false)
+                return
             }
-            const data = await getRoadmap(clientId || undefined, counselorId || undefined)
+            const profile = await getClientProfile(clientId, counselorId || undefined)
+            setClientData(profile)
+            const data = await getRoadmap(clientId, counselorId || undefined)
             if (data && data.milestones) {
                 try {
                     setSteps(JSON.parse(data.milestones))
-                    if (data.required_skills) setSkills(JSON.parse(data.required_skills))
-                    if (data.certifications) setCerts(JSON.parse(data.certifications))
+                    setSkills(data.required_skills ? JSON.parse(data.required_skills) : [])
+                    setCerts(data.certifications != null && data.certifications !== ''
+                        ? JSON.parse(data.certifications)
+                        : [])
                     setHasRoadmap(true)
                 } catch (e) {
                     console.error("Failed to parse roadmap data", e)
+                    setSteps([])
+                    setSkills([])
+                    setCerts([])
+                    setHasRoadmap(false)
                 }
             } else {
+                setSteps([])
+                setSkills([])
+                setCerts([])
                 setHasRoadmap(false)
             }
             setIsLoading(false)
@@ -69,7 +85,15 @@ export default function RoadmapPage() {
         if (data?.milestones) {
             setSteps(JSON.parse(data.milestones))
             if (data.required_skills) setSkills(JSON.parse(data.required_skills))
-            if (data.certifications) setCerts(JSON.parse(data.certifications))
+            if (data.certifications != null && data.certifications !== '') {
+                try {
+                    setCerts(JSON.parse(data.certifications))
+                } catch {
+                    setCerts([])
+                }
+            } else {
+                setCerts([])
+            }
             setHasRoadmap(true)
         }
         
@@ -187,6 +211,18 @@ export default function RoadmapPage() {
                         <div>
                             <p className="font-semibold mb-1">상담사를 선택해주세요</p>
                             <p className="text-xs">왼쪽 사이드바에서 상담사를 선택하면 해당 상담사의 로드맵을 확인할 수 있습니다.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* 내담자를 선택하지 않았을 때 안내 */}
+            {counselorId && !clientId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                    <div className="flex items-start gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <div>
+                            <p className="font-semibold mb-1">내담자를 선택해주세요</p>
+                            <p className="text-xs">대시보드 또는 내담자 관리에서 내담자를 선택하면 해당 내담자의 맞춤형 로드맵을 확인할 수 있습니다.</p>
                         </div>
                     </div>
                 </div>
@@ -410,10 +446,25 @@ export default function RoadmapPage() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-6">
+                                {certs.length === 0 ? (
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+                                        <p className="text-sm text-amber-800">
+                                            로드맵 생성 시 자격증 추천이 함께 산출됩니다. 로드맵을 생성하거나 갱신해 주세요.
+                                        </p>
+                                        <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                                            <p className="text-xs text-blue-800 leading-relaxed">
+                                                <span className="font-semibold">💡 안내:</span> 더 많은 자격증 정보는 <a 
+                                                    href="https://www.q-net.or.kr" 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="font-semibold underline hover:text-blue-900"
+                                                >Q-Net(한국산업인력공단)</a>에서 확인하실 수 있습니다.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
                                 <div className="space-y-4">
-                                    {(certs.length > 0 ? certs : [
-                                        { type: "알림", name: "추천 항목을 생성 중입니다.", status: "-", color: "text-gray-600 bg-gray-50" }
-                                    ]).map((cert, i) => (
+                                    {certs.map((cert, i) => (
                                         <div 
                                             key={i} 
                                             className={cn(
@@ -450,6 +501,7 @@ export default function RoadmapPage() {
                                         </div>
                                     ))}
                                 </div>
+                                )}
                                 
                                 {/* 자격증 상세 정보 다이얼로그 */}
                                 <Dialog open={isCertDialogOpen} onOpenChange={setIsCertDialogOpen}>
@@ -556,7 +608,7 @@ export default function RoadmapPage() {
                     <p className="text-gray-500 max-w-md mb-6">
                         AI 분석을 통해 {clientData ? `${clientData.client_name} 님` : "나"}에게 딱 맞는 맞춤형 커리어 로드맵을 생성해보세요.
                     </p>
-                    <Button onClick={handleGenerateRoadmap} disabled={isGenerating}>
+                    <Button onClick={handleGenerateRoadmap} disabled={!clientId || isGenerating}>
                         {isGenerating ? (
                             <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
