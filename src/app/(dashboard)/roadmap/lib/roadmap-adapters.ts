@@ -16,7 +16,7 @@ export interface RoadmapAdapters {
     /** Q-Net 자격증 목록 (선택, 없으면 빈 배열) */
     getQualifications?: () => Promise<unknown[]>
     /** Q-Net 시험 일정 (선택) */
-    getExamSchedule?: () => Promise<unknown[]>
+    getExamSchedule?: (targetNames?: string[]) => Promise<unknown[]>
 
 }
 
