@@ -75,21 +75,19 @@ export async function runRoadmap(
         })
 
         if (ragResult?.plan?.length) {
-            const [qualifications, examSchedule, jobCompetency] = await Promise.race([
+            const [qualifications, examSchedule] = await Promise.race([
                 Promise.all([
                     adapters.getQualifications?.() ?? Promise.resolve([]),
                     adapters.getExamSchedule?.() ?? Promise.resolve([]),
-                    adapters.getJobCompetencyList?.() ?? Promise.resolve([]),
                 ]),
-                new Promise<[unknown[], unknown[], unknown[]]>((resolve) =>
-                    setTimeout(() => resolve([[], [], []]), QNET_TIMEOUT_MS)
+                new Promise<[unknown[], unknown[]]>((resolve) =>
+                    setTimeout(() => resolve([[], []]), QNET_TIMEOUT_MS)
                 ),
             ])
             const first = ragResult.plan[0] as Record<string, unknown>
             first.자격정보 = (qualifications as unknown[]).slice(0, 3)
             first.시험일정 = (examSchedule as unknown[]).slice(0, 3)
             first['산업분야/대표기업'] = (first['산업분야/대표기업'] as string[]) || ['삼성전자', '현대자동차', '네이버']
-            first.직무역량 = (jobCompetency as unknown[]).slice(0, 3)
 
             const analysisRows = (userData.analysis || []) as Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
             const mapped = ragPlanToMilestones(

@@ -6,7 +6,6 @@ import { getRoadmapModel } from '@/lib/ai-models'
 import {
     getQualificationList,
     getExamSchedule,
-    getJobCompetencyList,
 } from '@/lib/qnet-api'
 import { searchCompanyInfo, searchJobInfo } from '@/lib/web-search'
 import { runRoadmap, getRoadmapRagContext } from './lib'
@@ -78,7 +77,6 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         searchJob: searchJobInfo,
         getQualifications: getQualificationList,
         getExamSchedule: getExamSchedule,
-        getJobCompetencyList,
     }
     const result = await runRoadmap(userData, adapters)
     const info = result.info
@@ -139,6 +137,6 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
     revalidatePath('/roadmap')
     revalidatePath('/admin/clients')
     revalidatePath('/dashboard')
-    
+
     return { success: true }
 }
