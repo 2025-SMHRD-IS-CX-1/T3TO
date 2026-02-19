@@ -223,15 +223,17 @@ export default function ClientsPage() {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="age_group">연령대</Label>
-                                    <select id="age_group" name="age_group" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient?.age_group || ""}>
-                                        <option value="">선택 안 함</option>
-                                        <option value="10대">10대</option>
-                                        <option value="20대">20대</option>
-                                        <option value="30대">30대</option>
-                                        <option value="40대">40대</option>
-                                        <option value="50대 이상">50대 이상</option>
-                                    </select>
+                                    <Label htmlFor="age_group">나이</Label>
+                                    <Input
+                                        id="age_group"
+                                        name="age_group"
+                                        type="number"
+                                        min={15}
+                                        max={100}
+                                        placeholder="만 25"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        defaultValue={selectedClient?.age_group && /^\d+$/.test(String(selectedClient.age_group)) ? selectedClient.age_group : ""}
+                                    />
                                 </div>
                             </div>
 
@@ -335,8 +337,8 @@ export default function ClientsPage() {
                                         <div className="flex items-start gap-3">
                                             <User className="h-5 w-5 text-gray-400 mt-0.5" />
                                             <div>
-                                                <p className="text-xs text-gray-400">성별 / 연령대</p>
-                                                <p className="text-sm font-medium">{selectedClient.gender || '미정'} / {selectedClient.age_group || '미정'}</p>
+                                                <p className="text-xs text-gray-400">성별 / 나이</p>
+                                                <p className="text-sm font-medium">{selectedClient.gender || '미정'} / {selectedClient.age_group && /^\d+$/.test(String(selectedClient.age_group)) ? `${selectedClient.age_group}세` : (selectedClient.age_group || '미정')}</p>
                                             </div>
                                         </div>
                                     </div>
