@@ -1,0 +1,5 @@
+# 자기소개서 모델 학습용 (기존 api requirements와 별도)
+torch>=2.0.0
+transformers>=4.36.0
+datasets>=2.14.0
+accelerate>=0.25.0
