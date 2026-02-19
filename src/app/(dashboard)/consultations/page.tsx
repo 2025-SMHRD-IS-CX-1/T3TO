@@ -118,7 +118,7 @@ export default function ConsultationsPage() {
                 .eq('consultation_id', selectedConsultation.consultation_id)
                 .single()
             setAnalysis(data)
-            alert('AI로 다시 분석했습니다. OPENAI_API_KEY가 설정되어 있으면 의미 기반 분석 결과가 반영됩니다.')
+            alert('AI로 다시 분석했습니다. 분석 결과가 반영되었습니다.')
         } else {
             alert(result.error ?? '다시 분석에 실패했습니다.')
         }

@@ -185,7 +185,7 @@ p { white-space: pre-wrap; }
             if (hasChange) {
                 alert('AI 다듬기가 완료되었습니다.')
             } else {
-                alert('AI가 수정할 부분을 찾지 못했거나 동일한 내용으로 반환했습니다. OPENAI_API_KEY 설정과 입력 내용을 확인해 주세요.')
+                alert('AI가 수정할 부분을 찾지 못했거나 동일한 내용으로 반환했습니다. 입력 내용을 확인해 주세요.')
             }
         } catch (e) {
             console.error('[AI 다듬기]', e)
