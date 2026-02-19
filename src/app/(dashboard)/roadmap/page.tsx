@@ -213,8 +213,8 @@ export default function RoadmapPage() {
                             <div>
                                 {clientData.age_group && (
                                     <>
-                                        <p className="text-muted-foreground">연령대</p>
-                                        <p className="font-medium">{clientData.age_group}</p>
+                                        <p className="text-muted-foreground">나이</p>
+                                        <p className="font-medium">{/^\d+$/.test(String(clientData.age_group)) ? `${clientData.age_group}세` : clientData.age_group}</p>
                                     </>
                                 )}
                                 <div className="mt-4">
@@ -514,10 +514,15 @@ export default function RoadmapPage() {
                                                 {selectedStep.resources && selectedStep.resources.length > 0 && (
                                                     <div>
                                                         <h4 className="font-semibold text-sm text-gray-900 mb-2">추천 자료</h4>
-                                                        <ul className="space-y-1">
+                                                        <ul className="space-y-3">
                                                             {selectedStep.resources.map((resource, i) => (
-                                                                <li key={i} className="text-sm text-gray-600">
-                                                                    • {resource.title}
+                                                                <li key={i} className="text-sm">
+                                                                    <span className="font-medium text-gray-800">• {resource.title}</span>
+                                                                    {'content' in resource && resource.content && (
+                                                                        <div className="mt-1.5 pl-4 pr-2 py-2 bg-gray-50 rounded-md border border-gray-100 text-gray-700 whitespace-pre-wrap max-h-48 overflow-y-auto text-xs leading-relaxed">
+                                                                            {resource.content}
+                                                                        </div>
+                                                                    )}
                                                                 </li>
                                                             ))}
                                                         </ul>

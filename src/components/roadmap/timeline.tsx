@@ -23,7 +23,7 @@ export interface RoadmapStep {
     description: string
     status: "completed" | "in-progress" | "locked"
     date?: string
-    resources?: { title: string; url: string; type: "video" | "article" | "quiz" }[]
+    resources?: { title: string; url: string; type: "video" | "article" | "quiz"; content?: string }[]
     quizScore?: number
     /** 사용자 맞춤 구체적 실행 방안 */
     actionItems?: string[]
