@@ -11,5 +11,6 @@ export { evaluateContextUtilization, evaluateRoadmapOutput } from './roadmap-eva
 export { getRoadmapRagContext } from './roadmap-rag-context'
 export { runRoadmap } from './roadmap-run'
 export { generateRoadmapWithRag, type GenerateRoadmapWithRagOpts } from './roadmap-rag-generate'
-export { GOAL_CONCRETIZATION_CONTENT, ragPlanToMilestones, type RagPlanToMilestonesResult } from './roadmap-milestones'
+export { ragPlanToMilestones, type RagPlanToMilestonesResult } from './roadmap-milestones'
+export { GOAL_CONCRETIZATION_CONTENT } from './roadmap-prompts'
 export { buildRuleBasedRoadmap } from './roadmap-rule-based'
