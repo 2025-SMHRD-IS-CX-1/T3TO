@@ -119,3 +119,29 @@ curl -X POST http://localhost:8000/api/self-intro/generate \
 - `MK_RESUME_MODEL_API_URL=http://localhost:8000` (서버 실행 주소)
 - 서버 실행: `cd mk_resume_model && pip install -r requirements.txt && uvicorn api:app --host 0.0.0.0 --port 8000`
 - 미설정 또는 호출 실패 시 기존 RAG API / 템플릿으로 폴백됩니다.
+
+## 모델 학습 (Fine-tuning)
+
+`data/examples.jsonl`(input·reference 쌍)이 있으면 **학습 가능한 생성 모델**을 fine-tuning할 수 있습니다.
+
+### 1. 데이터 준비
+
+- 크롤링 txt가 있으면: `python build_input_from_crawl.py` → `data/examples.jsonl` 생성
+- 없으면 `build_input_from_crawl.py` 상단 docstring 참고
+
+### 2. 학습 실행
+
+```bash
+cd mk_resume_model
+pip install -r requirements-train.txt
+python train_resume_model.py --data data/examples.jsonl --output_dir checkpoints/resume_lm
+```
+
+- **GPU**: 있으면 자동 사용. 없으면 CPU로도 동작하지만 느림.
+- **메모리 부족 시**: `--batch_size 2 --max_length 512`
+- **에폭/학습률**: `--epochs 3 --lr 3e-5`
+
+### 3. 학습 후
+
+- 체크포인트: `checkpoints/resume_lm/` (config, pytorch_model.bin, tokenizer)
+- 이 모델을 사용하는 추론 스크립트/API는 별도 연동 필요 (현재 api는 템플릿 생성기 사용)
