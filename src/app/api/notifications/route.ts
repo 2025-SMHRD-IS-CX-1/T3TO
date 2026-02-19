@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       .limit(1)
 
     if (error || !data || data.length === 0) return null
-    const value = data[0][dateColumn] as string | null
+    const value = (data[0] as any)[dateColumn] as string | null
     return value ? new Date(value) : null
   }
 

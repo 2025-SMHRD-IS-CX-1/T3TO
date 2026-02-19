@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 
@@ -201,19 +202,14 @@ export async function signup(formData: FormData) {
             console.warn('Signup: 트리거가 작동하지 않거나 아직 실행 중. 수동 INSERT 시도')
             
             const role = (user.user_metadata?.role as string) || 'counselor'
-            const insertData: any = {
+            const insertData: Record<string, unknown> = {
                 user_id: user.id,
                 email: user.email ?? '',
                 login_id: user.email ?? (typeof user.id === 'string' ? user.id : String(user.id)),
                 password_hash: 'SUPABASE_AUTH',
+                role,
+                name,
             }
-            
-            // role 컬럼이 있으면 추가
-            insertData.role = role
-            
-            // name 컬럼은 선택적 (테이블에 없을 수 있음)
-            // name 컬럼이 있으면 추가, 없으면 에러 발생하므로 일단 제외
-            // 필요시 name 컬럼을 테이블에 추가하거나, 트리거에서만 처리
             
             const { error: insertError, data: insertResult } = await supabase
                 .from('users')
@@ -267,6 +263,37 @@ export async function signup(formData: FormData) {
             }
         } else {
             console.log('Signup: 트리거가 정상 작동하여 users 테이블에 데이터가 생성되었습니다.')
+        }
+
+        // 회원가입 시 입력한 이름을 public.users.name에 바로 저장
+        // signUp 직후 서버 클라이언트가 새 세션을 쓰지 않으면 RLS로 UPDATE가 막힐 수 있으므로 setSession 적용
+        if (data.session) {
+            await supabase.auth.setSession(data.session)
+        }
+
+        const { data: updatedRows, error: updateNameError } = await supabase
+            .from('users')
+            .update({ name })
+            .eq('user_id', userIdForCheck)
+            .select('user_id, name')
+
+        if (updateNameError) {
+            console.warn('Signup: name 업데이트 실패:', updateNameError.message, updateNameError.code)
+            // user_id 타입이 UUID인 경우 직접 시도
+            const { error: updateNameError2 } = await supabase
+                .from('users')
+                .update({ name })
+                .eq('user_id', user.id)
+                .select()
+            if (updateNameError2) {
+                console.warn('Signup: name 업데이트(UUID) 실패:', updateNameError2.message)
+            } else {
+                console.log('Signup: public.users.name 저장 완료 (UUID):', name)
+            }
+        } else if (updatedRows && updatedRows.length > 0) {
+            console.log('Signup: public.users.name 저장 완료:', name, updatedRows)
+        } else {
+            console.warn('Signup: name 업데이트 시 매칭되는 행 없음. user_id 확인 필요:', userIdForCheck)
         }
 
         console.log('Signup successful for user:', data.user?.email)

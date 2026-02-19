@@ -5,6 +5,7 @@ import { usePathname, useSearchParams, useRouter } from "next/navigation"
 import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, LogOut, MessageSquare, UserCog, Shield, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
+import { ClientOnly } from "@/components/client-only"
 import {
     Dialog,
     DialogContent,
@@ -85,19 +86,28 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                         <label className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
                             상담사 선택
                         </label>
-                        <Select value={counselorId || ''} onValueChange={onCounselorChange}>
-                            <SelectTrigger className="w-full bg-white">
-                                <UserCog className="mr-2 h-4 w-4 text-gray-500" />
-                                <SelectValue placeholder="상담사를 선택하세요" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {counselors.map((c) => (
-                                    <SelectItem key={c.id} value={c.id}>
-                                        {c.email || c.id.slice(0, 8)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <ClientOnly
+                            fallback={
+                                <div className="flex h-10 w-full items-center rounded-md border border-input bg-white px-3 py-2 text-sm">
+                                    <UserCog className="mr-2 h-4 w-4 text-gray-500" />
+                                    <span className="text-muted-foreground">상담사를 선택하세요</span>
+                                </div>
+                            }
+                        >
+                            <Select value={counselorId || ''} onValueChange={onCounselorChange}>
+                                <SelectTrigger className="w-full bg-white">
+                                    <UserCog className="mr-2 h-4 w-4 text-gray-500" />
+                                    <SelectValue placeholder="상담사를 선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {counselors.map((c) => (
+                                        <SelectItem key={c.id} value={c.id}>
+                                            {c.email || c.id.slice(0, 8)}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </ClientOnly>
                         {!counselorId && (
                             <p className="px-3 mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
                                 ⚠️ 상담사를 선택하면 해당 상담사의 내담자 목록이 표시됩니다.

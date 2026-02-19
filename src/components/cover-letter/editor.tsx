@@ -1,12 +1,11 @@
 "use client"
 
-"use client"
-
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import * as Diff from "diff"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Copy, Save, Sparkles, RefreshCw, FileEdit, Check, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
+import { Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { saveDraft, deleteDraft, generateAIDrafts } from "@/app/(dashboard)/cover-letter/actions"
 import {
@@ -30,6 +29,7 @@ interface CoverLetterEditorProps {
 }
 
 export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditorProps) {
+    const router = useRouter()
     const [drafts, setDrafts] = useState<Draft[]>(initialDrafts)
     const [selectedDraftId, setSelectedDraftId] = useState<string>(initialDrafts.length > 0 ? initialDrafts[0].id : "")
     const [content, setContent] = useState<string>(initialDrafts.length > 0 ? initialDrafts[0].content : "")
@@ -50,6 +50,7 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
         setSelectedDraftId(draft.id)
         setContent(draft.content)
         setIsEditing(false)
+        setHighlightChunks(null)
     }
 
     const handleSave = async () => {
@@ -76,6 +77,10 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
         const result = await generateAIDrafts(clientId)
         if (result.success) {
             notifyNotificationCheck()
+            router.refresh()
+            setDrafts([])
+            setSelectedDraftId("")
+            setContent("")
             alert("3가지 버전의 AI 초안이 생성되었습니다.")
         } else {
             alert(result.error || "생성에 실패했습니다.")
@@ -83,103 +88,82 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
         setIsGenerating(false)
     }
 
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(content)
-            alert('자기소개서 내용이 클립보드에 복사되었습니다!')
-        } catch (err) {
-            alert('복사에 실패했습니다.')
-        }
+    // 다운로드용 파일명: 특수문자 제거
+    const getDownloadFilename = (ext: string) => {
+        const title = (drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서")
+            .replace(/[/\\:*?"<>|]/g, "_").trim() || "자기소개서"
+        return `${title}_${new Date().toISOString().split("T")[0]}.${ext}`
+    }
+
+    const downloadBlob = (blob: Blob, filename: string) => {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
     }
 
     const handleDownloadTxt = () => {
-        const title = drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서"
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${title}_${new Date().toISOString().split('T')[0]}.txt`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        const blob = new Blob([content ?? ""], { type: "text/plain;charset=utf-8" })
+        downloadBlob(blob, getDownloadFilename("txt"))
     }
 
-    const handleDownloadPdf = () => {
-        // Create a simple HTML document for PDF
+    const handleDownloadHtml = () => {
         const title = drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서"
-        const htmlContent = `
-<!DOCTYPE html>
+        const escapedTitle = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        const escapedContent = (content ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>${title}</title>
-    <style>
-        body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; line-height: 1.8; }
-        h1 { font-size: 24px; margin-bottom: 20px; }
-        p { white-space: pre-wrap; }
-    </style>
+<meta charset="UTF-8">
+<title>${escapedTitle}</title>
+<style>
+body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; line-height: 1.8; }
+h1 { font-size: 24px; margin-bottom: 20px; }
+p { white-space: pre-wrap; }
+</style>
 </head>
 <body>
-    <h1>${title}</h1>
-    <p>${content}</p>
+<h1>${escapedTitle}</h1>
+<p>${escapedContent}</p>
 </body>
-</html>
-        `
-        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${title}_${new Date().toISOString().split('T')[0]}.html`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        alert('HTML 파일로 다운로드되었습니다. 브라우저에서 열어 PDF로 인쇄할 수 있습니다.')
+</html>`
+        const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" })
+        downloadBlob(blob, getDownloadFilename("html"))
     }
 
-    const handleDownloadDocx = () => {
+    const handleDownloadRtf = () => {
         const title = drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서"
-        // Create RTF format which can be opened in Word
-        const rtfContent = `{\\rtf1\\ansi\\deff0
-{\\fonttbl{\\f0 Malgun Gothic;}}
-\\f0\\fs24
-{\\b ${title}}\\par
-\\par
-${content.replace(/\n/g, '\\par\n')}
-}`
-        const blob = new Blob([rtfContent], { type: 'application/rtf' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${title}_${new Date().toISOString().split('T')[0]}.rtf`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        alert('RTF 파일로 다운로드되었습니다. MS Word나 한글에서 열 수 있습니다.')
+        const escapeRtf = (s: string) => s.replace(/\\/g, "\\\\").replace(/{/g, "\\{").replace(/}/g, "\\}")
+        const bodyRtf = escapeRtf((content ?? "").replace(/\n/g, "\\par\n"))
+        const titleRtf = escapeRtf(title)
+        const rtfContent = `{\\rtf1\\ansi\\deff0\n{\\fonttbl{\\f0 Malgun Gothic;}}\n\\f0\\fs24\n{\\b ${titleRtf}}\\par\n\\par\n${bodyRtf}\n}`
+        const blob = new Blob([rtfContent], { type: "application/rtf" })
+        downloadBlob(blob, getDownloadFilename("rtf"))
     }
 
     const [isPolishing, setIsPolishing] = useState(false)
+    /** 다듬기 후 원문 대비 변경된 구간 표시용 (added 청크만 하이라이트) */
+    const [highlightChunks, setHighlightChunks] = useState<Diff.Change[] | null>(null)
 
     const handleAiPolish = async () => {
         if (!content) return
         setIsPolishing(true)
+        const originalContent = content
 
         // Simulate AI processing delay
         await new Promise(resolve => setTimeout(resolve, 2000))
 
         const polishedContent = content + "\n\n(AI가 문맥을 매끄럽게 다듬고, 설득력 있는 표현으로 수정했습니다.)"
+        const chunks = Diff.diffWords(originalContent, polishedContent)
         setContent(polishedContent)
+        setHighlightChunks(chunks)
 
         setIsPolishing(false)
-        alert('AI 윤문이 완료되었습니다.')
-    }
-
-    const handleCreateNew = () => {
-        setSelectedDraftId("")
-        setContent("")
-        setIsEditing(true)
+        alert('AI 다듬기가 완료되었습니다.')
     }
 
     const handleDelete = async (e: React.MouseEvent, draftId: string) => {
@@ -199,48 +183,42 @@ ${content.replace(/\n/g, '\\par\n')}
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] min-h-[600px]">
-            {/* Left Sidebar: Draft List */}
-            <div className="lg:col-span-3 space-y-4 flex flex-col h-full">
+        <div className="flex flex-col gap-4 h-[calc(100vh-140px)] min-h-[600px]">
+            {/* 초안 목록: 가로 스크롤 */}
+            <div className="flex flex-col gap-2 shrink-0">
                 <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-lg">초안 목록</h2>
-                    <div className="flex gap-1">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-[10px] bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-                            onClick={handleGenerateAIDrafts}
-                            disabled={isGenerating}
-                        >
-                            {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                            AI 생성(3버전)
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <RefreshCw className="h-4 w-4" />
-                        </Button>
-                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-[10px] bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                        onClick={handleGenerateAIDrafts}
+                        disabled={isGenerating}
+                    >
+                        {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                        AI 생성(3버전)
+                    </Button>
                 </div>
-
-                <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                <div className="flex gap-3 overflow-x-auto pb-2 min-h-[100px]">
                     {drafts.map((draft) => (
                         <div
                             key={draft.id}
                             onClick={() => handleSelectDraft(draft)}
                             className={cn(
-                                "p-4 rounded-xl border cursor-pointer transition-all hover:border-purple-300 hover:bg-purple-50",
+                                "shrink-0 w-[200px] p-4 rounded-xl border cursor-pointer transition-all hover:border-purple-300 hover:bg-purple-50",
                                 selectedDraftId === draft.id
                                     ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
                                     : "bg-white"
                             )}
                         >
-                            <div className="flex justify-between items-start mb-2">
+                            <div className="flex justify-between items-start mb-2 relative">
                                 <h3 className={cn("font-medium text-sm line-clamp-2 pr-6", selectedDraftId === draft.id ? "text-purple-900" : "text-gray-900")}>
                                     {draft.title}
                                 </h3>
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 absolute right-3 top-3"
+                                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 shrink-0 absolute right-0 top-0"
                                     onClick={(e) => handleDelete(e, draft.id)}
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -256,46 +234,38 @@ ${content.replace(/\n/g, '\\par\n')}
                             </div>
                         </div>
                     ))}
-                    <Button
-                        variant="outline"
-                        onClick={handleCreateNew}
-                        className="w-full border-dashed border-2 py-6 text-gray-500 hover:text-purple-600 hover:border-purple-300 hover:bg-purple-50"
-                    >
-                        + 새 초안 생성하기
-                    </Button>
                 </div>
             </div>
 
-            {/* Right Content: Editor */}
-            <div className="lg:col-span-9 flex flex-col h-full">
+            {/* Editor */}
+            <div className="flex-1 flex flex-col min-h-0">
                 <Card className="flex-1 flex flex-col overflow-hidden shadow-sm border-gray-200">
-                    <div className="border-b p-4 flex items-center justify-between bg-gray-50">
-                        <div className="flex items-center gap-3">
-                            <Badge variant="purple" className="rounded-md">AI 생성됨</Badge>
-                            <span className="text-sm font-medium text-gray-600">
-                                {isEditing ? "편집 모드" : "미리보기 모드"}
-                            </span>
-                        </div>
+                    <div className="border-b p-4 flex items-center justify-end bg-gray-50">
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setIsEditing(!isEditing)}
+                                onClick={() => {
+                                setIsEditing(!isEditing)
+                                setHighlightChunks(null)
+                            }}
                             >
                                 <FileEdit className="mr-2 h-4 w-4" />
                                 {isEditing ? "완료" : "직접 수정"}
                             </Button>
-                            <Button variant="outline" size="sm" onClick={handleAiPolish} disabled={isPolishing || !content}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                title="문장을 자연스럽게 다듬고 표현을 정리합니다"
+                                onClick={handleAiPolish}
+                                disabled={isPolishing || !content}
+                            >
                                 {isPolishing ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
                                     <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
                                 )}
-                                AI 윤문
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={handleCopy}>
-                                <Copy className="mr-2 h-4 w-4" />
-                                복사
+                                AI 다듬기
                             </Button>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -306,46 +276,70 @@ ${content.replace(/\n/g, '\\par\n')}
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={handleDownloadTxt}>
+                                    <DropdownMenuItem onSelect={() => handleDownloadTxt()}>
                                         텍스트 파일 (.txt)
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleDownloadPdf}>
+                                    <DropdownMenuItem onSelect={() => handleDownloadHtml()}>
                                         HTML 파일 (.html) - PDF 인쇄 가능
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleDownloadDocx}>
+                                    <DropdownMenuItem onSelect={() => handleDownloadRtf()}>
                                         RTF 파일 (.rtf) - Word/한글 호환
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                저장
-                            </Button>
                         </div>
                     </div>
 
                     <div className="flex-1 p-6 overflow-hidden bg-white">
                         {isEditing ? (
                             <textarea
-                                className="w-full h-full resize-none focus:outline-none text-base leading-relaxed text-gray-800 font-medium font-sans"
+                                className="w-full h-full resize-none focus:outline-none text-base leading-relaxed text-gray-800 font-medium font-sans min-h-0"
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
                                 placeholder="자기소개서 내용을 작성하세요..."
                             />
                         ) : (
                             <div className="h-full overflow-y-auto pr-2 prose prose-sm max-w-none text-gray-800 leading-relaxed whitespace-pre-line">
-                                {content || "등록된 내용이 없습니다."}
+                                {content
+                                    ? highlightChunks != null
+                                        ? highlightChunks.map((part, i) => {
+                                            if (part.added) {
+                                                return (
+                                                    <mark key={i} className="bg-amber-200/80 text-inherit rounded px-0.5">
+                                                        {part.value}
+                                                    </mark>
+                                                )
+                                            }
+                                            if (part.removed) return null
+                                            return <span key={i}>{part.value}</span>
+                                        })
+                                        : content
+                                    : "등록된 내용이 없습니다."}
                             </div>
                         )}
                     </div>
 
                     <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
                         <span>글자수: {content.length}자 (공백 포함)</span>
-                        <div className="flex items-center gap-2">
-                            <Check className="h-3 w-3 text-green-500" /> 자동 저장됨 (14:32)
-                        </div>
                     </div>
                 </Card>
+                <div className="flex justify-end gap-2 pt-3 shrink-0">
+                    {selectedDraftId && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                            onClick={(e) => handleDelete(e, selectedDraftId)}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            삭제
+                        </Button>
+                    )}
+                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        저장
+                    </Button>
+                </div>
             </div>
         </div>
     )
