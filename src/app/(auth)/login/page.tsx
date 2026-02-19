@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { login } from "../actions"
+import { syncLoginUser } from "../actions"
+import { createClient } from "@/lib/supabase/client"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -50,37 +51,107 @@ export default function LoginPage() {
         setLoading(true)
         setError(null)
 
-        const email = formData.get('email') as string
-        
-        try {
-            const result = await login(formData)
+        const email = (formData.get('email') as string)?.trim() ?? ''
+        const password = formData.get('password') as string
 
-            if (result?.error) {
-                setError(result.error)
+        if (!email || !password) {
+            setError('이메일과 비밀번호를 입력해주세요.')
+            setLoading(false)
+            return
+        }
+
+        // 클라이언트에서 Supabase URL이 있어야 함 (.env.local + npm run dev 재시작 필요)
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        if (!supabaseUrl || supabaseUrl === 'undefined') {
+            setError('Supabase URL이 설정되지 않았습니다. .env.local에 NEXT_PUBLIC_SUPABASE_URL을 넣고 터미널에서 npm run dev 를 다시 실행해주세요.')
+            setLoading(false)
+            return
+        }
+
+        const supabase = createClient()
+
+        const tryServerSignin = async (): Promise<boolean> => {
+            const r = await fetch('/api/auth/signin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            })
+            const j = await r.json().catch(() => ({}))
+            if (r.ok && j.success) return true
+            setError((j as { error?: string }).error || '서버 로그인 실패')
+            return false
+        }
+
+        try {
+            // 1) 브라우저에서 직접 Supabase 인증 시도
+            const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+
+            if (authError) {
+                const msg = authError.message || ''
+                if (msg === 'fetch failed' || msg.includes('fetch failed') || msg.includes('Failed to fetch')) {
+                    // 2) 브라우저→Supabase 실패 시 서버 경유 로그인 한 번 더 시도
+                    const serverOk = await tryServerSignin()
+                    if (serverOk) {
+                        syncLoginUser().catch(() => {})
+                        if (rememberMe) {
+                            const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
+                                .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
+                            localStorage.setItem('saved_accounts', JSON.stringify(updated))
+                            localStorage.setItem('remembered_email', email)
+                        } else localStorage.removeItem('remembered_email')
+                        window.location.href = '/dashboard'
+                        return
+                    }
+                    setLoading(false)
+                    return
+                }
+                if (msg.includes('Invalid login')) {
+                    setError('이메일 또는 비밀번호가 올바르지 않습니다.')
+                } else {
+                    setError(msg)
+                }
                 setLoading(false)
                 return
             }
 
-            // 성공 시 계정 저장 및 리다이렉트
-            if (result?.success) {
-                if (rememberMe) {
-                    const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                        .sort((a, b) => b.lastLogin - a.lastLogin)
-                        .slice(0, 3) // Keep last 3
-                    localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                    localStorage.setItem('remembered_email', email)
-                } else {
-                    localStorage.removeItem('remembered_email')
-                }
-                
-                window.location.href = '/dashboard'
-            }
-        } catch (err: any) {
-            // NEXT_REDIRECT 에러는 무시 (이미 리다이렉트됨)
-            if (err?.message?.includes('NEXT_REDIRECT')) {
+            if (!data.session) {
+                setError('로그인 세션을 받지 못했습니다. 다시 시도해주세요.')
+                setLoading(false)
                 return
             }
-            setError(err?.message || '로그인 중 오류가 발생했습니다.')
+
+            syncLoginUser().catch(() => {})
+
+            if (rememberMe) {
+                const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
+                    .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
+                localStorage.setItem('saved_accounts', JSON.stringify(updated))
+                localStorage.setItem('remembered_email', email)
+            } else {
+                localStorage.removeItem('remembered_email')
+            }
+
+            window.location.href = '/dashboard'
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err)
+            if (typeof msg === 'string' && msg.includes('NEXT_REDIRECT')) return
+            if (typeof msg === 'string' && (msg === 'Failed to fetch' || msg.includes('fetch failed') || msg.includes('Failed to fetch'))) {
+                const serverOk = await tryServerSignin()
+                if (serverOk) {
+                    syncLoginUser().catch(() => {})
+                    if (rememberMe) {
+                        const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
+                            .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
+                        localStorage.setItem('saved_accounts', JSON.stringify(updated))
+                        localStorage.setItem('remembered_email', email)
+                    } else localStorage.removeItem('remembered_email')
+                    window.location.href = '/dashboard'
+                    return
+                }
+                setError('Supabase 서버에 연결할 수 없습니다. ① 인터넷 연결 확인 ② 새 탭에서 주소 열어 보기: ' + supabaseUrl + ' ③ .env.local 확인 후 npm run dev 재시작.')
+            } else {
+                setError(msg || '로그인 중 오류가 발생했습니다.')
+            }
             setLoading(false)
         }
     }
@@ -174,6 +245,13 @@ export default function LoginPage() {
                                     <div className="mt-2 pt-2 border-t border-amber-300">
                                         <p className="text-[10px] text-amber-700">
                                             이메일 받은편지함을 확인하시거나, 스팸 폴더를 확인해주세요.
+                                        </p>
+                                    </div>
+                                )}
+                                {(error.includes('연결할 수 없습니다') || error.includes('fetch failed') || error.includes('Failed to fetch')) && (
+                                    <div className="mt-2 pt-2 border-t border-red-200 space-y-1">
+                                        <p className="text-[10px] text-red-700">
+                                            시크릿(인프라이빗) 창에서 시도하거나, 광고 차단·확장 프로그램을 끄고 다시 시도해 보세요.
                                         </p>
                                     </div>
                                 )}

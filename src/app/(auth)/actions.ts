@@ -5,83 +5,112 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 
-export async function login(formData: FormData) {
-    const supabase = await createClient()
-
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-    })
-
-    if (error) {
-        console.error('Login error:', error)
-
-        // 이메일 인증 관련 에러 체크 제거
-
-        return { error: error.message }
-    }
-
-    // 이메일 인증 체크 제거 - 바로 로그인 가능
-
-    // public.users에 없으면 동기화 (role 포함)
-    if (data.user) {
-        const userIdStr = typeof data.user.id === 'string' ? data.user.id : String(data.user.id)
-        const role = (data.user.user_metadata?.role as string) || (data.user.app_metadata?.role as string) || 'counselor'
-        
-        console.log('Login: public.users 동기화 시도:', {
-            userId: data.user.id,
-            userIdStr,
-            email: data.user.email,
-            role
-        })
-        
-        const { data: userInDb, error: selectError } = await supabase
-            .from('users')
-            .select('user_id')
-            .eq('user_id', userIdStr)
-            .single()
-        
-        if (selectError) {
-            console.warn('Login: public.users 조회 실패 (RLS 또는 존재하지 않음):', {
-                error: selectError.message,
-                code: selectError.code
-            })
+/** 클라이언트 로그인 성공 후, 쿠키에 담긴 세션으로 public.users 동기화 (실패해도 로그인은 유지) */
+export async function syncLoginUser(): Promise<{ ok: boolean; error?: string }> {
+    try {
+        const supabase = await createClient()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+            return { ok: false, error: userError?.message ?? '세션 없음' }
         }
-        
+        const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
+        const role = (user.user_metadata?.role as string) || (user.app_metadata?.role as string) || 'counselor'
         const { error: syncError } = await supabase
             .from('users')
             .upsert(
-                [
-                    {
-                        user_id: userIdStr,
-                        email: data.user.email ?? '',
-                        login_id: data.user.email ?? userIdStr,
-                        password_hash: 'SUPABASE_AUTH',
-                        role,
-                    },
-                ],
+                [{
+                    user_id: userIdStr,
+                    email: user.email ?? '',
+                    login_id: user.email ?? userIdStr,
+                    password_hash: 'SUPABASE_AUTH',
+                    role,
+                }],
                 { onConflict: 'user_id' }
             )
         if (syncError) {
-            console.error('Login: public.users sync failed:', {
-                error: syncError.message,
-                code: syncError.code,
-                details: syncError.details,
-                hint: syncError.hint
-            })
-        } else {
-            console.log('Login: public.users 동기화 성공')
+            console.warn('syncLoginUser: public.users sync failed', syncError.message)
+            return { ok: false, error: syncError.message }
         }
+        revalidatePath('/', 'layout')
+        return { ok: true }
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.warn('syncLoginUser:', msg)
+        return { ok: false, error: msg }
+    }
+}
+
+/** 서버 로그인 (레거시). 연결 오류 시 클라이언트 로그인 사용 권장 */
+export async function login(formData: FormData) {
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error('Login: Supabase env missing', {
+            hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+            hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        })
+        return { error: '서버 설정이 완료되지 않았습니다. NEXT_PUBLIC_SUPABASE_URL과 ANON_KEY를 확인해주세요.' }
     }
 
-    console.log('Login successful for user:', data.user?.email)
+    let supabase
+    try {
+        supabase = await createClient()
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error('Login: createClient failed', msg)
+        return { error: '인증 서버에 연결할 수 없습니다. .env.local 설정 후 개발 서버를 재시작해주세요.' }
+    }
+
+    let data: { user: unknown } | null = null
+    let error: { message: string } | null = null
+
+    try {
+        const result = await supabase.auth.signInWithPassword({ email, password })
+        data = result.data as { user: unknown } | null
+        error = result.error
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error('Login: signInWithPassword threw', msg)
+        if (msg === 'fetch failed' || msg.includes('fetch failed') || msg.includes('Failed to fetch')) {
+            return {
+                error: 'Supabase 인증 서버에 연결할 수 없습니다. 인터넷 연결, .env.local의 Supabase URL·키, Supabase 프로젝트 활성 상태를 확인한 뒤 개발 서버를 재시작해주세요.',
+            }
+        }
+        return { error: msg || '로그인 중 오류가 발생했습니다.' }
+    }
+
+    if (error) {
+        console.error('Login error:', error)
+        const msg = error.message || ''
+        if (msg === 'fetch failed' || msg.includes('fetch failed') || msg.includes('Failed to fetch')) {
+            return {
+                error: 'Supabase 인증 서버에 연결할 수 없습니다. 인터넷 연결을 확인하고, Supabase 대시보드에서 프로젝트가 일시중지되지 않았는지 확인한 뒤 개발 서버(npm run dev)를 재시작해주세요.',
+            }
+        }
+        return { error: msg }
+    }
+
+    const user = data?.user as { id: string; email?: string; user_metadata?: { role?: string }; app_metadata?: { role?: string } } | null
+    if (user) {
+        const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
+        const role = user.user_metadata?.role || user.app_metadata?.role || 'counselor'
+        const { error: syncError } = await supabase
+            .from('users')
+            .upsert(
+                [{
+                    user_id: userIdStr,
+                    email: user.email ?? '',
+                    login_id: user.email ?? userIdStr,
+                    password_hash: 'SUPABASE_AUTH',
+                    role,
+                }],
+                { onConflict: 'user_id' }
+            )
+        if (syncError) console.warn('Login: public.users sync failed', syncError.message)
+    }
 
     revalidatePath('/', 'layout')
-    
-    // 성공 상태 반환 (리다이렉트는 클라이언트에서 처리)
     return { success: true }
 }
 
