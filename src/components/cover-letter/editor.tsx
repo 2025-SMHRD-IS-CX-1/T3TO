@@ -174,10 +174,19 @@ p { white-space: pre-wrap; }
                 alert('AI가 수정된 내용을 반환하지 않았습니다.')
                 return
             }
+            const hasChange = polishedContent !== originalContent.trim()
             setContent(polishedContent)
-            setHighlightChunks(Diff.diffWords(originalContent, polishedContent))
+            setHighlightChunks(hasChange ? Diff.diffWords(originalContent, polishedContent) : null)
             setIsEditing(true)
-            alert('AI 다듬기가 완료되었습니다.')
+            // 선택된 초안의 로컬 복사본도 갱신해 두어, 다른 초안 갔다 와도 다듬은 내용이 유지되도록 함
+            if (selectedDraftId) {
+                setDrafts(prev => prev.map(d => d.id === selectedDraftId ? { ...d, content: polishedContent } : d))
+            }
+            if (hasChange) {
+                alert('AI 다듬기가 완료되었습니다.')
+            } else {
+                alert('AI가 수정할 부분을 찾지 못했거나 동일한 내용으로 반환했습니다. OPENAI_API_KEY 설정과 입력 내용을 확인해 주세요.')
+            }
         } catch (e) {
             console.error('[AI 다듬기]', e)
             alert('AI 다듬기 중 오류가 났습니다. 네트워크 또는 콘솔을 확인해주세요.')
