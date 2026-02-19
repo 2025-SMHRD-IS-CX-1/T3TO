@@ -148,22 +148,51 @@ p { white-space: pre-wrap; }
     const [isPolishing, setIsPolishing] = useState(false)
     /** 다듬기 후 원문 대비 변경된 구간 표시용 (added 청크만 하이라이트) */
     const [highlightChunks, setHighlightChunks] = useState<Diff.Change[] | null>(null)
+    /** Radix DropdownMenu의 서버/클라이언트 id 불일치로 인한 hydration 오류 방지 */
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     const handleAiPolish = async () => {
-        if (!content) return
+        if (!content?.trim()) return
         setIsPolishing(true)
         const originalContent = content
-
-        // Simulate AI processing delay
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        const polishedContent = content + "\n\n(AI가 문맥을 매끄럽게 다듬고, 설득력 있는 표현으로 수정했습니다.)"
-        const chunks = Diff.diffWords(originalContent, polishedContent)
-        setContent(polishedContent)
-        setHighlightChunks(chunks)
-
-        setIsPolishing(false)
-        alert('AI 다듬기가 완료되었습니다.')
+        try {
+            const res = await fetch('/api/cover-letter/polish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: content }),
+            })
+            const data = (await res.json().catch(() => ({}))) as { content?: string; error?: string }
+            if (!res.ok) {
+                alert(data?.error ?? `요청 실패 (${res.status})`)
+                return
+            }
+            const polishedContent = typeof data?.content === 'string' ? data.content.trim() : ''
+            if (!polishedContent) {
+                alert('AI가 수정된 내용을 반환하지 않았습니다.')
+                return
+            }
+            const hasChange = polishedContent !== originalContent.trim()
+            setContent(polishedContent)
+            setHighlightChunks(hasChange ? Diff.diffWords(originalContent, polishedContent) : null)
+            setIsEditing(true)
+            // 선택된 초안의 로컬 복사본도 갱신해 두어, 다른 초안 갔다 와도 다듬은 내용이 유지되도록 함
+            if (selectedDraftId) {
+                setDrafts(prev => prev.map(d => d.id === selectedDraftId ? { ...d, content: polishedContent } : d))
+            }
+            if (hasChange) {
+                alert('AI 다듬기가 완료되었습니다.')
+            } else {
+                alert('AI가 수정할 부분을 찾지 못했거나 동일한 내용으로 반환했습니다. OPENAI_API_KEY 설정과 입력 내용을 확인해 주세요.')
+            }
+        } catch (e) {
+            console.error('[AI 다듬기]', e)
+            alert('AI 다듬기 중 오류가 났습니다. 네트워크 또는 콘솔을 확인해주세요.')
+        } finally {
+            setIsPolishing(false)
+        }
     }
 
     const handleDelete = async (e: React.MouseEvent, draftId: string) => {
@@ -267,26 +296,34 @@ p { white-space: pre-wrap; }
                                 )}
                                 AI 다듬기
                             </Button>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <Download className="mr-2 h-4 w-4" />
-                                        다운로드
-                                        <ChevronDown className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onSelect={() => handleDownloadTxt()}>
-                                        텍스트 파일 (.txt)
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => handleDownloadHtml()}>
-                                        HTML 파일 (.html) - PDF 인쇄 가능
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => handleDownloadRtf()}>
-                                        RTF 파일 (.rtf) - Word/한글 호환
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            {mounted ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            다운로드
+                                            <ChevronDown className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onSelect={() => handleDownloadTxt()}>
+                                            텍스트 파일 (.txt)
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => handleDownloadHtml()}>
+                                            HTML 파일 (.html) - PDF 인쇄 가능
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => handleDownloadRtf()}>
+                                            RTF 파일 (.rtf) - Word/한글 호환
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : (
+                                <Button variant="outline" size="sm">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    다운로드
+                                    <ChevronDown className="ml-2 h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     </div>
 

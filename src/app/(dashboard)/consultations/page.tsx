@@ -25,7 +25,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { usePathname, useSearchParams } from "next/navigation"
-import { getConsultations, createConsultation, updateConsultation, deleteConsultation } from "./actions"
+import { getConsultations, createConsultation, updateConsultation, deleteConsultation, reanalyzeConsultation } from "./actions"
 import { useAdminContext } from "@/components/layout/shell"
 import { notifyNotificationCheck } from "@/lib/utils"
 
@@ -81,6 +81,7 @@ export default function ConsultationsPage() {
     const [isDetailOpen, setIsDetailOpen] = useState(false)
     const [analysis, setAnalysis] = useState<any>(null)
     const [loadingAnalysis, setLoadingAnalysis] = useState(false)
+    const [isReanalyzing, setIsReanalyzing] = useState(false)
 
     const [editingConsultation, setEditingConsultation] = useState<any>(null)
     const [isEditOpen, setIsEditOpen] = useState(false)
@@ -102,6 +103,26 @@ export default function ConsultationsPage() {
 
         setAnalysis(data)
         setLoadingAnalysis(false)
+    }
+
+    const handleReanalyze = async () => {
+        if (!selectedConsultation?.consultation_id) return
+        setIsReanalyzing(true)
+        const result = await reanalyzeConsultation(selectedConsultation.consultation_id)
+        if (result.success) {
+            const { createClient } = await import('@/lib/supabase/client')
+            const supabase = createClient()
+            const { data } = await supabase
+                .from('consultation_analysis')
+                .select('*')
+                .eq('consultation_id', selectedConsultation.consultation_id)
+                .single()
+            setAnalysis(data)
+            alert('AI로 다시 분석했습니다. OPENAI_API_KEY가 설정되어 있으면 의미 기반 분석 결과가 반영됩니다.')
+        } else {
+            alert(result.error ?? '다시 분석에 실패했습니다.')
+        }
+        setIsReanalyzing(false)
     }
 
     const handleEditClick = (e: React.MouseEvent, item: any) => {
@@ -427,10 +448,27 @@ export default function ConsultationsPage() {
                             </section>
 
                             <section>
-                                <h4 className="font-bold mb-4 flex items-center gap-2">
-                                    <Brain className="h-4 w-4 text-blue-500" />
-                                    AI 역량 및 성향 분석
-                                </h4>
+                                <div className="flex items-center justify-between gap-2 mb-4">
+                                    <h4 className="font-bold flex items-center gap-2">
+                                        <Brain className="h-4 w-4 text-blue-500" />
+                                        AI 역량 및 성향 분석
+                                    </h4>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="shrink-0 text-purple-600 border-purple-200 hover:bg-purple-50"
+                                        onClick={handleReanalyze}
+                                        disabled={loadingAnalysis || isReanalyzing}
+                                    >
+                                        {isReanalyzing ? (
+                                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                        ) : (
+                                            <Sparkles className="h-4 w-4 mr-1" />
+                                        )}
+                                        AI로 다시 분석
+                                    </Button>
+                                </div>
                                 {loadingAnalysis ? (
                                     <div className="flex justify-center py-8">
                                         <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
