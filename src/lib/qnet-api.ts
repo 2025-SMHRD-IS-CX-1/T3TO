@@ -88,21 +88,4 @@ export async function getExamSchedule(): Promise<unknown[]> {
     return items
 }
 
-/** 직무역량 목록 */
-export async function getJobCompetencyList(): Promise<unknown[]> {
-    if (!QNET_SERVICE_KEY) {
-        console.warn('[Q-Net API] QNET_SERVICE_KEY가 없어 직무역량 조회를 건너뜁니다')
-        return []
-    }
-    console.log('[Q-Net API] 직무역량 조회 시작')
-    const url = 'https://apis.data.go.kr/B490007/jobCompetency/getJobCompetencyList'
-    const xml = await fetchXml(url, { pageNo: '1', numOfRows: '10' })
-    if (!xml) {
-        console.warn('[Q-Net API] 직무역량 조회 실패 - XML 응답 없음')
-        return []
-    }
-    const parsed = parseXml(xml)
-    const items = extractItems(parsed)
-    console.log('[Q-Net API] 직무역량 조회 완료 - 결과 수:', items.length)
-    return items
-}
+

@@ -17,8 +17,7 @@ export interface RoadmapAdapters {
     getQualifications?: () => Promise<unknown[]>
     /** Q-Net 시험 일정 (선택) */
     getExamSchedule?: () => Promise<unknown[]>
-    /** Q-Net 직무역량 (선택, RAG plan에 직무역량 붙일 때 사용) */
-    getJobCompetencyList?: () => Promise<unknown[]>
+
 }
 
 /** RAG 컨텍스트 — DB/API에서 가져올 내담자 데이터. 어댑터에서 이 형태로 넘기면 됨 */
