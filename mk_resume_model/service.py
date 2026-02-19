@@ -1,7 +1,6 @@
 """
-자기소개서 생성 서비스 레이어.
-상담 기반 요청을 받아 자기소개서 초안을 생성합니다.
-checkpoints/resume_lm 이 있으면 학습된 모델로 생성, 없으면 템플릿 생성기 사용.
+자기소개서 생성 서비스 (파인튜닝 모델 전용).
+요청(직무·역량·배경)을 받아 resume_lm으로 초안을 생성합니다.
 """
 
 from __future__ import annotations
@@ -11,8 +10,6 @@ from pathlib import Path
 
 from models.counseling import AIAnalysisResult, CounselingContent, ExtractedBackground, SelfIntroRequest
 from models.output import SelfIntroResponse
-from adapter import to_self_intro_input
-from self_intro_generator import SelfIntroInput, generate_self_introduction
 
 _SERVICE_DIR = Path(__file__).resolve().parent
 _DEFAULT_CHECKPOINT = _SERVICE_DIR / "checkpoints" / "resume_lm"
@@ -20,70 +17,62 @@ _RESUME_LM_MODEL = None
 _RESUME_LM_TOKENIZER = None
 
 
-def _self_intro_input_to_dict(input_data: SelfIntroInput) -> dict:
-    bg = input_data.background
-    return {
-        "roles": list(input_data.roles),
-        "competencies": list(input_data.competencies),
-        "background": {
-            "name": bg.name,
-            "education": bg.education,
-            "experiences": list(bg.experiences or []),
-            "strengths": list(bg.strengths or []),
-            "career_values": bg.career_values,
-        },
-    }
-
-
 def _get_resume_lm_checkpoint() -> Path | None:
-    """학습된 모델 경로. 환경변수 우선, 없으면 checkpoints/resume_lm 자동 사용."""
+    """학습된 모델 경로. 환경변수 → checkpoints/resume_lm → 프로젝트 루트 resume_lm."""
     path = os.environ.get("RESUME_LM_CHECKPOINT")
     if path and Path(path).exists():
         return Path(path)
     if _DEFAULT_CHECKPOINT.exists():
         return _DEFAULT_CHECKPOINT
+    root_resume_lm = _SERVICE_DIR.parent / "resume_lm"
+    if root_resume_lm.exists():
+        return root_resume_lm
     return None
 
 
-def _try_create_with_resume_lm(input_data: SelfIntroInput) -> str | None:
-    global _RESUME_LM_MODEL, _RESUME_LM_TOKENIZER
-    path = _get_resume_lm_checkpoint()
-    if path is None:
-        return None
-    try:
-        from inference_resume_lm import load_model, generate
-    except ImportError:
-        return None
-    if _RESUME_LM_MODEL is None:
-        _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL = load_model(path, use_cpu=True)
-    input_dict = _self_intro_input_to_dict(input_data)
-    return generate(input_dict, _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL)
+def _request_to_input_dict(request: SelfIntroRequest) -> dict:
+    """API 요청을 모델 입력 dict로 변환."""
+    request.validate()
+    bg = request.ai_analysis.extracted_background
+    return {
+        "roles": list(request.ai_analysis.roles),
+        "competencies": list(request.ai_analysis.competencies),
+        "background": {
+            "name": bg.name if bg else None,
+            "education": (bg.education or "-") if bg else "-",
+            "experiences": list(bg.experiences or []) if bg else [],
+            "strengths": list(bg.strengths or []) if bg else [],
+        },
+    }
 
 
 def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
     """
-    상담 기반 요청을 받아 자기소개서 초안을 생성합니다.
-
-    Args:
-        request: 상담 컨텐츠, AI 분석 결과, 언어 등이 포함된 요청
-
-    Returns:
-        SelfIntroResponse: 생성된 자기소개서 초안 및 메타데이터
+    직무·역량·배경을 받아 파인튜닝 모델로 자기소개서 초안을 생성합니다.
+    모델이 없으면 ValueError를 발생시킵니다.
     """
-    input_data = to_self_intro_input(request)
-    draft_from_lm = _try_create_with_resume_lm(input_data)
-    if draft_from_lm is not None:
-        word_count = len(draft_from_lm.replace(" ", "").replace("\n", ""))
-        return SelfIntroResponse(
-            draft=draft_from_lm,
-            reasoning="(학습된 모델로 생성)",
-            word_count=word_count,
+    path = _get_resume_lm_checkpoint()
+    if path is None:
+        raise ValueError(
+            "파인튜닝 모델을 사용할 수 없습니다. "
+            "RESUME_LM_CHECKPOINT 또는 mk_resume_model/checkpoints/resume_lm(또는 프로젝트 루트 resume_lm)을 확인하세요."
         )
-    result = generate_self_introduction(input_data)
-    word_count = len(result.draft.replace(" ", "").replace("\n", ""))  # 한글 기준 글자 수
+
+    try:
+        from inference_resume_lm import load_model, generate
+    except ImportError as e:
+        raise ValueError("inference_resume_lm 로드 실패. transformers 등 의존성을 설치했는지 확인하세요.") from e
+
+    global _RESUME_LM_MODEL, _RESUME_LM_TOKENIZER
+    if _RESUME_LM_MODEL is None:
+        _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL = load_model(path, use_cpu=True)
+
+    input_dict = _request_to_input_dict(request)
+    draft = generate(input_dict, _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL)
+    word_count = len(draft.replace(" ", "").replace("\n", ""))
     return SelfIntroResponse(
-        draft=result.draft,
-        reasoning=result.reasoning,
+        draft=draft,
+        reasoning="(파인튜닝 모델로 생성)",
         word_count=word_count,
     )
 
@@ -99,26 +88,16 @@ def create_self_introduction_simple(
     strengths: list[str] | None = None,
     language: str = "ko",
 ) -> SelfIntroResponse:
-    """
-    간단한 인자만으로 자기소개서를 생성합니다.
-    웹 폼이나 스크립트에서 빠르게 호출할 때 유용합니다.
-    """
+    """간단 인자로 자기소개서 생성 (스크립트/폼용)."""
     counseling = CounselingContent(content=counseling_content)
-    extracted = ExtractedBackground(
-        name=name,
-        education=education,
-        experiences=experiences,
-        strengths=strengths,
-    ) if any([name, education, experiences, strengths]) else None
-
-    ai_analysis = AIAnalysisResult(
-        roles=roles,
-        competencies=competencies,
-        extracted_background=extracted,
+    extracted = (
+        ExtractedBackground(name=name, education=education, experiences=experiences, strengths=strengths)
+        if any([name, education, experiences, strengths])
+        else None
     )
     request = SelfIntroRequest(
         counseling=counseling,
-        ai_analysis=ai_analysis,
+        ai_analysis=AIAnalysisResult(roles=roles, competencies=competencies, extracted_background=extracted),
         language=language,
     )
     return create_self_introduction(request)

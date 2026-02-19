@@ -53,11 +53,6 @@ class SelfIntroRequestSchema(BaseModel):
     counseling: CounselingContentSchema
     ai_analysis: AIAnalysisResultSchema
     language: str = Field("ko", description="출력 언어 (ko/en)")
-    min_word_count: int = Field(600, ge=0, description="최소 글자 수")
-    focus: Optional[str] = Field(
-        "strength",
-        description="작성 초점: strength(역량) / experience(경험) / values(가치관)",
-    )
 
 
 class SelfIntroResponseSchema(BaseModel):
@@ -118,8 +113,6 @@ def generate_self_intro(request: SelfIntroRequestSchema) -> SelfIntroResponseSch
         counseling=_to_counseling(request.counseling),
         ai_analysis=_to_ai_analysis(request.ai_analysis),
         language=request.language,
-        min_word_count=request.min_word_count,
-        focus=(request.focus or "strength").strip().lower(),
     )
     try:
         result: SelfIntroResponse = create_self_introduction(req)
@@ -130,6 +123,8 @@ def generate_self_intro(request: SelfIntroRequestSchema) -> SelfIntroResponseSch
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health", summary="헬스 체크")
