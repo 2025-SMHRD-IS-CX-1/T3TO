@@ -48,7 +48,7 @@ async function fetchXml(url: string, params: Record<string, string | number>) {
         const json = parser.parse(text);
         return json;
     } catch (error) {
-        if (error.name === 'AbortError') {
+        if ((error as any).name === 'AbortError') {
             console.error("XML Fetch Timeout:", url);
         } else {
             console.error("XML Fetch Error:", error);
