@@ -322,15 +322,15 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="skill_vector">보유 기술 (스택)</Label>
-                                            <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL" />
+                                            <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="recommended_careers">희망 직무</Label>
-                                            <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어" />
+                                            <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="target_company">목표 기업</Label>
-                                            <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아" />
+                                            <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아 (IT) / 현대건설, 삼성물산 (건설) / 메디트로닉스, 지멘스헬스케어 (의료) / 롯데, 신세계 (유통)" />
                                         </div>
                                     </div>
                                     <DialogFooter>
@@ -473,11 +473,11 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-skill_vector">보유 기술 (스택)</Label>
-                                    <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector ?? ''} placeholder="예: React, Node.js, Python" />
-                                </div>
-                                <div className="space-y-2">
+                                    <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector ?? ''} placeholder="예: React, Node.js, Python (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
+                                    </div>
+                                    <div className="space-y-2">
                                     <Label htmlFor="edit-recommended_careers">희망 직무</Label>
-                                    <Input id="edit-recommended_careers" name="recommended_careers" defaultValue={selectedClient.recommended_careers ?? ''} placeholder="예: 프론트엔드 개발자" />
+                                    <Input id="edit-recommended_careers" name="recommended_careers" defaultValue={selectedClient.recommended_careers ?? ''} placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-target_company">목표 기업</Label>
