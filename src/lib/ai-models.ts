@@ -9,3 +9,8 @@ export function getRoadmapModel(): string {
 export function getCoverLetterModel(): string {
     return process.env.OPENAI_COVER_LETTER_MODEL ?? 'gpt-4o-mini'
 }
+
+/** 상담 AI 역량·성향 분석용 모델 */
+export function getConsultationAnalysisModel(): string {
+    return process.env.OPENAI_CONSULTATION_MODEL ?? 'gpt-4o-mini'
+}

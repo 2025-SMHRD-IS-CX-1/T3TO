@@ -1,7 +1,9 @@
 'use server'
 
+import { getConsultationAnalysisModel } from '@/lib/ai-models'
 import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import OpenAI from 'openai'
 import { createInitialRoadmap, getClientProfile } from '../roadmap/actions'
 
 export async function getConsultations(profileId?: string, counselorId?: string | null) {
@@ -115,7 +117,7 @@ function findAndSummarize(sentences: string[], patterns: RegExp[], maxLen: numbe
     return fallback
 }
 
-/** 상담 내용을 분석해 키워드·가치관·강점·약점을 각각 적절한 형식으로 추출 (규칙 기반) */
+/** 상담 내용을 분석해 키워드·가치관·강점·약점을 각각 적절한 형식으로 추출 (규칙 기반, AI 미사용 시 폴백) */
 function analyzeContent(content: string) {
     const trimmed = content.trim().replace(/\s+/g, ' ')
     const sentences = trimmed.split(/[.!?\n]+/).filter(Boolean).map(s => s.trim()).filter(s => s.length >= 3)
@@ -158,12 +160,70 @@ function analyzeContent(content: string) {
     }
 }
 
+/** LLM으로 상담 내용 분석 (의미 있는 키워드·가치관·강점·약점 추출). 실패 시 null 반환. */
+async function analyzeContentWithAI(content: string): Promise<{
+    interest_keywords: string
+    career_values: string
+    strengths: string
+    weaknesses: string
+} | null> {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey || !content?.trim()) return null
+
+    const client = new OpenAI({ apiKey })
+    const model = getConsultationAnalysisModel()
+
+    const systemPrompt = `당신은 진로·커리어 상담 전문가입니다. 내담자의 상담 원문을 읽고 다음 네 가지를 분석해 JSON으로만 답하세요. 다른 설명이나 마크다운 없이 반드시 아래 형식의 JSON 한 덩어리만 출력하세요.
+
+{
+  "interest_keywords": "상담에서 드러난 관심·핵심 주제를 의미 단위로 정리한 키워드 5~10개. 쉼표로 구분. 단순 단어 쪼개기가 아니라 '재직 경험', '직무 적합성', '이직 고민'처럼 의미 있는 구나 단어로만 나열.",
+  "career_values": "내담자가 중시하는 가치관·원하는 방향을 1~2문장으로 요약. 파악 어렵으면 '상담에서 핵심 가치관을 추가로 파악할 예정입니다.' 한 문장.",
+  "strengths": "내담자의 강점·자원을 1~2문장으로 요약. 구체적 표현 사용.",
+  "weaknesses": "내담자의 약점·고민·보완점을 1~2문장으로 요약. 비난이 아닌 성장 관점."
+}`
+
+    try {
+        const res = await client.chat.completions.create({
+            model,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: content.trim().slice(0, 6000) },
+            ],
+            temperature: 0.4,
+            max_tokens: 1024,
+        })
+        const raw = res.choices[0]?.message?.content?.trim() ?? ''
+        const jsonMatch = raw.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) return null
+        const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>
+        const interest_keywords = typeof parsed.interest_keywords === 'string' ? parsed.interest_keywords : ''
+        const career_values = typeof parsed.career_values === 'string' ? parsed.career_values : ''
+        const strengths = typeof parsed.strengths === 'string' ? parsed.strengths : ''
+        const weaknesses = typeof parsed.weaknesses === 'string' ? parsed.weaknesses : ''
+        if (!interest_keywords && !career_values && !strengths && !weaknesses) return null
+        return { interest_keywords, career_values, strengths, weaknesses }
+    } catch {
+        return null
+    }
+}
+
 async function analyzeConsultation(consultationId: string, profileId: string, content: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !profileId) return
 
-    const analysis = analyzeContent(content)
+    const ruleBased = analyzeContent(content)
+    const aiResult = await analyzeContentWithAI(content)
+
+    const analysis = aiResult
+        ? {
+            ...ruleBased,
+            interest_keywords: aiResult.interest_keywords || ruleBased.interest_keywords,
+            career_values: aiResult.career_values || ruleBased.career_values,
+            strengths: aiResult.strengths || ruleBased.strengths,
+            weaknesses: aiResult.weaknesses || ruleBased.weaknesses,
+        }
+        : ruleBased
     const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
 
     // consultation_analysis에 분석 결과 저장
@@ -221,6 +281,71 @@ export async function updateConsultation(
     if (error) {
         console.error('Error updating consultation:', error)
         return { error: error.message }
+    }
+
+    revalidatePath('/consultations')
+    return { success: true }
+}
+
+/** 기존 상담을 AI로 다시 분석해 consultation_analysis를 갱신 (OPENAI_API_KEY 있으면 LLM 사용) */
+export async function reanalyzeConsultation(consultationId: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    const { data: consultation, error: fetchError } = await supabase
+        .from('consultations')
+        .select('consultation_content, profile_id')
+        .eq('consultation_id', consultationId)
+        .eq('user_id', user.id)
+        .single()
+
+    if (fetchError || !consultation?.consultation_content) {
+        return { success: false, error: '상담 내용을 찾을 수 없습니다.' }
+    }
+
+    const content = consultation.consultation_content as string
+    const profileId = consultation.profile_id as string | null
+    const ruleBased = analyzeContent(content)
+    const aiResult = await analyzeContentWithAI(content)
+
+    const analysis = aiResult
+        ? {
+            ...ruleBased,
+            interest_keywords: aiResult.interest_keywords || ruleBased.interest_keywords,
+            career_values: aiResult.career_values || ruleBased.career_values,
+            strengths: aiResult.strengths || ruleBased.strengths,
+            weaknesses: aiResult.weaknesses || ruleBased.weaknesses,
+        }
+        : ruleBased
+
+    const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
+    const payload = {
+        interest_keywords: analysis.interest_keywords,
+        concern_factors: analysis.concern_factors,
+        career_values: analysis.career_values,
+        preference_conditions: analysis.preference_conditions,
+        avoidance_conditions: analysis.avoidance_conditions,
+        personality_traits: analysis.personality_traits,
+        strengths: analysis.strengths,
+        weaknesses: analysis.weaknesses,
+    }
+
+    const { data: updated } = await supabase
+        .from('consultation_analysis')
+        .update(payload)
+        .eq('consultation_id', consultationId)
+        .eq('user_id', userIdStr)
+        .select()
+        .maybeSingle()
+
+    if (!updated) {
+        const { error: insertError } = await supabase.from('consultation_analysis').insert({
+            consultation_id: consultationId,
+            user_id: userIdStr,
+            ...payload,
+        })
+        if (insertError) return { success: false, error: insertError.message }
     }
 
     revalidatePath('/consultations')
