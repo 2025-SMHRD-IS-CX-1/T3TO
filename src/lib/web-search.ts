@@ -26,6 +26,7 @@ export interface JobInfo {
     requirements?: string
     trends?: string
     skills?: string
+    certifications?: string
     sources: SearchResult[]
 }
 
@@ -169,6 +170,7 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
         `${jobTitle} 채용 요구사항 역량`,
         `${jobTitle} 최신 트렌드 2025 2026`,
         `${jobTitle} 필수 스킬 기술`,
+        `${jobTitle} 필수 자격증 요구사항`,
     ]
 
     const allResults: SearchResult[] = []
@@ -195,13 +197,20 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
         .join('\n\n')
         .slice(0, 1000)
 
+    const certifications = allResults
+        .filter((r) => r.content.includes('자격증') || r.content.includes('자격') || r.content.includes('인증'))
+        .map((r) => r.content)
+        .join('\n\n')
+        .slice(0, 800)
+
     const result = {
         jobTitle,
         requirements: requirements || undefined,
         trends: trends || undefined,
         skills: skills || undefined,
+        certifications: certifications || undefined,
         sources: allResults.slice(0, 5),
     }
-    console.log(`[Tavily API] 직무 정보 검색 완료 - 요구사항: ${!!requirements}, 트렌드: ${!!trends}, 스킬: ${!!skills}`)
+    console.log(`[Tavily API] 직무 정보 검색 완료 - 요구사항: ${!!requirements}, 트렌드: ${!!trends}, 스킬: ${!!skills}, 자격증: ${!!certifications}`)
     return result
 }

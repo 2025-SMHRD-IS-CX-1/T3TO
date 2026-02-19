@@ -7,6 +7,7 @@ import { generateRoadmapWithRag } from './roadmap-rag-generate'
 import { ragPlanToMilestones } from './roadmap-milestones'
 import { buildRuleBasedRoadmap } from './roadmap-rule-based'
 import { computeCompetenciesFromProfile } from './roadmap-competencies'
+import { getCertificationsForRoadmap } from './roadmap-qnet-rag'
 
 const SEARCH_TIMEOUT_MS = 10000
 const QNET_TIMEOUT_MS = 5000
@@ -92,13 +93,26 @@ export async function runRoadmap(
             first.직무역량 = (jobCompetency as unknown[]).slice(0, 3)
 
             const analysisRows = (userData.analysis || []) as Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
+            const targetJobForCerts = (clientData.recommended_careers && clientData.recommended_careers !== '없음' && clientData.recommended_careers !== '미정')
+                ? clientData.recommended_careers
+                : '희망 직무'
+            const majorForCerts = clientData.major || ''
+            const dynamicCerts = await getCertificationsForRoadmap({
+                targetJob: targetJobForCerts,
+                major: majorForCerts,
+                analysisList: analysisRows,
+                jobInfoFromTavily: jobInfoResult ?? undefined,
+                getAllQualifications: () => (adapters.getQualifications?.() ?? Promise.resolve([])) as Promise<unknown[]>,
+                getExamSchedule: () => (adapters.getExamSchedule?.() ?? Promise.resolve([])) as Promise<unknown[]>,
+            })
             const mapped = ragPlanToMilestones(
                 ragResult,
                 clientData,
                 qualifications as unknown[],
                 examSchedule as unknown[],
                 ragResult.companyInfos,
-                analysisRows
+                analysisRows,
+                dynamicCerts
             )
             const profileForCompetencies = {
                 major: clientData.major,

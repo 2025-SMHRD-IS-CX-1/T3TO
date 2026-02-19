@@ -4,7 +4,7 @@ import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getRoadmapModel } from '@/lib/ai-models'
 import {
-    getQualificationList,
+    getAllQualifications,
     getExamSchedule,
     getJobCompetencyList,
 } from '@/lib/qnet-api'
@@ -16,26 +16,23 @@ export async function getRoadmap(profileId?: string, counselorId?: string | null
     const userIdStr = await getEffectiveUserId(counselorId)
     if (!userIdStr) return null
 
-    let query = supabase
+    // profile_id(내담자 ID)가 없으면 조회하지 않음 - 다른 내담자 로드맵 노출 방지
+    if (!profileId || profileId === '') return null
+
+    const { data, error } = await supabase
         .from('career_roadmaps')
         .select('*')
         .eq('user_id', userIdStr)
+        .eq('profile_id', profileId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-
-    if (profileId) {
-        query = query.eq('profile_id', profileId)
-    }
-
-    const { data, error } = await query.limit(1).single()
+        .limit(1)
+        .maybeSingle()
 
     if (error) {
-        if (error.code !== 'PGRST116') {
-            console.error('Error fetching roadmap:', error)
-        }
+        console.error('[getRoadmap] 조회 에러:', error.code, error.message)
         return null
     }
-
     return data
 }
 
@@ -76,17 +73,17 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         model: getRoadmapModel(),
         searchCompany: searchCompanyInfo,
         searchJob: searchJobInfo,
-        getQualifications: getQualificationList,
+        getQualifications: () => getAllQualifications(5),
         getExamSchedule: getExamSchedule,
         getJobCompetencyList,
     }
     const result = await runRoadmap(userData, adapters)
     const info = result.info
     const dynamicSkills = result.dynamicSkills
-    const dynamicCerts = result.dynamicCerts
+    // Q-Net API에서 동적으로 필터링된 자격증만 사용 (디폴트 자격증 추가하지 않음)
+    const dynamicCerts = result.dynamicCerts ?? []
     const targetJob = result.targetJob
     const targetCompany = result.targetCompany
-
 
     console.log('[Roadmap] 최종 로드맵 데이터 준비 완료')
     console.log('[Roadmap] 목표 직무:', targetJob, '목표 기업:', targetCompany)

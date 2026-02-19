@@ -1,4 +1,4 @@
-/** Q-Net 자격증을 전공/직무·추출 키워드로 필터링 (추출 데이터 우선, 하드코딩 보조) */
+/** Q-Net 자격증을 전공/직무·추출 키워드로 필터링 (키워드 기반 필터링, RAG 실패 시 폴백용) */
 export function filterRelevantQualifications(
     qualifications: unknown[],
     examSchedule: unknown[],
@@ -21,11 +21,22 @@ export function filterRelevantQualifications(
             if (/안전|산업안전|건설안전/i.test(targetJob)) keywords.push('안전', '산업안전', '건설안전', '소방')
             if (/기계|자동차|메카트로닉스/i.test(targetJob)) keywords.push('기계', '자동차', '용접', '메카트로닉스')
             if (/전기|전자|전기기사|전자기사/i.test(targetJob)) keywords.push('전기', '전자', '전기공사', '산업계측')
+            if (/의료|의학|바이오|생명/i.test(targetJob)) keywords.push('의료', '의학', '바이오', '생명', '의료기기')
+            if (/마케팅|경영|경제|상경/i.test(targetJob)) keywords.push('마케팅', '경영', '경제', '사회조사', '컨설팅')
         }
     }
 
     if (major && major !== '정보 없음' && major !== '전공 분야') {
         keywords.push(...major.split(/[,\s]+/).filter((k) => k.length > 1))
+        // 전공별 관련 자격증 키워드 추가
+        if (/컴퓨터|정보|소프트웨어|IT|전산/i.test(major)) keywords.push('정보처리', '컴퓨터활용', '정보보안')
+        if (/의학|의료|바이오|생명|의공학/i.test(major)) keywords.push('의료기기', '바이오', '생명', '임상')
+        if (/토목|건설|건축|측량|구조/i.test(major)) keywords.push('토목', '건설', '건축', '측량', '구조')
+        if (/기계|자동차|메카트로닉스|기계공학/i.test(major)) keywords.push('기계', '자동차', '용접', '메카트로닉스')
+        if (/전기|전자|전기공학|전자공학/i.test(major)) keywords.push('전기', '전자', '전기공사', '산업계측')
+        if (/안전|소방|산업안전/i.test(major)) keywords.push('안전', '산업안전', '건설안전', '소방')
+        if (/경영|경제|마케팅|상경|경제학/i.test(major)) keywords.push('경영', '마케팅', '경제', '사회조사', '컨설팅')
+        if (/데이터|통계|경영정보/i.test(major)) keywords.push('데이터', '분석', '빅데이터', '통계')
     }
 
     const uniqueKeywords = [...new Set(keywords.map((k) => k.toLowerCase()))]
@@ -38,8 +49,8 @@ export function filterRelevantQualifications(
         if (!qual || typeof qual !== 'object') continue
 
         const qualObj = qual as Record<string, unknown>
-        const qualName = String(qualObj.qualName || qualObj.qualNm || qualObj.name || '').trim()
-        const qualDesc = String(qualObj.description || qualObj.desc || qualObj.qualDesc || '').trim()
+        const qualName = String(qualObj.qualName || qualObj.qualNm || qualObj.name || qualObj.jmfldnm || '').trim()
+        const qualDesc = String(qualObj.description || qualObj.desc || qualObj.qualDesc || qualObj.obligfldnm || qualObj.mdobligfldnm || '').trim()
 
         if (!qualName || seenNames.has(qualName)) continue
 
@@ -54,13 +65,12 @@ export function filterRelevantQualifications(
             for (const exam of examSchedule) {
                 if (!exam || typeof exam !== 'object') continue
                 const examObj = exam as Record<string, unknown>
-                const examQualName = String(examObj.qualName || examObj.qualNm || '').trim()
-                if (examQualName && qualNameLower.includes(examQualName.toLowerCase())) {
-                    const examDate = String(examObj.examDate || examObj.implYmd || '').trim()
-                    if (examDate) {
-                        examScheduleInfo = `시험일정: ${examDate}`
-                        break
-                    }
+                const examQualName = String(examObj.qualName || examObj.qualNm || examObj.jmfldnm || examObj.description || '').trim()
+                const examDate = String(examObj.docExamDt || examObj.pracExamStartDt || examObj.examDate || examObj.implYmd || '').trim()
+                const matches = examQualName && (qualNameLower.includes(examQualName.toLowerCase()) || examQualName.toLowerCase().includes(qualNameLower) || /기사|산업기사/.test(examQualName) && qualNameLower.includes('기사'))
+                if (matches && examDate) {
+                    examScheduleInfo = `시험일정: ${examDate}`
+                    break
                 }
             }
 
@@ -93,5 +103,9 @@ export function filterRelevantQualifications(
     }
 
     console.log('[Q-Net 필터링] 필터링된 자격증 수:', relevantCerts.length)
+    
+    // 하드코딩된 폴백 제거 - RAG 기반 추천으로 대체됨
+    // RAG가 실패할 때만 키워드 기반 필터링 결과 반환
+
     return relevantCerts
 }
