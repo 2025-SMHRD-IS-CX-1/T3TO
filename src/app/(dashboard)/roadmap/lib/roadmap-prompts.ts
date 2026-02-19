@@ -121,6 +121,11 @@ export const ROADMAP_SYSTEM_PROMPT = `너는 진로 상담 전문가야.
   - 데이터 분석: "패스트캠퍼스 데이터 사이언스 부트캠프 수료", "네이버 커넥트재단 부스트캠프 AI 참여" 등
   - 일반적인 이름(예: "백엔드 개발자 전문 과정")은 사용하지 말고 반드시 실제 교육 프로그램 이름을 사용해라.
 
+[자격증 추천 - RAG 컨텍스트 기반]
+- 자격증 추천 시에도 RAG 컨텍스트(DB 데이터 + Q-Net API 결과)를 활용해라.
+- **Q-Net API에서 가져온 실제 자격증 목록에서만 추천**하고, 절대 존재하지 않는 자격증을 만들어내지 말 것 (환각 금지).
+- 프로필(목표 직무, 전공)과 상담 내역(강점, 관심 키워드, 가치관)을 종합 분석하여 가장 관련성 높은 자격증을 선별해라.
+
 [Output Format]
 반드시 아래 JSON만 출력해라. 다른 설명 없이 JSON만.
 {
@@ -196,4 +201,176 @@ ${companyInfoText || '(목표 기업 웹 검색 결과 없음 - RAG는 DB 데이
 - 웹 검색 결과가 RAG 컨텍스트에 없어도 DB 데이터만으로 RAG 기반 내담자 맞춤형 로드맵을 생성해라
 - **핵심**: RAG 컨텍스트의 모든 데이터(DB + 웹 검색)를 함께 사용해서 종합적으로 로드맵을 작성해라. 웹 검색이 실패해도 RAG(DB만)로 생성해야 한다.
 - 내담자의 현재 상태에서 목표까지의 갭을 분석하고, 단계별로 현실적인 로드맵을 작성해라.`
+}
+
+/** 목표 기업이 없을 때 목표 구체화를 위한 상세 안내 (직무·산업·역량 구체화) */
+export const GOAL_CONCRETIZATION_CONTENT = `【목표 구체화를 위한 상세 안내】
+
+1. SMART 목표 설정
+• Specific(구체적): "개발자"가 아니라 "백엔드/프론트엔드/데이터 엔지니어" 등 구체 직무
+• Measurable(측정 가능): "역량 쌓기"가 아니라 "정보처리기사 취득", "포트폴리오 2개 완성"
+• Achievable(달성 가능): 현재 학력·경력에서 1~2년 내 도달 가능한 수준
+• Relevant(관련성): 전공·경험·관심사와 연결된 직무·산업
+• Time-bound(기한): "3개월 내 자격증 취득", "6개월 내 인턴 지원" 등
+
+2. 직무·산업 구체화
+• 희망 직무를 1~2개로 좁히기: 채용 사이트(원티드, 잡코리아)에서 실제 공고 키워드로 검색해 비슷한 직무명 확인
+• 관심 산업 정하기: IT·금융·제조·공공·스타트업 등, 직무와 맞는 산업 1~2개
+• 목표 연봉·근무 형태(정규직/인턴/프리랜서) 범위 정하기
+
+3. 역량 갭 분석
+• 해당 직무 채용 공고 5~10개에서 공통 요구 역량·자격·경험 정리
+• 현재 보유 역량과 비교해 부족한 항목(기술, 자격증, 프로젝트 경험 등) 리스트업
+• 부족 역량 중 3개월·6개월·1년 단위로 보완할 항목 우선순위 정하기
+
+4. 다음 단계
+• 위 내용을 바탕으로 1단계(기초 역량)→2단계(역량 강화·포트폴리오)→3단계(취업·안착) 순서로 실행 계획 수립
+• 상담 시 "구체적 직무명", "선호 산업", "갭 분석 결과"를 공유하면 더 맞춤형 로드맵을 만들 수 있습니다.`
+
+/** 자격증 추천용 시스템 프롬프트 - RAG 컨텍스트 기반 */
+export const CERT_RECOMMENDATION_SYSTEM_PROMPT = `너는 자격증 추천 전문가야.
+아래 **RAG 컨텍스트(Tavily 직무정보 + DB 데이터 + Q-Net API 결과)**를 **종합 분석**해서 내담자에게 가장 적합한 자격증을 추천해라.
+
+[핵심 원칙 - RAG 기반 추천]
+- **RAG 컨텍스트는 Tavily 직무정보(시장 요구사항·자격증), DB 데이터(진로프로필, 상담내역, 분석결과), Q-Net API 자격증 목록을 모두 포함**한다.
+- Tavily 직무정보가 있으면 시장에서 실제로 요구하는 자격증·스킬을 우선 반영하고, DB 데이터와 Q-Net API 결과를 함께 참고해서 맞춤형 자격증을 추천해라.
+- **Q-Net API에서 가져온 실제 자격증 목록에서만 추천**하고, 절대 존재하지 않는 자격증을 만들어내지 말 것 (환각 금지).
+- 진로프로필의 필드(전공, 목표 직무)와 상담내역·분석결과(강점, 관심 키워드, 가치관)를 종합하여 내담자에게 가장 관련성 높은 자격증을 선별해라.
+
+[RAG 컨텍스트 활용 방법]
+1. **DB 데이터 활용 (RAG 필수 구성요소)**:
+   - 진로프로필의 전공, 목표 직무를 바탕으로 필요한 자격증 분야 파악
+   - 상담내역과 분석결과에서 드러난 강점, 가치관, 관심사와 연관된 자격증 선별
+   - 내담자의 현재 역량 수준에 맞는 자격증 난이도 고려
+
+2. **Tavily 직무정보 활용 (RAG 선택 - 있으면 포함)**:
+   - 시장에서 해당 직무에 요구하는 자격증·역량·스킬 정보 반영
+   - 채용 트렌드와 필수 자격증 요구사항을 참고하여 추천
+
+3. **Q-Net API 결과 활용 (RAG 필수 구성요소)**:
+   - Q-Net API에서 가져온 실제 자격증 목록만 사용
+   - 자격증 이름, 설명, 시험 일정 등 실제 정보만 활용
+   - API에 없는 자격증은 절대 추천하지 말 것
+
+4. **RAG 기반 종합 추천 (핵심)**:
+   - RAG 컨텍스트 = Tavily 직무정보 + DB 데이터 + Q-Net API 결과를 모두 함께 사용해서 자격증 추천
+   - 프로필과 상담 내역에 가장 관련성 높은 자격증 3-5개를 선별
+   - 각 자격증의 관련성 점수(1-10)와 추천 이유를 제공
+
+[Output Format]
+반드시 아래 JSON만 출력해라. 다른 설명 없이 JSON만.
+{
+  "recommended": [
+    {
+      "qualName": "실제 자격증 이름 (Q-Net API에서 가져온 것만)",
+      "relevanceScore": 8,
+      "reason": "프로필과 상담 내역을 종합 분석한 추천 이유"
+    }
+  ]
+}`
+
+/** Q-Net API 실패 시 OpenAI 폴백용 프롬프트 - LLM 지식 기반 한국 자격증 추천 */
+export const CERT_OPENAI_FALLBACK_SYSTEM_PROMPT = `너는 한국 국가기술자격·자격증 추천 전문가야.
+Q-Net API가 불러와지지 않아, 네가 알고 있는 **실제 한국 국가기술자격·민간자격**만 추천해라.
+Tavily 직무정보가 제공되면 시장 요구사항·자격증을 반영하고, DB·상담 정보와 종합하여 맞춤형 추천해라.
+
+[핵심 원칙]
+- **실제 존재하는 자격증만** 추천 (정보처리기사, 정보처리산업기사, SQLD, ADsP, 정보보안기사, 빅데이터분석기사 등)
+- IT/개발 직무: 정보처리기사, 정보처리산업기사, SQLD, ADsP, 정보보안기사, 빅데이터분석기사, 컴퓨터활용능력 등
+- 의료/헬스케어: 의료기기산업기사, 임상심리사, 사회복지사 등
+- 데이터/AI: ADsP, SQLD, 빅데이터분석기사, 정보처리기사 등
+- 환각 금지: 존재하지 않는 자격증 만들지 말 것
+
+[Output Format]
+반드시 아래 JSON만 출력해라. 다른 설명 없이 JSON만.
+{
+  "recommended": [
+    {
+      "qualName": "실제 자격증 정식명",
+      "relevanceScore": 8,
+      "reason": "목표 직무·전공·상담 분석 기반 추천 이유"
+    }
+  ]
+}`
+
+/** Tavily 직무 정보 타입 */
+export type JobInfoFromTavily = {
+    jobTitle: string
+    requirements?: string
+    trends?: string
+    skills?: string
+    certifications?: string
+} | null
+
+/** 자격증 추천용 사용자 컨텍스트 빌더 */
+export function buildCertificationRecommendationContext(params: {
+    targetJob: string
+    major: string
+    analysisList: Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
+    qualifications: unknown[]
+    jobInfoFromTavily?: JobInfoFromTavily
+}): string {
+    const { targetJob, major, analysisList, qualifications, jobInfoFromTavily } = params
+    
+    // 상담 분석에서 키워드 추출
+    const analysisText = analysisList
+        .map((a) => [a.strengths, a.interest_keywords, a.career_values].filter(Boolean).join(' '))
+        .join(' ')
+
+    // Tavily 직무 정보 (유사 직무 요구사항·자격증·스킬)
+    const tavilySection = jobInfoFromTavily
+        ? `[RAG 컨텍스트 구성요소 0: Tavily 직무 정보 - 유사 직무 시장 데이터]
+- 직무명: ${jobInfoFromTavily.jobTitle}
+- 채용 요구사항·역량: ${jobInfoFromTavily.requirements || '없음'}
+- 최신 트렌드: ${jobInfoFromTavily.trends || '없음'}
+- 필수 스킬·기술: ${jobInfoFromTavily.skills || '없음'}
+- 직무 관련 자격증 요구: ${jobInfoFromTavily.certifications || '없음'}
+
+`
+        : ''
+
+    // IT/개발/AI 직무 시 관련 자격증을 우선 배치하여 LLM이 추천할 수 있도록 함
+    const isITRelated = /개발|엔지니어|소프트웨어|프로그래머|AI|인공지능|데이터|백엔드|프론트엔드|의료AI/i.test(targetJob + ' ' + major)
+    const itKeywords = ['정보처리', '정보처리기사', '정보처리산업기사', 'SQLD', 'ADsP', '빅데이터', '데이터분석', '정보보안', '컴퓨터']
+    const sortedQuals = isITRelated
+        ? [...qualifications].sort((a, b) => {
+            const getQualName = (q: unknown) => String((q as Record<string, unknown>)?.qualName || (q as Record<string, unknown>)?.qualNm || (q as Record<string, unknown>)?.name || (q as Record<string, unknown>)?.jmfldnm || '').trim()
+            const nameA = getQualName(a)
+            const nameB = getQualName(b)
+            const scoreA = itKeywords.some((kw) => nameA.includes(kw)) ? 1 : 0
+            const scoreB = itKeywords.some((kw) => nameB.includes(kw)) ? 1 : 0
+            return scoreB - scoreA
+          })
+        : qualifications
+
+    // 자격증 목록을 텍스트로 변환 (최대 150개 - IT 직무 시 관련 자격증 우선 포함)
+    const qualListText = sortedQuals
+        .slice(0, 150)
+        .map((qual, idx) => {
+            if (!qual || typeof qual !== 'object') return ''
+            const qualObj = qual as Record<string, unknown>
+            const qualName = String(qualObj.qualName || qualObj.qualNm || qualObj.name || qualObj.jmfldnm || '').trim()
+            const qualDesc = String(qualObj.description || qualObj.desc || qualObj.qualDesc || qualObj.obligfldnm || qualObj.mdobligfldnm || '').trim()
+            return `${idx + 1}. ${qualName}${qualDesc ? ` - ${qualDesc.slice(0, 100)}` : ''}`
+        })
+        .filter(Boolean)
+        .join('\n')
+
+    return `[RAG 컨텍스트 - Tavily 직무정보 + DB 데이터 + Q-Net API 결과]
+${tavilySection}[RAG 컨텍스트 구성요소 1: DB 데이터 - 내담자 프로필 및 상담 정보]
+- 목표 직무(희망 직무): ${targetJob || '없음'}
+- 전공: ${major || '없음'}
+- 상담 분석 결과 (강점, 관심 키워드, 가치관): ${analysisText || '없음'}
+
+[RAG 컨텍스트 구성요소 2: Q-Net API 결과 - 실제 자격증 목록]
+**중요**: 아래 목록에 있는 자격증에서만 추천하세요. 이 목록에 없는 자격증은 절대 추천하지 마세요.
+
+${qualListText || '(Q-Net API 자격증 목록 없음)'}
+
+[작성 지침 - RAG 컨텍스트(Tavily + DB + Q-Net API) 종합 활용]
+- Tavily 직무 정보가 있으면: 시장에서 요구하는 자격증·스킬을 반영하여 추천
+- DB 데이터(프로필, 상담 분석)를 참고해 내담자의 목표 직무, 전공, 강점, 관심사를 파악하고
+- Q-Net API 자격증 목록에서만 관련성 높은 자격증을 선별해라
+- 각 자격증의 관련성 점수(1-10)와 추천 이유를 제공하되, Tavily 시장 정보·프로필·상담 내역을 종합 분석한 근거를 명시해라
+- **핵심**: Q-Net API 목록에 없는 자격증은 절대 추천하지 말 것 (환각 금지).`
 }
