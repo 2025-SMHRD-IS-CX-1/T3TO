@@ -32,6 +32,30 @@ function useInsightLine(insights: string, lineIndex: number, fallback: string): 
     return line.replace(/^(강점|가치관):\s*/i, '').trim() || fallback
 }
 
+/** RAG 컨텍스트 문자열 생성. (실제 RAG 백엔드 연동 시 검색 결과로 교체) */
+function buildRagContext(params: {
+    targetJob: string
+    competencies: string[]
+    insights: string
+    consultationSummary?: string
+    clientName?: string
+    major?: string
+}): string {
+    const { targetJob, competencies, insights, consultationSummary, clientName, major } = params
+    const lines: string[] = []
+    lines.push(`[지원 직무] ${targetJob}`)
+    if (competencies.length) lines.push(`[직무 역량] ${competencies.join(', ')}`)
+    if (insights?.trim()) lines.push(`[상담 요약] ${insights.trim()}`)
+    if (consultationSummary?.trim()) lines.push(`[상담 내용 요약] ${consultationSummary.slice(0, 300).trim()}${consultationSummary.length > 300 ? '...' : ''}`)
+    if (clientName?.trim()) lines.push(`[지원자] ${clientName}`)
+    if (major?.trim()) lines.push(`[전공/학력] ${major}`)
+    lines.push('')
+    lines.push('[STAR 템플릿] 상황(Situation)-과제(Task)-행동(Action)-결과(Result) 순으로 경험을 서술하면 설득력이 높습니다.')
+    lines.push('[CAR 템플릿] 맥락(Context)-행동(Action)-결과(Result) 구조로 구체적 성과를 강조할 수 있습니다.')
+    lines.push('[SOAR 템플릿] 상황(Situation)-목표(Objective)-행동(Action)-성과(Result)로 성과 중심 서술에 적합합니다.')
+    return lines.join('\n')
+}
+
 /** 기본 템플릿 3종 (각 500자 이상) */
 function getTemplateVersions(
     profile: { client_name: string; major?: string; education_level?: string },
@@ -242,8 +266,96 @@ export async function generateAIDrafts(clientId: string) {
             ? analysisStrengths
             : [targetJob + ' 역량', '문제해결', '커뮤니케이션']
 
-    // 3. 템플릿 기반 3종 초안 생성 (프로필·로드맵·상담 분석 반영)
-    let versions = getTemplateVersions(profile, targetJob, insights)
+    // RAG 컨텍스트 생성 (파인튜닝/범용 LLM 생성 시 참고 자료로 전달)
+    const ragContext = buildRagContext({
+        targetJob,
+        competencies,
+        insights,
+        consultationSummary: consultationContent,
+        clientName: profile.client_name ?? undefined,
+        major: profile.major ?? profile.education_level ?? undefined,
+    })
+
+    // 3. 생성기: 파인튜닝 API 우선 → 실패 시 템플릿
+    const mkResumeApiUrl = process.env.MK_RESUME_MODEL_API_URL ?? ''
+    let versions: { type: string; title: string; content: string }[] | null = null
+
+    if (mkResumeApiUrl.trim()) {
+        const baseUrl = mkResumeApiUrl.replace(/\/$/, '')
+        const extractedBackground = {
+            name: profile.client_name ?? null,
+            education: profile.major ?? profile.education_level ?? null,
+            experiences: (profile.work_experience && String(profile.work_experience).trim())
+                ? [String(profile.work_experience).trim()]
+                : [],
+            strengths: analysisStrengths.length > 0 ? analysisStrengths : null,
+            career_values: careerValues || undefined,
+        }
+        const payload = (focus: string) => ({
+            counseling: {
+                content: consultationContent || '상담 기록이 아직 없습니다. 프로필과 로드맵 정보를 바탕으로 작성합니다.',
+                session_date: null,
+                notes: null,
+            },
+            ai_analysis: {
+                roles: [targetJob],
+                competencies,
+                extracted_background: extractedBackground,
+            },
+            language: 'ko',
+            min_word_count: 600,
+            focus,
+            rag_context: ragContext,
+        })
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 120_000)
+        try {
+            const [res1, res2, res3] = await Promise.all([
+                fetch(`${baseUrl}/api/self-intro/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload('strength')),
+                    signal: controller.signal,
+                }),
+                fetch(`${baseUrl}/api/self-intro/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload('experience')),
+                    signal: controller.signal,
+                }),
+                fetch(`${baseUrl}/api/self-intro/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload('values')),
+                    signal: controller.signal,
+                }),
+            ])
+            clearTimeout(timeoutId)
+            if (res1.ok && res2.ok && res3.ok) {
+                const [data1, data2, data3] = await Promise.all([
+                    res1.json() as Promise<{ draft?: string }>,
+                    res2.json() as Promise<{ draft?: string }>,
+                    res3.json() as Promise<{ draft?: string }>,
+                ])
+                const d1 = (data1?.draft ?? '').trim()
+                const d2 = (data2?.draft ?? '').trim()
+                const d3 = (data3?.draft ?? '').trim()
+                if (d1 && d2 && d3) {
+                    versions = [
+                        { type: 'Version 1', title: `${targetJob} - 역량 중심`, content: d1 },
+                        { type: 'Version 2', title: `${targetJob} - 경험 중심`, content: d2 },
+                        { type: 'Version 3', title: `${targetJob} - 가치관 중심`, content: d3 },
+                    ]
+                }
+            }
+        } catch {
+            clearTimeout(timeoutId)
+        }
+    }
+
+    if (versions == null || versions.length === 0) {
+        versions = getTemplateVersions(profile, targetJob, insights)
+    }
 
     // 생성된 3종 공통: 문맥 자연스럽게 다듬기 (OPENAI_API_KEY 있으면 적용, 실패 시 원문 유지)
     if (versions && versions.length >= 3 && process.env.OPENAI_API_KEY) {
