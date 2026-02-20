@@ -5,7 +5,8 @@ import type { RoadmapAdapters, RoadmapRagContext, RunRoadmapResult } from './roa
 import type { CompanyInfo, JobInfo } from './roadmap-types'
 import { computeCompetenciesFromProfile, extractKeywordsFromAnalysis } from './roadmap-competencies'
 import { filterRelevantQualifications } from './roadmap-qnet'
-import { GOAL_CONCRETIZATION_CONTENT } from './roadmap-milestones'
+import { GOAL_CONCRETIZATION_CONTENT } from './roadmap-prompts'
+import { recommendCertificationsWithRag, getCertificationsFromOpenAIFallback } from './roadmap-qnet-rag'
 
 /** 검색 결과(CompanyInfo[])에서 제목·액션용 요약 추출 (실제 검색/RAG 기반 구체화용) */
 function summarizeFromSearch(companyInfos: CompanyInfo[], jobInfo: JobInfo | null): {
@@ -97,14 +98,44 @@ export async function buildRuleBasedRoadmap(
     }
     const phase1Desc = `목표 직무(${targetJob}) 달성을 위한 기초 역량을 다집니다.`
 
+    // 자격증 추천: Tavily + DB·상담 + Q-Net/OpenAI 종합 (로드맵 생성 시 함께 산출)
+    const dynamicSkills = computeCompetenciesFromProfile(ruleProfile, ruleAnalysisList, targetJob, targetCompany)
+    const jobInfoFromTavily = jobInfoResult ? {
+        jobTitle: jobInfoResult.jobTitle,
+        requirements: jobInfoResult.requirements,
+        trends: jobInfoResult.trends,
+        skills: jobInfoResult.skills,
+        certifications: (jobInfoResult as { certifications?: string }).certifications,
+    } : null
+    let dynamicCerts: RunRoadmapResult['dynamicCerts']
+    if (qualifications.length > 0) {
+        dynamicCerts = await recommendCertificationsWithRag({
+            qualifications,
+            examSchedule,
+            targetJob,
+            major,
+            analysisList: ruleAnalysisList,
+            jobInfoFromTavily,
+        })
+    } else {
+        dynamicCerts = await getCertificationsFromOpenAIFallback({
+            targetJob,
+            major,
+            analysisList: ruleAnalysisList,
+            jobInfoFromTavily,
+        })
+    }
+
+    // 전공/직무 기반 첫 번째 자격증 추천 (Q-Net 결과 우선, 없으면 전공 기반)
+    const firstCertName = dynamicCerts.length > 0 ? dynamicCerts[0].name : (major && major !== '전공 분야' && major !== '정보 없음' ? `${major} 관련 자격증` : '목표 직무 관련 자격증')
     const phase1Actions = [
-        `전공 지식 증명을 위해 **정보처리기사** 필기 일정 수립 및 3개월 내 1차 취득 목표`,
+        `전공 지식 증명을 위해 **${firstCertName}** 필기 일정 수립 및 3개월 내 1차 취득 목표`,
         `${major} 실무 연계: ${targetJob} 관련 소규모 프로젝트 1개 이상 기획·구현 (Git 저장소 관리)`,
         `협업 도구 숙달: Git 브랜치 전략, Jira 이슈/스프린트 작성 연습`,
         `데이터 기반 문제 해결: 실무 데이터 분석 사례 1건 정리 (의사결정 근거 문서화)`,
     ]
     if (educationLevel === '고등학교 졸업' || educationLevel === '전문대 졸업' || educationLevel === '대학교 재학') {
-        phase1Actions[0] = `정보처리기사 또는 관련 기초 자격증 준비 (필기 합격 목표)`
+        phase1Actions[0] = `${firstCertName} 또는 관련 기초 자격증 준비 (필기 합격 목표)`
         phase1Actions[1] = `${major} 기초 이론 정리 및 ${targetJob} 진로와 연결한 학습 로드맵 작성`
     }
     if (ragSummary.interests) {
@@ -194,72 +225,6 @@ export async function buildRuleBasedRoadmap(
         },
     ]
 
-    const dynamicSkills = computeCompetenciesFromProfile(ruleProfile, ruleAnalysisList, targetJob, targetCompany)
-    const ruleExtractedKw = extractKeywordsFromAnalysis(ruleAnalysisList)
-    let dynamicCerts = filterRelevantQualifications(qualifications, examSchedule, targetJob, major, ruleExtractedKw)
-
-    if (dynamicCerts.length < 3) {
-        const isDev = /개발|엔지니어|소프트웨어|프로그래머/i.test(targetJob)
-        const isData = /데이터|분석|AI|인공지능/i.test(targetJob)
-        if ((isDev || isData) && !dynamicCerts.some((c) => c.name.includes('정보처리'))) {
-            dynamicCerts.unshift({
-                type: '자격증',
-                name: '정보처리기사',
-                status: '취득 권장',
-                color: 'text-blue-600 bg-blue-50',
-                details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 3회 (3월, 7월, 10월)', description: '정보처리 관련 산업기사 자격을 취득한 자 또는 관련학과 졸업자 등이 응시할 수 있는 국가기술자격증입니다.' },
-            })
-        }
-    }
-
-    const isDataRule = /데이터|분석|AI|인공지능/i.test(targetJob)
-    const isCivilRule = /토목|건설|측량|건축|구조/i.test(targetJob)
-    const isSafetyRule = /안전|산업안전|건설안전/i.test(targetJob)
-    const isMechRule = /기계|자동차|메카트로닉스/i.test(targetJob)
-    const isElecRule = /전기|전자|전기기사|전자기사/i.test(targetJob)
-    if (isDataRule) {
-        dynamicCerts.push(
-            { type: '자격증', name: 'ADsP (데이터분석 준전문가)', status: '취득 권장', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터 분석 기초 지식과 데이터 분석 프로세스에 대한 이해를 인증하는 자격증입니다.' } },
-            { type: '자격증', name: 'SQLD (SQL 개발자)', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터베이스와 데이터 모델링에 대한 지식을 바탕으로 SQL을 작성하고 활용할 수 있는 능력을 인증합니다.' } },
-            { type: '자격증', name: '빅데이터분석기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 상', examSchedule: '연 1회 (10월)', description: '빅데이터 분석 및 활용 능력을 종합적으로 평가하는 국가기술자격증입니다.' } }
-        )
-    } else if (isCivilRule) {
-        dynamicCerts.push(
-            { type: '자격증', name: '토목기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '토목공학에 관한 전문지식과 기술을 바탕으로 토목공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설공학에 관한 전문지식과 기술을 바탕으로 건설공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '측량기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '측량에 관한 전문지식과 기술을 바탕으로 지형측량, 지적측량, 공공측량 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설안전기사', status: '준비 중', color: 'text-red-600 bg-red-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설현장의 안전관리에 관한 전문지식과 기술을 바탕으로 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
-        )
-    } else if (isSafetyRule) {
-        dynamicCerts.push(
-            { type: '자격증', name: '산업안전기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '산업안전에 관한 전문지식과 기술을 바탕으로 산업현장의 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설안전기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설현장의 안전관리에 관한 전문지식과 기술을 바탕으로 안전관리 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '소방설비기사', status: '준비 중', color: 'text-red-600 bg-red-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '소방설비에 관한 전문지식과 기술을 바탕으로 소방설비 설치, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '위험물기능사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '위험물의 취급 및 저장에 관한 전문지식과 기술을 인증하는 국가기술자격증입니다.' } }
-        )
-    } else if (isMechRule) {
-        dynamicCerts.push(
-            { type: '자격증', name: '기계기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '기계공학에 관한 전문지식과 기술을 바탕으로 기계설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '자동차정비기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '자동차 정비에 관한 전문지식과 기술을 바탕으로 자동차 점검, 수리, 정비 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '용접기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '용접에 관한 전문지식과 기술을 바탕으로 용접 작업을 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '건설기계기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '건설기계에 관한 전문지식과 기술을 바탕으로 건설기계의 설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
-        )
-    } else if (isElecRule) {
-        dynamicCerts.push(
-            { type: '자격증', name: '전기기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '전기에 관한 전문지식과 기술을 바탕으로 전기설비 설계, 시공, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '전자기사', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 2회 (4월, 10월)', description: '전자공학에 관한 전문지식과 기술을 바탕으로 전자설비 설계, 제조, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '전기공사기사', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '전기공사에 관한 전문지식과 기술을 바탕으로 전기공사 설계, 시공, 감리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } },
-            { type: '자격증', name: '산업계측기사', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중', examSchedule: '연 2회 (4월, 10월)', description: '산업계측에 관한 전문지식과 기술을 바탕으로 계측기기 설계, 설치, 유지관리 등의 업무를 수행할 수 있는 능력을 인증하는 국가기술자격증입니다.' } }
-        )
-    } else {
-        dynamicCerts.push(
-            { type: '자격증', name: '정보처리기사', status: '취득 권장', color: 'text-blue-600 bg-blue-50', details: { written: '필기: 100점 만점에 60점 이상 (과목당 40점 이상)', practical: '실기: 100점 만점에 60점 이상', difficulty: '난이도: 중상', examSchedule: '연 3회 (3월, 7월, 10월)', description: '정보처리 관련 산업기사 자격을 취득한 자 또는 관련학과 졸업자 등이 응시할 수 있는 국가기술자격증입니다.' } },
-            { type: '자격증', name: 'ADsP (데이터분석 준전문가)', status: '준비 중', color: 'text-orange-600 bg-orange-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터 분석 기초 지식과 데이터 분석 프로세스에 대한 이해를 인증하는 자격증입니다.' } },
-            { type: '자격증', name: 'SQLD (SQL 개발자)', status: '취득 권장', color: 'text-green-600 bg-green-50', details: { written: '필기: 60점 이상 (100점 만점)', practical: '실기: 없음', difficulty: '난이도: 중하', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '데이터베이스와 데이터 모델링에 대한 지식을 바탕으로 SQL을 작성하고 활용할 수 있는 능력을 인증합니다.' } },
-            { type: '자격증', name: '컴퓨터활용능력 1급', status: '준비 중', color: 'text-purple-600 bg-purple-50', details: { written: '필기: 70점 이상 (100점 만점)', practical: '실기: 70점 이상 (100점 만점)', difficulty: '난이도: 중', examSchedule: '연 4회 (3월, 6월, 9월, 12월)', description: '컴퓨터 활용 능력을 평가하는 자격증으로, 엑셀, 액세스 등의 활용 능력을 인증합니다.' } }
-        )
-    }
-
     const devPrograms = ['패스트캠퍼스 백엔드 개발 부트캠프', '네이버 커넥트재단 부스트캠프', '삼성 SW 아카데미', '코드스쿼드 마스터즈 코스', '우아한테크코스']
     const dataPrograms = ['패스트캠퍼스 데이터 사이언스 부트캠프', '네이버 커넥트재단 부스트캠프 AI', '삼성 SDS 멀티캠퍼스 데이터 분석 과정', '코드스테이츠 AI 부트캠프', '플래티넘 데이터 아카데미']
     const civilPrograms = ['한국건설기술인협회 토목기사 실무과정', '한국건설기술교육원 건설기사 양성과정', '한국토지주택공사 토목기술자 교육과정', '건설교육원 토목설계 실무과정', '한국건설산업교육원 토목시공 전문과정']
@@ -267,6 +232,14 @@ export async function buildRuleBasedRoadmap(
     const mechPrograms = ['한국기계산업진흥회 기계기사 실무과정', '한국자동차산업협회 자동차정비 전문교육', '기계교육원 기계설계 실무과정', '한국산업인력공단 기계기사 양성과정', '기계기술교육원 기계제조 전문과정']
     const elecPrograms = ['한국전기공사협회 전기기사 실무과정', '한국전자산업진흥회 전자기사 양성과정', '전기교육원 전기설비 실무과정', '한국산업인력공단 전기기사 전문교육', '전자기술교육원 전자설계 실무과정']
     const generalPrograms = ['패스트캠퍼스 IT 부트캠프', '네이버 커넥트재단 부스트캠프', '삼성 SW 아카데미', '코드스테이츠 부트캠프', '멀티캠퍼스 IT 과정']
+    
+    // 직무 계열 분석
+    const isDataRule = /데이터|분석|AI|인공지능/i.test(targetJob)
+    const isCivilRule = /토목|건설|측량|건축|구조/i.test(targetJob)
+    const isSafetyRule = /안전|산업안전|건설안전/i.test(targetJob)
+    const isMechRule = /기계|자동차|메카트로닉스/i.test(targetJob)
+    const isElecRule = /전기|전자|전기기사|전자기사/i.test(targetJob)
+    
     let educationProgram = ''
     if (isDevCareer) educationProgram = devPrograms[Math.floor(Math.random() * devPrograms.length)]
     else if (isDataRule) educationProgram = dataPrograms[Math.floor(Math.random() * dataPrograms.length)]

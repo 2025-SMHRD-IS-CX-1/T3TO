@@ -7,9 +7,10 @@ import { generateRoadmapWithRag } from './roadmap-rag-generate'
 import { ragPlanToMilestones } from './roadmap-milestones'
 import { buildRuleBasedRoadmap } from './roadmap-rule-based'
 import { computeCompetenciesFromProfile } from './roadmap-competencies'
+import { getCertificationsForRoadmap } from './roadmap-qnet-rag'
 
 const SEARCH_TIMEOUT_MS = 10000
-const QNET_TIMEOUT_MS = 15000
+const QNET_TIMEOUT_MS = 5000
 
 export async function runRoadmap(
     userData: RoadmapRagContext,
@@ -37,6 +38,7 @@ export async function runRoadmap(
             .filter(Boolean)
         const jobTitle = clientData.recommended_careers || ''
 
+        const tavilyStart = Date.now()
         const [companyInfos, jobInfo] = await Promise.race([
             Promise.all([
                 companyNames.length && adapters.searchCompany ? adapters.searchCompany(companyNames) : Promise.resolve([]),
@@ -48,6 +50,7 @@ export async function runRoadmap(
         ])
         companyInfosResult = companyInfos
         jobInfoResult = jobInfo
+        console.log(`[runRoadmap] Tavily(기업+직무 검색): ${Date.now() - tavilyStart}ms`)
 
         if (companyInfosResult.length > 0) {
             companyInfoText = companyInfosResult
@@ -65,6 +68,7 @@ export async function runRoadmap(
 
         const openai = new OpenAI({ apiKey: adapters.openaiApiKey })
         const model = adapters.model ?? 'gpt-4o-mini'
+        const ragStart = Date.now()
         const ragResult = await generateRoadmapWithRag(userData, {
             openai,
             model,
@@ -73,71 +77,52 @@ export async function runRoadmap(
             companyInfosResult,
             jobInfoResult,
         })
+        console.log(`[runRoadmap] OpenAI RAG 로드맵 생성: ${Date.now() - ragStart}ms`)
 
         if (ragResult?.plan?.length) {
-            // RAG 결과에서 자격증 이름 추출 (마일스톤이나 추천 자격증 섹션이 있다면 활용)
-            // 현재 구조상 plan 내부에 명시적인 자격증 필드가 없을 수 있으므로, 전체 텍스트에서 유추하거나
-            // ragResult의 다른 필드를 활용해야 함.
-            // 우선 plan의 각 항목에서 '자격증' 관련 키워드가 있는 경우 추출 시도.
-            const potentialCertNames: string[] = []
-
-            // 1. Plan 내 마일스톤 제목/내용에서 추출
-            ragResult.plan.forEach((item: any) => {
-                if (item.milestone_title) potentialCertNames.push(item.milestone_title)
-                // 필요 시 detailed_content 등에서도 추출 가능하나, 정확도를 위해 제목 위주로.
-            })
-
-            // 2. Client Data의 추천 직무 기반 키워드 추가 (보완)
-            if (clientData.recommended_careers) {
-                potentialCertNames.push(clientData.recommended_careers)
-            }
-
-            // 3. 직무별 기본 추천 자격증 추가 (roadmap-milestones.ts 로직과 일치)
-            const targetJob = clientData.recommended_careers || ''
-            const isDevCareer = /개발|엔지니어|소프트웨어|프로그래머/i.test(targetJob)
-            const isDataCareer = /데이터|분석|AI|인공지능/i.test(targetJob)
-            const isCivilCareer = /토목|건설|측량|건축|구조/i.test(targetJob)
-            const isSafetyCareer = /안전|산업안전|건설안전/i.test(targetJob)
-            const isMechCareer = /기계|자동차|메카트로닉스/i.test(targetJob)
-            const isElecCareer = /전기|전자|전기기사|전자기사/i.test(targetJob)
-
-            if (isDataCareer) {
-                potentialCertNames.push('ADsP', '데이터분석', 'SQLD', 'SQL', '빅데이터분석기사')
-            } else if (isCivilCareer) {
-                potentialCertNames.push('토목기사', '건설기사', '측량기사', '건설안전기사')
-            } else if (isSafetyCareer) {
-                potentialCertNames.push('산업안전기사', '건설안전기사', '소방설비기사', '위험물기능사')
-            } else if (isMechCareer) {
-                potentialCertNames.push('기계기사', '자동차정비기사', '용접기사', '건설기계기사')
-            } else if (isElecCareer) {
-                potentialCertNames.push('전기기사', '전자기사', '전기공사기사', '산업계측기사')
-            } else {
-                // 개발 직무 또는 기본
-                potentialCertNames.push('정보처리기사', 'ADsP', 'SQLD', '컴퓨터활용능력')
-            }
-
-            const [qualifications, examSchedule] = await Promise.race([
+            const qnetStart = Date.now()
+            const [qualifications, examSchedule, jobCompetency] = await Promise.race([
                 Promise.all([
                     adapters.getQualifications?.() ?? Promise.resolve([]),
-                    adapters.getExamSchedule?.(potentialCertNames) ?? Promise.resolve([]),
+                    adapters.getExamSchedule?.() ?? Promise.resolve([]),
+                    adapters.getJobCompetencyList?.() ?? Promise.resolve([]),
                 ]),
-                new Promise<[unknown[], unknown[]]>((resolve) =>
-                    setTimeout(() => resolve([[], []]), QNET_TIMEOUT_MS)
+                new Promise<[unknown[], unknown[], unknown[]]>((resolve) =>
+                    setTimeout(() => resolve([[], [], []]), QNET_TIMEOUT_MS)
                 ),
             ])
+            console.log(`[runRoadmap] Q-Net(자격증+시험일정+직무역량): ${Date.now() - qnetStart}ms`)
             const first = ragResult.plan[0] as Record<string, unknown>
             first.자격정보 = (qualifications as unknown[]).slice(0, 3)
             first.시험일정 = (examSchedule as unknown[]).slice(0, 3)
             first['산업분야/대표기업'] = (first['산업분야/대표기업'] as string[]) || ['삼성전자', '현대자동차', '네이버']
+            first.직무역량 = (jobCompetency as unknown[]).slice(0, 3)
 
             const analysisRows = (userData.analysis || []) as Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
+            const targetJobForCerts = (clientData.recommended_careers && clientData.recommended_careers !== '없음' && clientData.recommended_careers !== '미정')
+                ? clientData.recommended_careers
+                : '희망 직무'
+            const majorForCerts = clientData.major || ''
+            const certsStart = Date.now()
+            const dynamicCerts = await getCertificationsForRoadmap({
+                targetJob: targetJobForCerts,
+                major: majorForCerts,
+                analysisList: analysisRows,
+                jobInfoFromTavily: jobInfoResult ?? undefined,
+                education_level: clientData.education_level || undefined,
+                work_experience_years: clientData.work_experience_years ?? 0,
+                getAllQualifications: () => (adapters.getQualifications?.() ?? Promise.resolve([])) as Promise<unknown[]>,
+                getExamSchedule: () => (adapters.getExamSchedule?.() ?? Promise.resolve([])) as Promise<unknown[]>,
+            })
+            console.log(`[runRoadmap] 자격증 추천( getCertificationsForRoadmap ): ${Date.now() - certsStart}ms`)
             const mapped = ragPlanToMilestones(
                 ragResult,
                 clientData,
                 qualifications as unknown[],
                 examSchedule as unknown[],
                 ragResult.companyInfos,
-                analysisRows
+                analysisRows,
+                dynamicCerts
             )
             const profileForCompetencies = {
                 major: clientData.major,

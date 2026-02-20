@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Map, FileText, Calendar, ArrowRight, User, Plus, Loader2 } from "lucide-react"
+import { Map, Calendar, ArrowRight, User, Plus, Loader2 } from "lucide-react"
 import Link from "next/link"
 import {
     Select,
@@ -45,7 +45,7 @@ export default function DashboardPage() {
     const [isDeleting, setIsDeleting] = useState(false)
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
     const [isSavingEdit, setIsSavingEdit] = useState(false)
-    const [draftCount, setDraftCount] = useState(0)
+const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; tags: string[] }[]>([])
 
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -116,13 +116,13 @@ export default function DashboardPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [urlClientId, counselorId, clients]) // clients 의존성 추가하여 목록 로드 후 find 실행되도록 함
 
-    // 선택된 내담자의 자기소개서 초안 개수
+// 선택된 내담자의 자기소개서 초안 목록
     useEffect(() => {
         if (!selectedClientId) {
-            setDraftCount(0)
+            setDrafts([])
             return
         }
-        getDrafts(selectedClientId, counselorId || undefined).then((list) => setDraftCount(list.length))
+        getDrafts(selectedClientId, counselorId || undefined).then((list) => setDrafts(list))
     }, [selectedClientId, counselorId])
 
     const fetchClients = async () => {
@@ -264,9 +264,6 @@ export default function DashboardPage() {
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">
                         {selectedClient ? `${selectedClient.name} 님의 현황` : "대시보드"}
                     </h1>
-                    <p className="text-muted-foreground">
-                        {selectedClient ? `${selectedClient.name} 님의 진로 진행 상황을 한눈에 확인하세요.` : "내담자를 선택하여 진로 진행 상황을 확인하세요."}
-                    </p>
                 </div>
             </div>
 
@@ -373,15 +370,15 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="skill_vector">보유 기술 (스택)</Label>
-                                            <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL" />
+                                            <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="recommended_careers">희망 직무</Label>
-                                            <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어" />
+                                            <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="target_company">목표 기업</Label>
-                                            <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아" />
+                                            <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아 (IT) / 현대건설, 삼성물산 (건설) / 메디트로닉스, 지멘스헬스케어 (의료) / 롯데, 신세계 (유통)" />
                                         </div>
                                     </div>
                                     <DialogFooter>
@@ -413,7 +410,7 @@ export default function DashboardPage() {
                         {selectedClient && (
                             <Button asChild>
                                 <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
-                                    새 목표 생성
+로드맵 생성
                                 </Link>
                             </Button>
                         )}
@@ -524,11 +521,11 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-skill_vector">보유 기술 (스택)</Label>
-                                    <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector ?? ''} placeholder="예: React, Node.js, Python" />
-                                </div>
-                                <div className="space-y-2">
+                                    <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector ?? ''} placeholder="예: React, Node.js, Python (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
+                                    </div>
+                                    <div className="space-y-2">
                                     <Label htmlFor="edit-recommended_careers">희망 직무</Label>
-                                    <Input id="edit-recommended_careers" name="recommended_careers" defaultValue={selectedClient.recommended_careers ?? ''} placeholder="예: 프론트엔드 개발자" />
+                                    <Input id="edit-recommended_careers" name="recommended_careers" defaultValue={selectedClient.recommended_careers ?? ''} placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-target_company">목표 기업</Label>
@@ -571,8 +568,8 @@ export default function DashboardPage() {
                 </Card>
             ) : (
                 <>
-                    {/* Stats Cards - 클릭 시 수정/조회 페이지로 이동 */}
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+{/* Stats Cards - 내담자 정보, 로드맵 진행률, 다가오는 일정 */}
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <Card
                             className="cursor-pointer transition-colors hover:bg-gray-50/80"
                             onClick={() => setIsEditDialogOpen(true)}
@@ -613,20 +610,6 @@ export default function DashboardPage() {
                                 </CardContent>
                             </Card>
                         </Link>
-                        <Link href={`/cover-letter?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
-                            <Card className="cursor-pointer transition-colors hover:bg-gray-50/80">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">자기소개서</CardTitle>
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                                        <FileText className="h-4 w-4" />
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-gray-900">{draftCount}개 초안</div>
-                                    <p className="text-xs text-muted-foreground mt-1">클릭하여 작성·조회</p>
-                                </CardContent>
-                            </Card>
-                        </Link>
                         <Link href={`/schedule?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
                             <Card className="cursor-pointer transition-colors hover:bg-gray-50/80">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -645,18 +628,18 @@ export default function DashboardPage() {
                         </Link>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                        <Card className="col-span-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Card className="flex flex-col h-full">
                             <CardHeader>
                                 <CardTitle>추천 로드맵</CardTitle>
                             </CardHeader>
-                            <CardContent>
+<CardContent className="flex flex-col flex-1 min-h-0">
                                 {roadmapData && roadmapData.milestones ? (() => {
                                     try {
                                         const milestones = JSON.parse(roadmapData.milestones)
                                         const firstStep = milestones[0]
                                         return (
-                                            <div className="space-y-4">
+<div className="flex flex-col h-full">
                                                 <div className="border-l-4 border-purple-600 pl-4">
                                                     <h3 className="font-semibold text-gray-900 mb-2">{firstStep?.title || '로드맵'}</h3>
                                                     <p className="text-sm text-gray-600 line-clamp-2">{firstStep?.description || ''}</p>
@@ -669,7 +652,7 @@ export default function DashboardPage() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="flex items-center gap-2 pt-2 border-t">
+<div className="mt-auto flex justify-end pt-4 border-t">
                                                     <Button variant="outline" size="sm" asChild>
                                                         <Link
                                                             href={
@@ -697,7 +680,7 @@ export default function DashboardPage() {
                                                 </div>
                                                 <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
                                                 <p className="text-xs text-muted-foreground mt-2 mb-4">
-                                                    "새 목표 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
+"로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
                                                 </p>
                                                 <Button variant="outline" asChild>
                                                     <Link
@@ -725,7 +708,7 @@ export default function DashboardPage() {
                                         </div>
                                         <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
                                         <p className="text-xs text-muted-foreground mt-2 mb-4">
-                                            "새 목표 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
+                                            "로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
                                         </p>
                                         <Button variant="outline" asChild>
                                             <Link
@@ -747,16 +730,38 @@ export default function DashboardPage() {
                                 )}
                             </CardContent>
                         </Card>
-                        <Card className="col-span-3">
+                        <Card className="h-full">
                             <CardHeader>
-                                <CardTitle>최근 활동</CardTitle>
+                                <CardTitle>자기소개서</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex flex-col items-center justify-center py-8 text-center">
-                                    <p className="text-sm text-muted-foreground">
-                                        아직 활동 기록이 없습니다
-                                    </p>
-                                </div>
+                                {drafts.length === 0 ? (
+                                    <Link href={`/cover-letter?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`} className="block">
+                                        <div className="flex flex-col items-center justify-center py-8 text-center cursor-pointer hover:opacity-80">
+                                            <div className="text-2xl font-bold text-gray-900">0개 초안</div>
+                                            <p className="text-sm text-muted-foreground mt-1">클릭하여 작성·조회</p>
+                                        </div>
+                                    </Link>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {drafts.map((draft, idx) => (
+                                            <Link
+                                                key={draft.id}
+                                                href={`/cover-letter?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}&draftId=${draft.id}`}
+                                                className="block p-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50/80 transition-colors"
+                                            >
+                                                <div className="font-medium text-sm text-gray-900 line-clamp-1">{draft.title}</div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-muted-foreground">{draft.date}</span>
+                                                    {draft.tags?.length > 0 && (
+                                                        <span className="text-[10px] text-purple-600">#{draft.tags[0]}</span>
+                                                    )}
+                                                </div>
+                                            </Link>
+                                        ))}
+                                        <p className="text-xs text-muted-foreground pt-1">클릭하여 해당 초안 확인·수정</p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Clock, MapPin, Video, MoreHorizontal, Check, X, Plus, Loader2, Calendar as CalendarIcon, Trash2 } from "lucide-react"
@@ -524,25 +523,6 @@ export default function SchedulePage() {
                                                 </span>
                                             </CardDescription>
                                         </div>
-                                        {event.status === 'confirmed' ? (
-                                            <Badge variant="success" className="shrink-0">확정됨</Badge>
-                                        ) : (
-                                            <Badge variant="warning" className="shrink-0">대기 중</Badge>
-                                        )}
-                                    </div>
-                                    {event.content && (
-                                        <p className="mt-3 text-sm text-gray-600 border-t pt-2 line-clamp-2">
-                                            {event.content}
-                                        </p>
-                                    )}
-                                </CardHeader>
-                                <CardContent className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0">
-                                            {event.mentor[0]}
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2 sm:justify-end flex-1">
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -552,29 +532,36 @@ export default function SchedulePage() {
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-xs sm:text-sm h-8"
-                                            onClick={() => setDetailEvent(event)}
-                                        >
-                                            세부사항
-                                        </Button>
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            className="text-xs sm:text-sm h-8"
-                                            onClick={() => {
-                                                if (event.type === 'online') {
-                                                    window.open('https://meet.google.com/new', '_blank')
-                                                } else {
-                                                    alert('오프라인 일정입니다. 장소를 확인해 주세요.')
-                                                }
-                                            }}
-                                        >
-                                            입장하기
-                                        </Button>
                                     </div>
+                                    {event.content && (
+                                        <p className="mt-3 text-sm text-gray-600 border-t pt-2 line-clamp-2">
+                                            {event.content}
+                                        </p>
+                                    )}
+                                </CardHeader>
+                                <CardContent className="flex flex-nowrap items-center justify-center gap-3 px-4 sm:px-6 pt-0">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs sm:text-sm h-9 min-h-[2.25rem] inline-flex items-center flex-1 sm:flex-initial"
+                                        onClick={() => setDetailEvent(event)}
+                                    >
+                                        자세히
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="text-xs sm:text-sm h-9 min-h-[2.25rem] inline-flex items-center flex-1 sm:flex-initial"
+                                        onClick={() => {
+                                            if (event.type === 'online') {
+                                                window.open('https://meet.google.com/new', '_blank')
+                                            } else {
+                                                alert('오프라인 일정입니다. 장소를 확인해 주세요.')
+                                            }
+                                        }}
+                                    >
+                                        온라인상담
+                                    </Button>
                                 </CardContent>
                             </Card>
                         ))
