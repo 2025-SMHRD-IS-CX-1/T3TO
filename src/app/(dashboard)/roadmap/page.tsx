@@ -541,55 +541,17 @@ export default function RoadmapPage() {
                                                         <span className="text-sm text-gray-600">{selectedCert.details.difficulty}</span>
                                                     </div>
                                                 )}
-                                                {(selectedCert.details.examScheduleWritten !== undefined || selectedCert.details.examSchedulePractical !== undefined || selectedCert.details.examSchedule) && (
-                                                    <div className="space-y-1.5">
-                                                        <span className="font-semibold text-sm text-gray-700 block">시험일정</span>
-                                                        {selectedCert.details.examScheduleWritten !== undefined && (
-                                                            <div className="flex items-start gap-2">
-                                                                <span className="text-sm text-gray-600 font-medium min-w-[48px]">필기:</span>
-                                                                <span className="text-sm text-gray-600">
-                                                                    {selectedCert.details.examScheduleWritten || '—'}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {selectedCert.details.examSchedulePractical !== undefined && (
-                                                            <div className="flex items-start gap-2">
-                                                                <span className="text-sm text-gray-600 font-medium min-w-[48px]">실기:</span>
-                                                                <span className="text-sm text-gray-600">
-                                                                    {selectedCert.details.examSchedulePractical || '—'}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {selectedCert.details.examScheduleWritten === undefined && selectedCert.details.examSchedulePractical === undefined && selectedCert.details.examSchedule && (
-                                                            <span className="text-sm text-gray-600">
-                                                                {String(selectedCert.details.examSchedule).replace(/^시험일정:\s*/, '')}
-                                                            </span>
-                                                        )}
-                                                        <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-gray-100">
-                                                            실제 일정과 상이할 수 있으니 Q-Net에서 확인하세요.{' '}
-                                                            <a
-                                                                href="https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03"
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="font-medium underline hover:text-amber-900"
-                                                            >
-                                                                연간 국가기술자격 시험일정(기사·산업기사 등)
-                                                            </a>
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                {selectedCert?.type === '자격증' && selectedCert.details.examScheduleWritten === undefined && selectedCert.details.examSchedulePractical === undefined && !selectedCert.details.examSchedule && (
-                                                    <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-gray-100">
-                                                        실제 일정과 상이할 수 있으니 Q-Net에서 확인하세요.{' '}
+                                                {selectedCert?.type === '자격증' && (
+                                                    <div className="flex items-start gap-2">
                                                         <a
                                                             href="https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03"
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="font-medium underline hover:text-amber-900"
+                                                            className="text-sm font-medium text-amber-700 underline hover:text-amber-900"
                                                         >
-                                                            연간 국가기술자격 시험일정(기사·산업기사 등)
+                                                            시험일정 확인
                                                         </a>
-                                                    </p>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
