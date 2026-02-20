@@ -45,7 +45,7 @@ export default function DashboardPage() {
     const [isDeleting, setIsDeleting] = useState(false)
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
     const [isSavingEdit, setIsSavingEdit] = useState(false)
-    const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; tags: string[] }[]>([])
+const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; tags: string[] }[]>([])
 
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -74,7 +74,7 @@ export default function DashboardPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [urlClientId, counselorId, selectedClientId])
 
-    // 선택된 내담자의 자기소개서 초안 목록
+// 선택된 내담자의 자기소개서 초안 목록
     useEffect(() => {
         if (!selectedClientId) {
             setDrafts([])
@@ -359,7 +359,7 @@ export default function DashboardPage() {
                         {selectedClient && (
                             <Button asChild>
                                 <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
-                                    로드맵 생성
+로드맵 생성
                                 </Link>
                             </Button>
                         )}
@@ -517,7 +517,7 @@ export default function DashboardPage() {
                 </Card>
             ) : (
                 <>
-                    {/* Stats Cards - 내담자 정보, 로드맵 진행률, 다가오는 일정 */}
+{/* Stats Cards - 내담자 정보, 로드맵 진행률, 다가오는 일정 */}
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <Card
                             className="cursor-pointer transition-colors hover:bg-gray-50/80"
@@ -582,13 +582,13 @@ export default function DashboardPage() {
                             <CardHeader>
                                 <CardTitle>추천 로드맵</CardTitle>
                             </CardHeader>
-                            <CardContent className="flex flex-col flex-1 min-h-0">
+<CardContent className="flex flex-col flex-1 min-h-0">
                                 {roadmapData && roadmapData.milestones ? (() => {
                                     try {
                                         const milestones = JSON.parse(roadmapData.milestones)
                                         const firstStep = milestones[0]
                                         return (
-                                            <div className="flex flex-col h-full">
+<div className="flex flex-col h-full">
                                                 <div className="border-l-4 border-purple-600 pl-4">
                                                     <h3 className="font-semibold text-gray-900 mb-2">{firstStep?.title || '로드맵'}</h3>
                                                     <p className="text-sm text-gray-600 line-clamp-2">{firstStep?.description || ''}</p>
@@ -601,7 +601,7 @@ export default function DashboardPage() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="mt-auto flex justify-end pt-4 border-t">
+<div className="mt-auto flex justify-end pt-4 border-t">
                                                     <Button variant="outline" size="sm" asChild>
                                                         <Link
                                                             href={
@@ -629,7 +629,7 @@ export default function DashboardPage() {
                                                 </div>
                                                 <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
                                                 <p className="text-xs text-muted-foreground mt-2 mb-4">
-                                                    "로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
+"로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
                                                 </p>
                                                 <Button variant="outline" asChild>
                                                     <Link

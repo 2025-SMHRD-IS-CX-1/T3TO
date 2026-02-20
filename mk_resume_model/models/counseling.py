@@ -48,12 +48,15 @@ class AIAnalysisResult:
 @dataclass
 class SelfIntroRequest:
     """
-    자기소개서 생성을 위한 요청 (파인튜닝 모델용).
+    자기소개서 생성을 위한 전체 요청.
+    웹 서비스 API에서 사용하는 통합 입력 모델입니다.
     """
 
     counseling: CounselingContent
     ai_analysis: AIAnalysisResult
     language: str = "ko"
+    min_word_count: int = 600
+    focus: str = "strength"  # 작성 초점: "strength"(역량) | "experience"(경험) | "values"(가치관)
 
     def validate(self) -> None:
         """필수 필드 검증."""
