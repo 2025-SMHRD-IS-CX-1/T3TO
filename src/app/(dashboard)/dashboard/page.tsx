@@ -59,20 +59,62 @@ export default function DashboardPage() {
     }, [counselorId])
 
     useEffect(() => {
-        if (clients.length > 0 && urlClientId) {
-            handleClientSelect(urlClientId)
-        }
-    }, [clients, urlClientId])
+        // 클라이언트 목록이 로드되고 URL에 clientId가 없을 때
+        if (clients.length > 0 && !urlClientId) {
+            // 1. localStorage에서 마지막 선택 확인
+            const lastClientId = localStorage.getItem('lastSelectedClientId')
+            const lastCounselorId = localStorage.getItem('lastSelectedCounselorId')
 
-    // URL에서 clientId가 변경되면 로드맵 다시 가져오기
+            // 현재 컨텍스트(상담사/관리자)에 맞는 저장된 값이 있는지 확인
+            const isValidSavedClient = lastClientId && clients.find(c => c.id === lastClientId)
+
+            if (isValidSavedClient) {
+                // 저장된 클라이언트로 이동
+                const params = new URLSearchParams()
+                params.set('clientId', lastClientId)
+                if (counselorId || lastCounselorId) {
+                    params.set('counselorId', (counselorId || lastCounselorId)!)
+                }
+                router.replace(`/dashboard?${params.toString()}`)
+            }
+            // 2. 저장된 값이 없으면 첫 번째 클라이언트 자동 선택 (옵션)
+            // else if (clients.length > 0) {
+            //     const firstClient = clients[0]
+            //     const params = new URLSearchParams()
+            //     params.set('clientId', firstClient.id)
+            //     if (counselorId) params.set('counselorId', counselorId)
+            //     router.replace(`/dashboard?${params.toString()}`)
+            // }
+        }
+    }, [clients, urlClientId, counselorId, router])
+
+    // URL에서 clientId가 변경되면 로드맵 다시 가져오기 & selectedClientId 동기화
     useEffect(() => {
-        if (urlClientId && selectedClientId) {
+        if (urlClientId) {
+            // URL에 ID가 있으면 상태 업데이트 및 스토리지 저장
+            setSelectedClientId(urlClientId)
+            localStorage.setItem('lastSelectedClientId', urlClientId)
+            if (counselorId) {
+                localStorage.setItem('lastSelectedCounselorId', counselorId)
+            }
+
+            // 클라이언트 객체 찾아서 설정
+            if (clients.length > 0) {
+                const client = clients.find(c => c.id === urlClientId)
+                if (client) setSelectedClient(client)
+            }
+
             fetchRoadmap(urlClientId)
+            fetchUpcomingEvent(urlClientId)
+            // URL에 ID가 없으면 초기화 (단, 위에서 자동 리다이렉트가 일어나지 않은 경우)
         } else {
+            setSelectedClientId("")
+            setSelectedClient(null)
             setRoadmapData(null)
+            setUpcomingEvent(null)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [urlClientId, counselorId, selectedClientId])
+    }, [urlClientId, counselorId, clients]) // clients 의존성 추가하여 목록 로드 후 find 실행되도록 함
 
     // 선택된 내담자의 자기소개서 초안 개수
     useEffect(() => {
@@ -103,9 +145,18 @@ export default function DashboardPage() {
     }
 
     const handleClientSelect = (clientId: string) => {
+        // 상태 업데이트 (UI 반응성)
         setSelectedClientId(clientId)
+
+        // localStorage 저장
+        localStorage.setItem('lastSelectedClientId', clientId)
+        if (counselorId) {
+            localStorage.setItem('lastSelectedCounselorId', counselorId)
+        }
+
         const client = clients.find(c => c.id === clientId)
         setSelectedClient(client)
+
         if (clientId) {
             fetchUpcomingEvent(clientId)
             fetchRoadmap(clientId)
@@ -122,7 +173,7 @@ export default function DashboardPage() {
 
     const handleAddClient = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        
+
         setIsSubmitting(true)
 
         const form = e.currentTarget
@@ -207,7 +258,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
             )}
-            
+
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">
