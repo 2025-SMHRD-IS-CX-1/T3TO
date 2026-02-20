@@ -150,114 +150,114 @@ export function Navbar() {
                         </>
                     }
                 >
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="relative group"
-                        >
-                            <Bell className="h-5 w-5 text-gray-600 transition-colors group-hover:text-purple-600" />
-                            {hasNotification && (
-                                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
-                            )}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                        align="end"
-                        className="w-80 p-0"
-                        onInteractOutside={() => {
-                            if (hasNotification && typeof window !== "undefined" && notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated)) {
-                                markAllAsRead()
-                            }
-                        }}
-                    >
-                        {/* 헤더 + 구분선 */}
-                        <div className="px-3 py-3 shadow-[0_1px_0_rgba(148,163,184,0.12)]">
-                            <p className="text-sm font-semibold text-black">알림</p>
-                        </div>
-                        {/* 액션: 모두 읽음만 */}
-                        <div className="flex items-center justify-end px-3 py-2.5 bg-slate-50/60 shadow-[0_1px_0_rgba(148,163,184,0.1)]">
-                            <button
-                                type="button"
-                                className="flex items-center gap-1.5 text-xs text-purple-600 hover:underline"
-                                onClick={markAllAsRead}
-                            >
-                                <Check className="h-3.5 w-3.5" />
-                                모두 읽음
-                            </button>
-                        </div>
-                        {notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated) ? (
-                            <div key={`read-${JSON.stringify(readAt)}`} className="text-sm text-black max-h-80 overflow-y-auto">
-                                {notifDetail.clientsUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("clients", notifDetail.clientsLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>내담자가 추가/변경되었습니다.</div>
-                                )}
-                                {notifDetail.calendarUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("calendar", notifDetail.calendarLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>새 상담 일정이 생성/변경되었습니다.</div>
-                                )}
-                                {notifDetail.roadmapUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("roadmap", notifDetail.roadmapLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>로드맵 내용이 업데이트되었습니다.</div>
-                                )}
-                                {notifDetail.resumeUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("resume", notifDetail.resumeLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>자기소개서 초안이 작성/수정되었습니다.</div>
-                                )}
-                                {notifDetail.consultationUpdated && (
-                                    <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("consultation", notifDetail.consultationLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>상담 기록이 추가/수정되었습니다.</div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="px-3 py-6 text-xs text-black text-center">
-                                새로운 알림이 없습니다.
-                            </div>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
                     <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <div className="h-8 w-8 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-xs shadow-sm cursor-pointer hover:bg-purple-200 transition-colors">
-                            {userInitial}
-                        </div>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                        <div className="flex items-center gap-3 p-3">
-                            <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold">
-                                {userInitial}
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-sm font-semibold text-gray-900">상담사 계정</span>
-                                <span className="text-[10px] text-gray-500 truncate w-32">{userEmail}</span>
-                            </div>
-                        </div>
-                        <Separator className="my-1" />
-                        <DropdownMenuItem className="cursor-pointer">
-                            <User className="mr-2 h-4 w-4" />
-                            <span>내 프로필 설정</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer">
-                            <Settings className="mr-2 h-4 w-4" />
-                            <span>시스템 설정</span>
-                        </DropdownMenuItem>
-                        <Separator className="my-1" />
-                        <DropdownMenuItem
-                            className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
-                            onClick={async () => {
-                                const supabase = createClient()
-                                await supabase.auth.signOut()
-                                window.location.href = '/login'
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="relative group"
+                            >
+                                <Bell className="h-5 w-5 text-gray-600 transition-colors group-hover:text-purple-600" />
+                                {hasNotification && (
+                                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
+                                )}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                            align="end"
+                            className="w-80 p-0"
+                            onInteractOutside={() => {
+                                if (hasNotification && typeof window !== "undefined" && notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated)) {
+                                    markAllAsRead()
+                                }
                             }}
                         >
-                            <LogOut className="mr-2 h-4 w-4" />
-                            <span>로그아웃</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
-                            onClick={() => setIsDeleteDialogOpen(true)}
-                        >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>회원탈퇴</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
+                            {/* 헤더 + 구분선 */}
+                            <div className="px-3 py-3 shadow-[0_1px_0_rgba(148,163,184,0.12)]">
+                                <p className="text-sm font-semibold text-black">알림</p>
+                            </div>
+                            {/* 액션: 모두 읽음만 */}
+                            <div className="flex items-center justify-end px-3 py-2.5 bg-slate-50/60 shadow-[0_1px_0_rgba(148,163,184,0.1)]">
+                                <button
+                                    type="button"
+                                    className="flex items-center gap-1.5 text-xs text-purple-600 hover:underline"
+                                    onClick={markAllAsRead}
+                                >
+                                    <Check className="h-3.5 w-3.5" />
+                                    모두 읽음
+                                </button>
+                            </div>
+                            {notifDetail && (notifDetail.roadmapUpdated || notifDetail.resumeUpdated || notifDetail.calendarUpdated || notifDetail.consultationUpdated || notifDetail.clientsUpdated) ? (
+                                <div key={`read-${JSON.stringify(readAt)}`} className="text-sm text-black max-h-80 overflow-y-auto">
+                                    {notifDetail.clientsUpdated && (
+                                        <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("clients", notifDetail.clientsLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>내담자가 추가/변경되었습니다.</div>
+                                    )}
+                                    {notifDetail.calendarUpdated && (
+                                        <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("calendar", notifDetail.calendarLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>새 상담 일정이 생성/변경되었습니다.</div>
+                                    )}
+                                    {notifDetail.roadmapUpdated && (
+                                        <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("roadmap", notifDetail.roadmapLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>로드맵 내용이 업데이트되었습니다.</div>
+                                    )}
+                                    {notifDetail.resumeUpdated && (
+                                        <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("resume", notifDetail.resumeLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>자기소개서 초안이 작성/수정되었습니다.</div>
+                                    )}
+                                    {notifDetail.consultationUpdated && (
+                                        <div className={`flex items-center gap-2 px-3 py-2.5 hover:bg-purple-100/50 shadow-[0_1px_0_rgba(148,163,184,0.08)] last:shadow-none ${isUnread("consultation", notifDetail.consultationLatest) ? "font-semibold" : "font-light"}`}><span className="text-[10px] text-gray-500 shrink-0">•</span>상담 기록이 추가/수정되었습니다.</div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="px-3 py-6 text-xs text-black text-center">
+                                    새로운 알림이 없습니다.
+                                </div>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <div className="h-8 w-8 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-xs shadow-sm cursor-pointer hover:bg-purple-200 transition-colors">
+                                {userInitial}
+                            </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <div className="flex items-center gap-3 p-3">
+                                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold">
+                                    {userInitial}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-gray-900">상담사 계정</span>
+                                    <span className="text-[10px] text-gray-500 truncate w-32">{userEmail}</span>
+                                </div>
+                            </div>
+                            <Separator className="my-1" />
+                            <DropdownMenuItem className="cursor-pointer">
+                                <User className="mr-2 h-4 w-4" />
+                                <span>내 프로필 설정</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer">
+                                <Settings className="mr-2 h-4 w-4" />
+                                <span>시스템 설정</span>
+                            </DropdownMenuItem>
+                            <Separator className="my-1" />
+                            <DropdownMenuItem
+                                className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
+                                onClick={async () => {
+                                    const supabase = createClient()
+                                    await supabase.auth.signOut()
+                                    window.location.href = '/login'
+                                }}
+                            >
+                                <LogOut className="mr-2 h-4 w-4" />
+                                <span>로그아웃</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
+                                onClick={() => setIsDeleteDialogOpen(true)}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>회원탈퇴</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
                     </DropdownMenu>
                 </ClientOnly>
             </div>
@@ -284,7 +284,7 @@ export function Navbar() {
                             onClick={async () => {
                                 setIsDeleting(true)
                                 const result = await deleteAccount()
-                                
+
                                 if (result.error) {
                                     alert(`회원탈퇴 실패: ${result.error}`)
                                     setIsDeleting(false)

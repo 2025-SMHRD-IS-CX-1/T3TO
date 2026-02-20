@@ -76,7 +76,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     return (
         <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)]">
             <div className="flex h-16 items-center px-4 border-b border-gray-100">
-                <Link href="/dashboard" className="flex items-center justify-center">
+                <Link href={getHref('/dashboard')} className="flex items-center justify-center">
                     <img src="/logo.png" alt="Career Bridge" className="h-12 w-auto object-contain mix-blend-multiply" />
                 </Link>
             </div>
@@ -95,7 +95,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                             }
                         >
                             <Select value={counselorId || ''} onValueChange={onCounselorChange}>
-                                <SelectTrigger className="w-full bg-white">
+                                <SelectTrigger className="w-full bg-white cursor-pointer">
                                     <UserCog className="mr-2 h-4 w-4 text-gray-500" />
                                     <SelectValue placeholder="상담사를 선택하세요" />
                                 </SelectTrigger>
@@ -259,14 +259,14 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                         await supabase.auth.signOut()
                         window.location.href = '/login'
                     }}
-                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900"
+                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
                 >
                     <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                     로그아웃
                 </button>
                 <button
                     onClick={() => setIsDeleteDialogOpen(true)}
-                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 hover:text-red-700"
+                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 hover:text-red-700 cursor-pointer"
                 >
                     <Trash2 className="mr-3 h-5 w-5 text-red-400 group-hover:text-red-500" />
                     회원탈퇴
@@ -295,7 +295,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                             onClick={async () => {
                                 setIsDeleting(true)
                                 const result = await deleteAccount()
-                                
+
                                 if (result.error) {
                                     alert(`회원탈퇴 실패: ${result.error}`)
                                     setIsDeleting(false)
