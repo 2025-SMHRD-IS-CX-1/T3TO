@@ -13,12 +13,6 @@ export interface RoadmapAdapters {
     searchCompany?: (companyNames: string[]) => Promise<CompanyInfo[]>
     /** 목표 직무명 → 직무 요구사항/스킬 검색 (선택) */
     searchJob?: (jobTitle: string) => Promise<JobInfo | null>
-    /** Q-Net 자격증 목록 (선택, 없으면 빈 배열) */
-    getQualifications?: () => Promise<unknown[]>
-    /** Q-Net 시험 일정 (선택) */
-    getExamSchedule?: () => Promise<unknown[]>
-    /** Q-Net 직무역량 (선택, RAG plan에 직무역량 붙일 때 사용) */
-    getJobCompetencyList?: () => Promise<unknown[]>
 }
 
 /** RAG 컨텍스트 — DB/API에서 가져올 내담자 데이터. 어댑터에서 이 형태로 넘기면 됨 */

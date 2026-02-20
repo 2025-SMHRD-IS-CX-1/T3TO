@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRoadmapModel } from '@/lib/ai-models'
-import {
-    getAllQualifications,
-    getExamSchedule,
-    getJobCompetencyList,
-} from '@/lib/qnet-api'
 import { searchCompanyInfo, searchJobInfo } from '@/lib/web-search'
 import { runRoadmap } from '@/app/(dashboard)/roadmap/lib'
 import type { RoadmapRagContext } from '@/app/(dashboard)/roadmap/lib'
@@ -45,9 +40,6 @@ export async function POST(req: NextRequest) {
         model: getRoadmapModel(),
         searchCompany: searchCompanyInfo,
         searchJob: searchJobInfo,
-        getQualifications: () => getAllQualifications(5),
-        getExamSchedule,
-        getJobCompetencyList,
     }
 
     try {

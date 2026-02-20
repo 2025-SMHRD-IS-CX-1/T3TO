@@ -59,9 +59,9 @@ export async function buildRuleBasedRoadmap(
     const targetJob = rawTargetJob && rawTargetJob !== '없음' && rawTargetJob !== '미정' ? rawTargetJob : '희망 직무'
     const targetCompany = rawTargetCompany && rawTargetCompany !== '없음' && rawTargetCompany !== '미정' ? rawTargetCompany : ''
 
-    // 1) 검색·RAG 선행: 기업 검색 + 직무 검색 + Q-Net 병렬 수행
+    // 1) 검색·RAG 선행: 기업 검색 + 직무 검색 (자격증/시험일정 API 미사용)
     const companies = targetCompany ? targetCompany.split(/[,，、]/).map((c) => c.trim()).filter(Boolean) : []
-    const [companyInfosRule, jobInfoResult, qualResult] = await Promise.all([
+    const [companyInfosRule, jobInfoResult] = await Promise.all([
         companies.length && adapters.searchCompany
             ? Promise.race([
                 adapters.searchCompany(companies),
@@ -69,15 +69,9 @@ export async function buildRuleBasedRoadmap(
             ])
             : Promise.resolve([] as CompanyInfo[]),
         adapters.searchJob ? adapters.searchJob(targetJob).catch(() => null) : Promise.resolve(null as JobInfo | null),
-        Promise.race([
-            Promise.all([
-                adapters.getQualifications?.() ?? Promise.resolve([]),
-                adapters.getExamSchedule?.() ?? Promise.resolve([]),
-            ]),
-            new Promise<[unknown[], unknown[]]>((resolve) => setTimeout(() => resolve([[], []]), 5000)),
-        ]),
     ])
-    const [qualifications, examSchedule] = qualResult
+    const qualifications: unknown[] = []
+    const examSchedule: unknown[] = []
     const searchSummary = summarizeFromSearch(companyInfosRule, jobInfoResult ?? null)
 
     const educationLevel = clientData?.education_level || ruleProfile?.education_level || '정보 없음'

@@ -10,7 +10,6 @@ import { computeCompetenciesFromProfile } from './roadmap-competencies'
 import { getCertificationsForRoadmap } from './roadmap-qnet-rag'
 
 const SEARCH_TIMEOUT_MS = 10000
-const QNET_TIMEOUT_MS = 5000
 
 export async function runRoadmap(
     userData: RoadmapRagContext,
@@ -80,23 +79,14 @@ export async function runRoadmap(
         console.log(`[runRoadmap] OpenAI RAG 로드맵 생성: ${Date.now() - ragStart}ms`)
 
         if (ragResult?.plan?.length) {
-            const qnetStart = Date.now()
-            const [qualifications, examSchedule, jobCompetency] = await Promise.race([
-                Promise.all([
-                    adapters.getQualifications?.() ?? Promise.resolve([]),
-                    adapters.getExamSchedule?.() ?? Promise.resolve([]),
-                    adapters.getJobCompetencyList?.() ?? Promise.resolve([]),
-                ]),
-                new Promise<[unknown[], unknown[], unknown[]]>((resolve) =>
-                    setTimeout(() => resolve([[], [], []]), QNET_TIMEOUT_MS)
-                ),
-            ])
-            console.log(`[runRoadmap] Q-Net(자격증+시험일정+직무역량): ${Date.now() - qnetStart}ms`)
+            const qualifications: unknown[] = []
+            const examSchedule: unknown[] = []
+            const jobCompetency: unknown[] = []
             const first = ragResult.plan[0] as Record<string, unknown>
-            first.자격정보 = (qualifications as unknown[]).slice(0, 3)
-            first.시험일정 = (examSchedule as unknown[]).slice(0, 3)
+            first.자격정보 = qualifications.slice(0, 3)
+            first.시험일정 = examSchedule.slice(0, 3)
             first['산업분야/대표기업'] = (first['산업분야/대표기업'] as string[]) || ['삼성전자', '현대자동차', '네이버']
-            first.직무역량 = (jobCompetency as unknown[]).slice(0, 3)
+            first.직무역량 = jobCompetency.slice(0, 3)
 
             const analysisRows = (userData.analysis || []) as Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
             const targetJobForCerts = (clientData.recommended_careers && clientData.recommended_careers !== '없음' && clientData.recommended_careers !== '미정')
@@ -111,15 +101,13 @@ export async function runRoadmap(
                 jobInfoFromTavily: jobInfoResult ?? undefined,
                 education_level: clientData.education_level || undefined,
                 work_experience_years: clientData.work_experience_years ?? 0,
-                getAllQualifications: () => (adapters.getQualifications?.() ?? Promise.resolve([])) as Promise<unknown[]>,
-                getExamSchedule: () => (adapters.getExamSchedule?.() ?? Promise.resolve([])) as Promise<unknown[]>,
             })
             console.log(`[runRoadmap] 자격증 추천( getCertificationsForRoadmap ): ${Date.now() - certsStart}ms`)
             const mapped = ragPlanToMilestones(
                 ragResult,
                 clientData,
-                qualifications as unknown[],
-                examSchedule as unknown[],
+                qualifications,
+                examSchedule,
                 ragResult.companyInfos,
                 analysisRows,
                 dynamicCerts
