@@ -81,22 +81,20 @@ export async function runRoadmap(
 
         if (ragResult?.plan?.length) {
             const qnetStart = Date.now()
-            const [qualifications, examSchedule, jobCompetency] = await Promise.race([
+            const [qualifications, examSchedule] = await Promise.race([
                 Promise.all([
                     adapters.getQualifications?.() ?? Promise.resolve([]),
                     adapters.getExamSchedule?.() ?? Promise.resolve([]),
-                    adapters.getJobCompetencyList?.() ?? Promise.resolve([]),
                 ]),
-                new Promise<[unknown[], unknown[], unknown[]]>((resolve) =>
-                    setTimeout(() => resolve([[], [], []]), QNET_TIMEOUT_MS)
+                new Promise<[unknown[], unknown[]]>((resolve) =>
+                    setTimeout(() => resolve([[], []]), QNET_TIMEOUT_MS)
                 ),
             ])
-            console.log(`[runRoadmap] Q-Net(자격증+시험일정+직무역량): ${Date.now() - qnetStart}ms`)
+            console.log(`[runRoadmap] Q-Net(자격증+시험일정): ${Date.now() - qnetStart}ms`)
             const first = ragResult.plan[0] as Record<string, unknown>
             first.자격정보 = (qualifications as unknown[]).slice(0, 3)
             first.시험일정 = (examSchedule as unknown[]).slice(0, 3)
             first['산업분야/대표기업'] = (first['산업분야/대표기업'] as string[]) || ['삼성전자', '현대자동차', '네이버']
-            first.직무역량 = (jobCompetency as unknown[]).slice(0, 3)
 
             const analysisRows = (userData.analysis || []) as Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
             const targetJobForCerts = (clientData.recommended_careers && clientData.recommended_careers !== '없음' && clientData.recommended_careers !== '미정')
