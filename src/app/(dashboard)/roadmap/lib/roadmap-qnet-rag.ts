@@ -4,6 +4,7 @@
  */
 import OpenAI from 'openai'
 import { getRoadmapModel } from '@/lib/ai-models'
+import { filterQualificationsByEligibility, getExamScheduleWrittenAndPractical } from './roadmap-qnet'
 import {
     CERT_RECOMMENDATION_SYSTEM_PROMPT,
     CERT_OPENAI_FALLBACK_SYSTEM_PROMPT,
@@ -17,6 +18,10 @@ interface RecommendCertificationsOpts {
     major: string
     analysisList: Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
     jobInfoFromTavily?: { jobTitle: string; requirements?: string; trends?: string; skills?: string; certifications?: string } | null
+    education_level?: string
+    work_experience_years?: number
+    /** Q-Net API 미제공 시 Tavily 시험일정 검색 결과 */
+    examScheduleTavilyFallback?: { summary?: string; url?: string }
     profileId?: string
     counselorId?: string | null
 }
@@ -33,23 +38,36 @@ export async function recommendCertificationsWithRag(
         practical?: string
         difficulty?: string
         examSchedule?: string
+        examScheduleWritten?: string
+        examSchedulePractical?: string
         description?: string
     }
 }>> {
-    const { qualifications, examSchedule, targetJob, major, analysisList, jobInfoFromTavily } = opts
+    const { qualifications, examSchedule, targetJob, major, analysisList, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback } = opts
 
     if (qualifications.length === 0) {
         console.log('[자격증 RAG] Q-Net API 결과가 없어 추천을 건너뜁니다')
         return []
     }
 
-    // roadmap-prompts.ts의 메인 프롬프트 구조 활용 (Tavily 직무정보 포함)
+    // 학력·경력(직종 경력 포함)에 따른 자격조건 필터: 고졸→기능사 위주, 대학재학→기능사·산업기사, 대학졸업→기능사·산업기사·기사
+    const eligibleQuals = filterQualificationsByEligibility(qualifications, education_level, work_experience_years)
+    if (eligibleQuals.length === 0) {
+        console.log('[자격증 RAG] 학력·경력 조건에 맞는 자격증이 없어 추천을 건너뜁니다')
+        return []
+    }
+    console.log('[자격증 RAG] 자격조건 필터 후 추천 후보:', eligibleQuals.length, '개 (학력:', education_level || '미입력', ', 경력:', work_experience_years + '년)')
+
+    // roadmap-prompts.ts의 메인 프롬프트 구조 활용 (Tavily 직무정보 + 학력·경력 + 시험일정 Tavily 폴백 반영)
     const userPrompt = buildCertificationRecommendationContext({
         targetJob,
         major,
         analysisList,
-        qualifications,
+        qualifications: eligibleQuals,
         jobInfoFromTavily,
+        education_level,
+        work_experience_years,
+        examScheduleTavilyFallback,
     })
 
     try {
@@ -62,7 +80,7 @@ export async function recommendCertificationsWithRag(
         const openai = new OpenAI({ apiKey: openaiApiKey })
         const model = getRoadmapModel()
 
-        console.log('[자격증 RAG] LLM 호출 시작 - 자격증 수:', qualifications.length)
+        console.log('[자격증 RAG] LLM 호출 시작 - 자격증 수:', eligibleQuals.length)
         const res = await openai.chat.completions.create({
             model,
             messages: [
@@ -100,6 +118,8 @@ export async function recommendCertificationsWithRag(
                 practical?: string
                 difficulty?: string
                 examSchedule?: string
+                examScheduleWritten?: string
+                examSchedulePractical?: string
                 description?: string
             }
         }> = []
@@ -107,8 +127,8 @@ export async function recommendCertificationsWithRag(
         const seenNames = new Set<string>()
 
         for (const rec of parsed.recommended.slice(0, 5)) {
-            // 실제 자격증 목록에서 매칭
-            const matchedQual = qualifications.find((qual) => {
+            // 자격조건 필터된 목록에서만 매칭 (학력·경력에 맞는 자격만)
+            const matchedQual = eligibleQuals.find((qual) => {
                 if (!qual || typeof qual !== 'object') return false
                 const qualObj = qual as Record<string, unknown>
                 const qualName = String(qualObj.qualName || qualObj.qualNm || qualObj.name || qualObj.jmfldnm || '').trim()
@@ -121,20 +141,8 @@ export async function recommendCertificationsWithRag(
             const qualName = String(qualObj.qualName || qualObj.qualNm || qualObj.name || qualObj.jmfldnm || '').trim()
             const qualDesc = String(qualObj.description || qualObj.desc || qualObj.qualDesc || qualObj.obligfldnm || qualObj.mdobligfldnm || '').trim()
 
-            // 시험 일정 찾기
-            let examScheduleInfo = ''
-            for (const exam of examSchedule) {
-                if (!exam || typeof exam !== 'object') continue
-                const examObj = exam as Record<string, unknown>
-                const examQualName = String(examObj.qualName || examObj.qualNm || examObj.jmfldnm || examObj.description || '').trim()
-                const examDate = String(examObj.docExamDt || examObj.pracExamStartDt || examObj.examDate || examObj.implYmd || '').trim()
-                const qualLower = qualName.toLowerCase()
-                const matches = examQualName && (qualLower.includes(examQualName.toLowerCase()) || examQualName.toLowerCase().includes(qualLower) || (/기사|산업기사/.test(examQualName) && qualLower.includes('기사')))
-                if (matches && examDate) {
-                    examScheduleInfo = `시험일정: ${examDate}`
-                    break
-                }
-            }
+            // 시험 일정: API 데이터만 사용 (필기/실기 시행월·회차, 환각 금지)
+            const { examScheduleWritten, examSchedulePractical } = getExamScheduleWrittenAndPractical(examSchedule, qualName)
 
             const colors = [
                 'text-blue-600 bg-blue-50',
@@ -143,7 +151,7 @@ export async function recommendCertificationsWithRag(
                 'text-purple-600 bg-purple-50',
                 'text-red-600 bg-red-50',
             ]
-            const statuses = ['취득 권장', '준비 중', '관심 분야']
+            const statuses = ['취득 권장', '취득 추천', '관심 분야']
 
             recommendedCerts.push({
                 type: '자격증',
@@ -152,7 +160,8 @@ export async function recommendCertificationsWithRag(
                 color: colors[recommendedCerts.length % colors.length],
                 details: {
                     description: rec.reason || qualDesc || `${qualName}에 관한 국가기술자격증입니다.`,
-                    examSchedule: examScheduleInfo || '시험일정: Q-Net 공식 사이트 확인',
+                    examScheduleWritten,
+                    examSchedulePractical,
                     difficulty: '난이도: 중',
                     written: '필기: 100점 만점에 60점 이상',
                     practical: '실기: 100점 만점에 60점 이상',
@@ -182,7 +191,7 @@ export async function getCertificationsFromOpenAIFallback(opts: {
     name: string
     status: string
     color: string
-    details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; description?: string }
+    details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
 }>> {
     const { targetJob, major, analysisList, jobInfoFromTavily } = opts
     const openaiApiKey = process.env.OPENAI_API_KEY
@@ -237,7 +246,7 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
             'text-purple-600 bg-purple-50',
             'text-red-600 bg-red-50',
         ]
-        const statuses = ['취득 권장', '준비 중', '관심 분야']
+        const statuses = ['취득 권장', '취득 추천', '관심 분야']
 
         return parsed.recommended.slice(0, 5).map((rec, i) => ({
             type: '자격증',
@@ -246,7 +255,8 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
             color: colors[i % colors.length],
             details: {
                 description: rec.reason || `${rec.qualName}에 관한 국가기술자격증입니다.`,
-                examSchedule: '시험일정: Q-Net(www.q-net.or.kr) 공식 사이트 확인',
+                examScheduleWritten: '',
+                examSchedulePractical: '',
                 difficulty: '난이도: 중',
                 written: '필기: 100점 만점에 60점 이상',
                 practical: '실기: 100점 만점에 60점 이상',
@@ -258,12 +268,16 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
     }
 }
 
-/** 로드맵 생성 시 사용 - Tavily + DB·상담 + Q-Net/OpenAI 기반 자격증 추천 (단일 진입점) */
+/** 로드맵 생성 시 사용 - Tavily + DB·상담 + Q-Net/OpenAI 기반 자격증 추천 (단일 진입점). 학력·경력 반영. Q-Net API 미제공 시 Tavily 시험일정 검색 활용 */
 export async function getCertificationsForRoadmap(opts: {
     targetJob: string
     major: string
     analysisList: Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
     jobInfoFromTavily?: { jobTitle: string; requirements?: string; trends?: string; skills?: string; certifications?: string } | null
+    education_level?: string
+    work_experience_years?: number
+    /** Q-Net 시험일정 API 미제공 시 Tavily 검색 결과 */
+    examScheduleTavilyFallback?: { summary?: string; url?: string }
     getAllQualifications: () => Promise<unknown[]>
     getExamSchedule: () => Promise<unknown[]>
 }): Promise<Array<{
@@ -271,9 +285,9 @@ export async function getCertificationsForRoadmap(opts: {
     name: string
     status: string
     color: string
-    details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; description?: string }
+    details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
 }>> {
-    const { targetJob, major, analysisList, jobInfoFromTavily, getAllQualifications, getExamSchedule } = opts
+    const { targetJob, major, analysisList, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback, getAllQualifications, getExamSchedule } = opts
     const [qualifications, examSchedule] = await Promise.all([
         getAllQualifications(),
         getExamSchedule(),
@@ -295,6 +309,9 @@ export async function getCertificationsForRoadmap(opts: {
         major,
         analysisList,
         jobInfoFromTavily: jobInfoFromTavily ?? undefined,
+        education_level,
+        work_experience_years,
+        examScheduleTavilyFallback,
     })
 }
 
@@ -309,6 +326,8 @@ function fallbackToKeywordFiltering(opts: RecommendCertificationsOpts): Array<{
         practical?: string
         difficulty?: string
         examSchedule?: string
+        examScheduleWritten?: string
+        examSchedulePractical?: string
         description?: string
     }
 }> {
@@ -321,6 +340,8 @@ function fallbackToKeywordFiltering(opts: RecommendCertificationsOpts): Array<{
         opts.examSchedule,
         opts.targetJob,
         opts.major,
-        extractedKw
+        extractedKw,
+        opts.education_level ?? '',
+        opts.work_experience_years ?? 0
     )
 }

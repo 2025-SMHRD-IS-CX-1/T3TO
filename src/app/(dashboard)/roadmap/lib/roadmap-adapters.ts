@@ -47,7 +47,7 @@ export interface RunRoadmapResult {
         name: string
         status: string
         color: string
-        details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; description?: string }
+        details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
     }>
     targetJob: string
     targetCompany: string
