@@ -2,20 +2,9 @@
 
 import Link from "next/link"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, LogOut, MessageSquare, UserCog, Shield, Trash2 } from "lucide-react"
+import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, LogOut, MessageSquare, UserCog, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
 import { ClientOnly } from "@/components/client-only"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { deleteAccount } from "@/app/(auth)/actions"
 import {
     Select,
     SelectContent,
@@ -49,8 +38,6 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const router = useRouter()
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-    const [isDeleting, setIsDeleting] = useState(false)
     const clientId = searchParams.get('clientId')
     const counselorId = searchParams.get('counselorId')
     const isAdmin = adminContext?.role === 'admin'
@@ -74,9 +61,9 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     }
 
     return (
-        <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)]">
+        <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)] print:hidden">
             <div className="flex h-16 items-center px-4 border-b border-gray-100">
-                <Link href="/dashboard" className="flex items-center justify-center">
+                <Link href={getHref("/dashboard")} className="flex items-center justify-center">
                     <img src="/logo.png" alt="Career Bridge" className="h-12 w-auto object-contain mix-blend-multiply" />
                 </Link>
             </div>
@@ -251,7 +238,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                     </div>
                 </nav>
             </div>
-            <div className="p-4 bg-white/95 shadow-[0_-1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm space-y-2">
+            <div className="p-4 bg-white/95 shadow-[0_-1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm">
                 <button
                     onClick={async () => {
                         const { createClient } = await import('@/lib/supabase/client')
@@ -259,59 +246,12 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                         await supabase.auth.signOut()
                         window.location.href = '/login'
                     }}
-                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900"
+                    className="w-full group flex items-center justify-center px-3 py-3 text-sm font-semibold text-gray-900 rounded-lg border-2 border-gray-200 bg-gray-50 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
                 >
-                    <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
+                    <LogOut className="mr-2 h-5 w-5" />
                     로그아웃
                 </button>
-                <button
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    className="w-full group flex items-center px-3 py-2.5 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 hover:text-red-700"
-                >
-                    <Trash2 className="mr-3 h-5 w-5 text-red-400 group-hover:text-red-500" />
-                    회원탈퇴
-                </button>
             </div>
-
-            {/* 회원탈퇴 확인 다이얼로그 */}
-            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>회원탈퇴</DialogTitle>
-                        <DialogDescription>
-                            정말로 회원탈퇴를 하시겠습니까? 이 작업은 되돌릴 수 없으며, 모든 데이터가 삭제됩니다.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsDeleteDialogOpen(false)}
-                            disabled={isDeleting}
-                        >
-                            취소
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={async () => {
-                                setIsDeleting(true)
-                                const result = await deleteAccount()
-                                
-                                if (result.error) {
-                                    alert(`회원탈퇴 실패: ${result.error}`)
-                                    setIsDeleting(false)
-                                    setIsDeleteDialogOpen(false)
-                                } else {
-                                    // 성공 시 로그인 페이지로 이동
-                                    window.location.href = '/login'
-                                }
-                            }}
-                            disabled={isDeleting}
-                        >
-                            {isDeleting ? '처리 중...' : '회원탈퇴'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     )
 }

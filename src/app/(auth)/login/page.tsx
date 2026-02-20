@@ -8,14 +8,12 @@ import { syncLoginUser } from "../actions"
 import { createClient } from "@/lib/supabase/client"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { MoreHorizontal, User } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface SavedAccount {
-    email: string;
-    lastLogin: number;
+    email: string
+    lastLogin: number
 }
 
 export default function LoginPage() {
@@ -24,28 +22,40 @@ export default function LoginPage() {
     const [rememberMe, setRememberMe] = useState(false)
     const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([])
     const [signupSuccess, setSignupSuccess] = useState(false)
+    const [prefillEmail, setPrefillEmail] = useState('')
+    const [hasLoadedStorage, setHasLoadedStorage] = useState(false)
     const router = useRouter()
     const searchParams = useSearchParams()
 
     useEffect(() => {
-        // Load saved accounts and remember me preference
+        if (typeof window === 'undefined') return
         const saved = localStorage.getItem('saved_accounts')
         if (saved) {
-            setSavedAccounts(JSON.parse(saved))
+            try {
+                setSavedAccounts(JSON.parse(saved))
+            } catch {
+                setSavedAccounts([])
+            }
         }
-        const savedEmail = localStorage.getItem('remembered_email')
-        if (savedEmail) {
-            // Pre-fill email if needed, or just set rememberMe
+        const remembered = localStorage.getItem('remembered_email')
+        if (remembered) {
             setRememberMe(true)
+            setPrefillEmail(remembered)
         }
-        
-        // 회원가입 성공 메시지 확인
+        setHasLoadedStorage(true)
         if (searchParams.get('signup') === 'success') {
             setSignupSuccess(true)
-            // URL에서 쿼리 파라미터 제거 (새로고침 시 메시지가 다시 나타나지 않도록)
             router.replace('/login')
         }
     }, [searchParams, router])
+
+    const handleQuickLogin = (email: string) => {
+        const emailInput = document.getElementById('email') as HTMLInputElement
+        if (emailInput) {
+            emailInput.value = email
+            document.getElementById('password')?.focus()
+        }
+    }
 
     async function handleSubmit(formData: FormData) {
         setLoading(true)
@@ -60,7 +70,6 @@ export default function LoginPage() {
             return
         }
 
-        // 클라이언트에서 Supabase URL이 있어야 함 (.env.local + npm run dev 재시작 필요)
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
         if (!supabaseUrl || supabaseUrl === 'undefined') {
             setError('Supabase URL이 설정되지 않았습니다. .env.local에 NEXT_PUBLIC_SUPABASE_URL을 넣고 터미널에서 npm run dev 를 다시 실행해주세요.')
@@ -82,23 +91,27 @@ export default function LoginPage() {
             return false
         }
 
+        const saveAccountIfRemembered = () => {
+            if (rememberMe) {
+                const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
+                    .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
+                localStorage.setItem('saved_accounts', JSON.stringify(updated))
+                localStorage.setItem('remembered_email', email)
+            } else {
+                localStorage.removeItem('remembered_email')
+            }
+        }
+
         try {
-            // 1) 브라우저에서 직접 Supabase 인증 시도
             const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
             if (authError) {
                 const msg = authError.message || ''
                 if (msg === 'fetch failed' || msg.includes('fetch failed') || msg.includes('Failed to fetch')) {
-                    // 2) 브라우저→Supabase 실패 시 서버 경유 로그인 한 번 더 시도
                     const serverOk = await tryServerSignin()
                     if (serverOk) {
                         syncLoginUser().catch(() => {})
-                        if (rememberMe) {
-                            const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                                .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
-                            localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                            localStorage.setItem('remembered_email', email)
-                        } else localStorage.removeItem('remembered_email')
+                        saveAccountIfRemembered()
                         window.location.href = '/dashboard'
                         return
                     }
@@ -121,16 +134,7 @@ export default function LoginPage() {
             }
 
             syncLoginUser().catch(() => {})
-
-            if (rememberMe) {
-                const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                    .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
-                localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                localStorage.setItem('remembered_email', email)
-            } else {
-                localStorage.removeItem('remembered_email')
-            }
-
+            saveAccountIfRemembered()
             window.location.href = '/dashboard'
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err)
@@ -139,12 +143,7 @@ export default function LoginPage() {
                 const serverOk = await tryServerSignin()
                 if (serverOk) {
                     syncLoginUser().catch(() => {})
-                    if (rememberMe) {
-                        const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                            .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
-                        localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                        localStorage.setItem('remembered_email', email)
-                    } else localStorage.removeItem('remembered_email')
+                    saveAccountIfRemembered()
                     window.location.href = '/dashboard'
                     return
                 }
@@ -153,15 +152,6 @@ export default function LoginPage() {
                 setError(msg || '로그인 중 오류가 발생했습니다.')
             }
             setLoading(false)
-        }
-    }
-
-    const handleQuickLogin = (email: string) => {
-        // For quick login, we'd ideally have a token, but for now just pre-fill email
-        const emailInput = document.getElementById('email') as HTMLInputElement
-        if (emailInput) {
-            emailInput.value = email
-            document.getElementById('password')?.focus()
         }
     }
 
@@ -175,14 +165,14 @@ export default function LoginPage() {
                     <CardDescription>계정에 로그인하여 상담 업무를 시작하세요</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {/* Saved Accounts section */}
                     {savedAccounts.length > 0 && (
                         <div className="space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">최근 로그인 계정</p>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">저장된 계정</p>
                             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
                                 {savedAccounts.map((account) => (
                                     <button
                                         key={account.email}
+                                        type="button"
                                         onClick={() => handleQuickLogin(account.email)}
                                         className="flex flex-col items-center gap-1.5 min-w-[70px] group transition-all"
                                     >
@@ -196,23 +186,33 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    <form action={handleSubmit} className="space-y-4">
+                    <form action={handleSubmit} className="space-y-4" autoComplete="off">
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="email">이메일</Label>
                                 <Input
+                                    key={hasLoadedStorage ? 'email-prefilled' : 'email-initial'}
                                     id="email"
                                     name="email"
                                     placeholder="name@example.com"
                                     type="email"
-                                    defaultValue={typeof window !== 'undefined' ? localStorage.getItem('remembered_email') || '' : ''}
+                                    autoComplete="off"
+                                    defaultValue={prefillEmail}
                                     required
                                     className="h-11"
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="password">비밀번호</Label>
-                                <Input id="password" name="password" type="password" placeholder="••••••••" required className="h-11" />
+                                <Input
+                                    id="password"
+                                    name="password"
+                                    type="password"
+                                    placeholder="••••••••"
+                                    autoComplete="current-password"
+                                    required
+                                    className="h-11"
+                                />
                             </div>
                         </div>
 
@@ -236,8 +236,8 @@ export default function LoginPage() {
 
                         {error && (
                             <div className={`p-3 rounded-lg border text-xs font-medium ${
-                                error.includes('이메일 인증') 
-                                    ? 'bg-amber-50 border-amber-200 text-amber-800' 
+                                error.includes('이메일 인증')
+                                    ? 'bg-amber-50 border-amber-200 text-amber-800'
                                     : 'bg-red-50 border-red-100 text-red-600'
                             }`}>
                                 {error}
@@ -262,8 +262,6 @@ export default function LoginPage() {
                             {loading ? "보안 로그인 중..." : "로그인"}
                         </Button>
                     </form>
-
-
                 </CardContent>
                 <CardFooter className="pb-8">
                     <div className="text-sm text-center w-full text-slate-500">
@@ -274,4 +272,3 @@ export default function LoginPage() {
         </div>
     )
 }
-

@@ -21,11 +21,11 @@ export function Shell({
 }) {
     return (
         <AdminContext.Provider value={adminContext}>
-            <div className="flex h-screen overflow-hidden bg-[#F5F3FF]">
+            <div className="flex h-screen overflow-hidden bg-[#F5F3FF] print:h-auto print:min-h-0 print:overflow-visible">
                 <Sidebar adminContext={adminContext} />
-                <div className="flex flex-1 flex-col overflow-hidden">
+                <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
                     <Navbar />
-                    <main className="flex-1 overflow-y-auto p-8">
+                    <main className="flex-1 overflow-y-auto p-8 print:overflow-visible print:min-h-0">
                         <div className="mx-auto max-w-6xl rounded-3xl bg-white/90 shadow-[0_18px_60px_rgba(148,163,184,0.25)] border border-purple-50">
                             <div className="p-8">
                                 {children}
