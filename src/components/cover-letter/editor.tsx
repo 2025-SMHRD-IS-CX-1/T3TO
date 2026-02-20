@@ -233,13 +233,13 @@ p { white-space: pre-wrap; }
                     <h2 className="font-semibold text-lg">초안 목록</h2>
                     <Button
                         variant="outline"
-                        size="sm"
-                        className="h-8 text-[10px] bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                        size="default"
+                        className="h-10 px-4 text-sm bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
                         onClick={handleGenerateAIDrafts}
                         disabled={isGenerating}
                     >
-                        {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                        AI 생성(3버전)
+                        {isGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                        초안 생성
                     </Button>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-2 min-h-[100px]">
@@ -295,20 +295,6 @@ p { white-space: pre-wrap; }
                             >
                                 <FileEdit className="mr-2 h-4 w-4" />
                                 {isEditing ? "완료" : "직접 수정"}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                title="문장을 자연스럽게 다듬고 표현을 정리합니다"
-                                onClick={handleAiPolish}
-                                disabled={isPolishing || !content}
-                            >
-                                {isPolishing ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
-                                )}
-                                AI 다듬기
                             </Button>
                             {mounted ? (
                                 <DropdownMenu>
