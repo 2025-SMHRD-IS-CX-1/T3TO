@@ -2,9 +2,9 @@
 """
 examples.jsonl 데이터로 자기소개서 생성 모델 fine-tuning.
 
-- 입력: data/examples.jsonl (input, reference) 쌍
-- 모델: Hugging Face 한국어 Causal LM (기본: skt/kogpt2-base-v2)
-- 학습: prompt(직무/역량/배경) → reference(자기소개서 본문) 생성 학습
+- 입력: data/examples.jsonl — 각 줄이 {"input": {...}, "reference": "자기소개서 본문"} (build_input_from_crawl.py로 생성).
+- 모델: Hugging Face 한국어 Causal LM (기본: skt/kogpt2-base-v2).
+- 학습: prompt(직무/역량/배경) + [자기소개서] 다음부터 reference + EOS 까지를 completion으로 두고, 해당 구간에만 loss 부여.
 
 사용법:
   pip install -r requirements-train.txt
@@ -35,7 +35,7 @@ DEFAULT_DATA = SCRIPT_DIR / "data" / "examples.jsonl"
 DEFAULT_OUTPUT = SCRIPT_DIR / "checkpoints" / "resume_lm"
 DEFAULT_MODEL = "skt/kogpt2-base-v2"
 
-# 프롬프트/완성 구분자 (학습 시 loss는 완성 부분만)
+# 프롬프트/완성 구분자. completion은 [자기소개서] 뒤 ~ EOS. loss는 prompt_prefix_len 이후만 계산.
 PROMPT_PREFIX = "직무·역량·배경에 따른 자기소개서 초안을 작성하세요.\n\n"
 INPUT_PREFIX = "[입력]\n"
 OUTPUT_PREFIX = "\n[자기소개서]\n"
@@ -43,7 +43,7 @@ EOS = "<|endoftext|>"
 
 
 def serialize_input(inp: dict) -> str:
-    """모델 입력용 문자열로 변환."""
+    """input dict를 '직무: ... 역량: ... 학력: ... 경험: ... 강점: ...' 한 줄씩 문자열로 변환."""
     roles = inp.get("roles") or []
     comps = inp.get("competencies") or []
     bg = inp.get("background") or {}
@@ -58,6 +58,7 @@ def serialize_input(inp: dict) -> str:
 
 
 def load_examples(path: Path) -> list[dict]:
+    """JSONL 파일에서 한 줄씩 읽어 {"input", "reference"} 딕셔너리 리스트로 반환."""
     examples = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -69,7 +70,7 @@ def load_examples(path: Path) -> list[dict]:
 
 
 def build_texts(examples: list[dict], max_reference_len: int = 2048) -> list[str]:
-    """각 예시를 'prompt + completion' 한 문자열로. 학습 시 completion 부분에만 loss."""
+    """각 예시를 'PROMPT_PREFIX + [입력] + serialize_input(input) + [자기소개서] + reference + EOS' 한 문자열로. reference 너무 길면 잘림."""
     texts = []
     for ex in examples:
         inp = ex.get("input") or {}
@@ -96,8 +97,8 @@ def tokenize_for_causal_lm(
     prompt_prefix_len: int | None = None,
 ):
     """
-    토큰화 후 input_ids, labels 반환.
-    labels에서 prompt 부분은 -100으로 마스크해 loss 미계산.
+    텍스트 리스트 토큰화 후 input_ids, attention_mask, labels 반환.
+    labels에서 앞쪽 prompt_prefix_len 토큰과 padding 위치는 -100으로 두어 loss 제외 (completion만 학습).
     """
     out = tokenizer(
         texts,
