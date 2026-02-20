@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
@@ -28,7 +28,7 @@ import { createClientProfile, getClients, deleteClient, updateClientProfile } fr
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 
-export default function ClientsPage() {
+function ClientsPageContent() {
     const [clients, setClients] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
@@ -580,5 +580,17 @@ export default function ClientsPage() {
                 )}
             </div>
         </div>
+    )
+}
+
+export default function ClientsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+            </div>
+        }>
+            <ClientsPageContent />
+        </Suspense>
     )
 }
