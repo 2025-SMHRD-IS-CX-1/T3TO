@@ -43,3 +43,7 @@ next-env.d.ts
 # ide
 .vscode/
 .idea/
+
+# resume_lm checkpoints (large model files, use mk_resume_model/checkpoints/resume_lm locally)
+/resume_lm
+mk_resume_model/checkpoints/

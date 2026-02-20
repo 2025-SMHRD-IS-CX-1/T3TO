@@ -26,13 +26,22 @@ interface Draft {
 interface CoverLetterEditorProps {
     initialDrafts: Draft[]
     clientId?: string
+    /** URL 등에서 지정된 초안 ID가 있으면 해당 초안을 선택한 상태로 열기 */
+    initialSelectedDraftId?: string
 }
 
-export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditorProps) {
+export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraftId }: CoverLetterEditorProps) {
     const router = useRouter()
     const [drafts, setDrafts] = useState<Draft[]>(initialDrafts)
-    const [selectedDraftId, setSelectedDraftId] = useState<string>(initialDrafts.length > 0 ? initialDrafts[0].id : "")
-    const [content, setContent] = useState<string>(initialDrafts.length > 0 ? initialDrafts[0].content : "")
+    const resolvedInitialId =
+        initialSelectedDraftId && initialDrafts.some((d) => d.id === initialSelectedDraftId)
+            ? initialSelectedDraftId
+            : initialDrafts.length > 0
+              ? initialDrafts[0].id
+              : ""
+    const initialDraft = initialDrafts.find((d) => d.id === resolvedInitialId)
+    const [selectedDraftId, setSelectedDraftId] = useState<string>(resolvedInitialId)
+    const [content, setContent] = useState<string>(initialDraft?.content ?? (initialDrafts.length > 0 ? initialDrafts[0].content : ""))
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
@@ -41,10 +50,15 @@ export function CoverLetterEditor({ initialDrafts, clientId }: CoverLetterEditor
     useEffect(() => {
         setDrafts(initialDrafts)
         if (initialDrafts.length > 0 && !selectedDraftId) {
-            setSelectedDraftId(initialDrafts[0].id)
-            setContent(initialDrafts[0].content)
+            const id =
+                initialSelectedDraftId && initialDrafts.some((d) => d.id === initialSelectedDraftId)
+                    ? initialSelectedDraftId
+                    : initialDrafts[0].id
+            const draft = initialDrafts.find((d) => d.id === id) ?? initialDrafts[0]
+            setSelectedDraftId(draft.id)
+            setContent(draft.content)
         }
-    }, [initialDrafts, selectedDraftId])
+    }, [initialDrafts, selectedDraftId, initialSelectedDraftId])
 
     const handleSelectDraft = (draft: Draft) => {
         setSelectedDraftId(draft.id)
