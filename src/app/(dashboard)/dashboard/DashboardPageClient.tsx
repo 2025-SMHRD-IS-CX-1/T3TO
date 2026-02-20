@@ -646,14 +646,7 @@ export default function DashboardPageClient() {
                                                 <div className="border-l-4 border-purple-600 pl-4">
                                                     <h3 className="font-semibold text-gray-900 mb-2">{firstStep?.title || '로드맵'}</h3>
                                                     <p className="text-sm text-gray-600 line-clamp-2">{firstStep?.description || ''}</p>
-                                                    {roadmapData.target_job && (
-                                                        <div className="mt-2 flex items-center gap-2">
-                                                            <Badge variant="outline" className="text-xs">
-                                                                목표: {roadmapData.target_job}
-                                                                {roadmapData.target_company && ` @ ${roadmapData.target_company}`}
-                                                            </Badge>
-                                                        </div>
-                                                    )}
+
                                                 </div>
                                                 <div className="mt-auto flex justify-end pt-4 border-t">
                                                     <Button variant="outline" size="sm" asChild>
