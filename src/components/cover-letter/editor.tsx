@@ -37,8 +37,8 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
         initialSelectedDraftId && initialDrafts.some((d) => d.id === initialSelectedDraftId)
             ? initialSelectedDraftId
             : initialDrafts.length > 0
-              ? initialDrafts[0].id
-              : ""
+                ? initialDrafts[0].id
+                : ""
     const initialDraft = initialDrafts.find((d) => d.id === resolvedInitialId)
     const [selectedDraftId, setSelectedDraftId] = useState<string>(resolvedInitialId)
     const [content, setContent] = useState<string>(initialDraft?.content ?? (initialDrafts.length > 0 ? initialDrafts[0].content : ""))
@@ -151,10 +151,37 @@ p { white-space: pre-wrap; }
 
     const handleDownloadRtf = () => {
         const title = drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서"
-        const escapeRtf = (s: string) => s.replace(/\\/g, "\\\\").replace(/{/g, "\\{").replace(/}/g, "\\}")
-        const bodyRtf = escapeRtf((content ?? "").replace(/\n/g, "\\par\n"))
-        const titleRtf = escapeRtf(title)
-        const rtfContent = `{\\rtf1\\ansi\\deff0\n{\\fonttbl{\\f0 Malgun Gothic;}}\n\\f0\\fs24\n{\\b ${titleRtf}}\\par\n\\par\n${bodyRtf}\n}`
+
+        // RTF unicode escape helper
+        const toRtfUnicode = (str: string) => {
+            let result = ""
+            for (let i = 0; i < str.length; i++) {
+                const code = str.charCodeAt(i)
+                if (code < 128) {
+                    // ASCII characters: escape special chars
+                    const char = str[i]
+                    if (char === '\\' || char === '{' || char === '}') {
+                        result += '\\' + char
+                    } else if (char === '\n') {
+                        result += '\\par\n'
+                    } else {
+                        result += char
+                    }
+                } else {
+                    // Unicode characters: \uN?
+                    // RTF requires signed 16-bit integers for standard RTF writers
+                    const signedCode = code > 32767 ? code - 65536 : code
+                    result += `\\u${signedCode}?`
+                }
+            }
+            return result
+        }
+
+        const bodyRtf = toRtfUnicode(content ?? "")
+        const titleRtf = toRtfUnicode(title)
+
+        // \uc1 ensures that if a reader doesn't understand Unicode, it skips 1 char (the '?')
+        const rtfContent = `{\\rtf1\\ansi\\deff0\\uc1\n{\\fonttbl{\\f0 Malgun Gothic;}}\n\\f0\\fs24\n{\\b ${titleRtf}}\\par\n\\par\n${bodyRtf}\n}`
         const blob = new Blob([rtfContent], { type: "application/rtf" })
         downloadBlob(blob, getDownloadFilename("rtf"))
     }
@@ -289,9 +316,9 @@ p { white-space: pre-wrap; }
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => {
-                                setIsEditing(!isEditing)
-                                setHighlightChunks(null)
-                            }}
+                                    setIsEditing(!isEditing)
+                                    setHighlightChunks(null)
+                                }}
                             >
                                 <FileEdit className="mr-2 h-4 w-4" />
                                 {isEditing ? "완료" : "직접 수정"}

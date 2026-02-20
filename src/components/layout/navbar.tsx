@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, Search, User, LogOut, Settings, Trash2, Check } from "lucide-react"
+import { Bell, Search, LogOut, Trash2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { ClientOnly } from "@/components/client-only"
@@ -229,15 +229,6 @@ export function Navbar() {
                                     <span className="text-[10px] text-gray-500 truncate w-32">{userEmail}</span>
                                 </div>
                             </div>
-                            <Separator className="my-1" />
-                            <DropdownMenuItem className="cursor-pointer">
-                                <User className="mr-2 h-4 w-4" />
-                                <span>내 프로필 설정</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
-                                <Settings className="mr-2 h-4 w-4" />
-                                <span>시스템 설정</span>
-                            </DropdownMenuItem>
                             <Separator className="my-1" />
                             <DropdownMenuItem
                                 className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"

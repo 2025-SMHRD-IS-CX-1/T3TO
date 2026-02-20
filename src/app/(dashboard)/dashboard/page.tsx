@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Map, Calendar, ArrowRight, User, Plus, Loader2 } from "lucide-react"
+import { Map, Calendar, ArrowRight, User, Plus, Loader2, Target, Building2 } from "lucide-react"
 import Link from "next/link"
 import {
     Select,
@@ -643,12 +643,28 @@ export default function DashboardPage() {
                                                 <div className="border-l-4 border-purple-600 pl-4">
                                                     <h3 className="font-semibold text-gray-900 mb-2">{firstStep?.title || '로드맵'}</h3>
                                                     <p className="text-sm text-gray-600 line-clamp-2">{firstStep?.description || ''}</p>
-                                                    {roadmapData.target_job && (
-                                                        <div className="mt-2 flex items-center gap-2">
-                                                            <Badge variant="outline" className="text-xs">
-                                                                목표: {roadmapData.target_job}
-                                                                {roadmapData.target_company && ` @ ${roadmapData.target_company}`}
-                                                            </Badge>
+                                                    {(roadmapData.target_job || roadmapData.target_company) && (
+                                                        <div className="mt-4 rounded-lg border border-purple-100 bg-purple-50/50 p-3">
+                                                            <div className="flex flex-col gap-2">
+                                                                {roadmapData.target_job && (
+                                                                    <div className="flex items-start gap-2 text-sm">
+                                                                        <Target className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-semibold text-purple-900 text-xs">목표 직무</span>
+                                                                            <span className="text-gray-700">{roadmapData.target_job}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {roadmapData.target_company && (
+                                                                    <div className="flex items-start gap-2 text-sm">
+                                                                        <Building2 className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-semibold text-purple-900 text-xs">목표 기업</span>
+                                                                            <span className="text-gray-700">{roadmapData.target_company}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
