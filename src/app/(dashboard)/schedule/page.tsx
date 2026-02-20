@@ -560,7 +560,7 @@ export default function SchedulePage() {
                                             }
                                         }}
                                     >
-                                        온라인상담
+                                        온라인 상담
                                     </Button>
                                 </CardContent>
                             </Card>
