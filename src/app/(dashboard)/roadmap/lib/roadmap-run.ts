@@ -38,6 +38,7 @@ export async function runRoadmap(
             .filter(Boolean)
         const jobTitle = clientData.recommended_careers || ''
 
+        const tavilyStart = Date.now()
         const [companyInfos, jobInfo] = await Promise.race([
             Promise.all([
                 companyNames.length && adapters.searchCompany ? adapters.searchCompany(companyNames) : Promise.resolve([]),
@@ -49,6 +50,7 @@ export async function runRoadmap(
         ])
         companyInfosResult = companyInfos
         jobInfoResult = jobInfo
+        console.log(`[runRoadmap] Tavily(기업+직무 검색): ${Date.now() - tavilyStart}ms`)
 
         if (companyInfosResult.length > 0) {
             companyInfoText = companyInfosResult
@@ -66,6 +68,7 @@ export async function runRoadmap(
 
         const openai = new OpenAI({ apiKey: adapters.openaiApiKey })
         const model = adapters.model ?? 'gpt-4o-mini'
+        const ragStart = Date.now()
         const ragResult = await generateRoadmapWithRag(userData, {
             openai,
             model,
@@ -74,8 +77,10 @@ export async function runRoadmap(
             companyInfosResult,
             jobInfoResult,
         })
+        console.log(`[runRoadmap] OpenAI RAG 로드맵 생성: ${Date.now() - ragStart}ms`)
 
         if (ragResult?.plan?.length) {
+            const qnetStart = Date.now()
             const [qualifications, examSchedule, jobCompetency] = await Promise.race([
                 Promise.all([
                     adapters.getQualifications?.() ?? Promise.resolve([]),
@@ -86,6 +91,7 @@ export async function runRoadmap(
                     setTimeout(() => resolve([[], [], []]), QNET_TIMEOUT_MS)
                 ),
             ])
+            console.log(`[runRoadmap] Q-Net(자격증+시험일정+직무역량): ${Date.now() - qnetStart}ms`)
             const first = ragResult.plan[0] as Record<string, unknown>
             first.자격정보 = (qualifications as unknown[]).slice(0, 3)
             first.시험일정 = (examSchedule as unknown[]).slice(0, 3)
@@ -97,14 +103,18 @@ export async function runRoadmap(
                 ? clientData.recommended_careers
                 : '희망 직무'
             const majorForCerts = clientData.major || ''
+            const certsStart = Date.now()
             const dynamicCerts = await getCertificationsForRoadmap({
                 targetJob: targetJobForCerts,
                 major: majorForCerts,
                 analysisList: analysisRows,
                 jobInfoFromTavily: jobInfoResult ?? undefined,
+                education_level: clientData.education_level || undefined,
+                work_experience_years: clientData.work_experience_years ?? 0,
                 getAllQualifications: () => (adapters.getQualifications?.() ?? Promise.resolve([])) as Promise<unknown[]>,
                 getExamSchedule: () => (adapters.getExamSchedule?.() ?? Promise.resolve([])) as Promise<unknown[]>,
             })
+            console.log(`[runRoadmap] 자격증 추천( getCertificationsForRoadmap ): ${Date.now() - certsStart}ms`)
             const mapped = ragPlanToMilestones(
                 ragResult,
                 clientData,

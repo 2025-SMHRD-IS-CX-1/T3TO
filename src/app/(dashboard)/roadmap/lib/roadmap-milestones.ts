@@ -10,7 +10,7 @@ import { GOAL_CONCRETIZATION_CONTENT } from './roadmap-prompts'
 export type RagPlanToMilestonesResult = {
     info: Array<{ id: string; title: string; description: string; status: string; date: string; quizScore: number; resources: { title: string; url: string; type: 'video' | 'article' | 'quiz'; content?: string }[]; actionItems: string[] }>
     dynamicSkills: Array<{ title: string; desc: string; level: number }>
-    dynamicCerts: Array<{ type: string; name: string; status: string; color: string; details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; description?: string } }>
+    dynamicCerts: Array<{ type: string; name: string; status: string; color: string; details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string } }>
     targetJob: string
     targetCompany: string
 }
@@ -18,7 +18,7 @@ export type RagPlanToMilestonesResult = {
 /** RAG plan + Q-Net API 데이터를 기존 마일스톤/스킬/자격 형식으로 변환 */
 export function ragPlanToMilestones(
     rag: RagRoadmapResult,
-    clientData: { recommended_careers?: string; target_company?: string; education_level?: string; major?: string },
+    clientData: { recommended_careers?: string; target_company?: string; education_level?: string; major?: string; work_experience_years?: number },
     qualifications: unknown[] = [],
     examSchedule: unknown[] = [],
     companyInfos?: CompanyInfo[],
@@ -40,7 +40,7 @@ export function ragPlanToMilestones(
         {
             major: clientData?.major,
             education_level: clientData?.education_level,
-            work_experience_years: 0, // RAG 경로에서는 work_experience_years 정보가 없으므로 0으로 설정
+            work_experience_years: clientData?.work_experience_years ?? 0,
         },
         analysisList,
         targetJob,
@@ -53,7 +53,15 @@ export function ragPlanToMilestones(
     // 로드맵 생성 시 종합 추천된 자격증이 있으면 사용, 없으면 키워드 필터링
     const dynamicCerts = precomputedCerts && precomputedCerts.length > 0
         ? precomputedCerts
-        : filterRelevantQualifications(qualifications, examSchedule, targetJob, major, extractedKw)
+        : filterRelevantQualifications(
+            qualifications,
+            examSchedule,
+            targetJob,
+            major,
+            extractedKw,
+            clientData?.education_level ?? '',
+            clientData?.work_experience_years ?? 0
+        )
 
     /** "채용 공고·인재상 분석 기반" 등 맥락 문구 제거 후 실질적 수행 내용만 반환 */
     const stripMetaPhrases = (s: string): string => {

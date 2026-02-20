@@ -192,13 +192,14 @@ export async function createClientProfile(formData: FormData, counselorId?: stri
 
     console.log('createClientProfile: 내담자 추가 성공', { profile_id: newProfile?.profile_id, user_id: newProfile?.user_id })
 
-    // Automatically create initial roadmap for the new client
+    // 로드맵은 백그라운드에서 생성 (등록은 즉시 응답)
     if (newProfile) {
         const { createInitialRoadmap } = await import('../../roadmap/actions')
-        await createInitialRoadmap(newProfile.profile_id, newProfile, counselorId)
+        createInitialRoadmap(newProfile.profile_id, newProfile, counselorId).catch((e) =>
+            console.error('[createClientProfile] 백그라운드 로드맵 생성 실패:', e)
+        )
     }
 
-    // 관련 페이지들 캐시 무효화
     revalidatePath('/admin/clients')
     revalidatePath('/dashboard')
     return { success: true }
