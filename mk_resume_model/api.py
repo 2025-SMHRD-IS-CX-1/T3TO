@@ -1,6 +1,8 @@
 """
 자기소개서 생성 웹 API.
-FastAPI 기반으로 모듈화되어 웹 서비스에 연결할 수 있습니다.
+
+- FastAPI 앱: POST /api/self-intro/generate 로 요청 받아 서비스 create_self_introduction 호출 후 응답 반환.
+- 요청/응답은 Pydantic 스키마로 검증. 내부적으로는 models.counseling / models.output 의 dataclass 로 변환해 사용.
 """
 
 from __future__ import annotations
@@ -19,10 +21,10 @@ from models.counseling import (
 from models.output import SelfIntroResponse
 
 
-# --- Pydantic 스키마 (API 요청/응답용) ---
+# --- Pydantic 스키마 (JSON 요청/응답 검증용. OpenAPI 문서에도 사용) ---
 
 class CounselingContentSchema(BaseModel):
-    """상담 컨텐츠 스키마"""
+    """상담 컨텐츠 스키마 (요청 body.counseling)"""
 
     content: str = Field(..., description="상담 기록 전문 또는 요약")
     session_date: Optional[str] = Field(None, description="상담 일자")
@@ -30,7 +32,7 @@ class CounselingContentSchema(BaseModel):
 
 
 class ExtractedBackgroundSchema(BaseModel):
-    """AI 추출 배경 정보 스키마"""
+    """AI 추출 배경 정보 스키마 (요청 body.ai_analysis.extracted_background)"""
 
     name: Optional[str] = None
     education: Optional[str] = None
@@ -40,7 +42,7 @@ class ExtractedBackgroundSchema(BaseModel):
 
 
 class AIAnalysisResultSchema(BaseModel):
-    """AI 분석 결과 스키마"""
+    """AI 분석 결과 스키마 (요청 body.ai_analysis). roles, competencies 필수."""
 
     roles: List[str] = Field(..., description="추천 직무/분야 목록")
     competencies: List[str] = Field(..., description="직무역량 목록")
@@ -48,7 +50,7 @@ class AIAnalysisResultSchema(BaseModel):
 
 
 class SelfIntroRequestSchema(BaseModel):
-    """자기소개서 생성 요청 스키마"""
+    """자기소개서 생성 요청 스키마 (POST body 전체)"""
 
     counseling: CounselingContentSchema
     ai_analysis: AIAnalysisResultSchema
@@ -61,14 +63,14 @@ class SelfIntroRequestSchema(BaseModel):
 
 
 class SelfIntroResponseSchema(BaseModel):
-    """자기소개서 생성 응답 스키마"""
+    """자기소개서 생성 응답 스키마 (draft 본문 + 선택 reasoning + 글자 수)"""
 
     draft: str = Field(..., description="자기소개서 초안 본문")
     reasoning: Optional[str] = Field(None, description="추론 과정")
     word_count: int = Field(0, description="생성된 글자 수")
 
 
-# --- FastAPI 앱 ---
+# --- FastAPI 앱 및 엔드포인트 ---
 
 app = FastAPI(
     title="자기소개서 생성 API",
@@ -78,6 +80,7 @@ app = FastAPI(
 
 
 def _to_counseling(c: CounselingContentSchema) -> CounselingContent:
+    """Pydantic 스키마 → counseling 모델(dataclass) 변환."""
     return CounselingContent(
         content=c.content,
         session_date=c.session_date,
@@ -86,6 +89,7 @@ def _to_counseling(c: CounselingContentSchema) -> CounselingContent:
 
 
 def _to_extracted(e: Optional[ExtractedBackgroundSchema]) -> Optional[ExtractedBackground]:
+    """Pydantic 스키마 → ExtractedBackground 변환. None이면 None 반환."""
     if e is None:
         return None
     return ExtractedBackground(
@@ -98,6 +102,7 @@ def _to_extracted(e: Optional[ExtractedBackgroundSchema]) -> Optional[ExtractedB
 
 
 def _to_ai_analysis(a: AIAnalysisResultSchema) -> AIAnalysisResult:
+    """Pydantic 스키마 → AIAnalysisResult 변환."""
     return AIAnalysisResult(
         roles=a.roles,
         competencies=a.competencies,
@@ -112,6 +117,7 @@ def _to_ai_analysis(a: AIAnalysisResultSchema) -> AIAnalysisResult:
     description="상담 컨텐츠와 AI 분석된 직무역량/추천분야를 바탕으로 자기소개서 초안을 생성합니다.",
 )
 def generate_self_intro(request: SelfIntroRequestSchema) -> SelfIntroResponseSchema:
+    """요청 스키마 → SelfIntroRequest 변환 후 create_self_introduction 호출, 응답 스키마로 반환. 검증 실패 시 400."""
     from models.counseling import SelfIntroRequest
 
     req = SelfIntroRequest(
