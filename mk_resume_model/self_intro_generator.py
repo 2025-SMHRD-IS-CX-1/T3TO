@@ -1,3 +1,12 @@
+"""
+자기소개서 템플릿 생성기.
+
+- 입력: SelfIntroInput(roles, competencies, background, language, focus)
+- 출력: SelfIntroOutput(reasoning, draft)
+- reasoning: 왜 이렇게 구성했는지 설명 문단 (직무/역량/가정 등)
+- draft: 실제 자기소개서 본문. focus에 따라 역량/경험/가치관 중심 3종 + 영어 1종.
+- LM 체크포인트가 없을 때 서비스 레이어에서 이 모듈을 사용합니다.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,7 +20,7 @@ Focus = Literal["strength", "experience", "values"]
 @dataclass
 class CandidateBackground:
     """
-    지원자 기본 정보 및 경험을 표현하는 데이터 클래스.
+    지원자 기본 정보 및 경험. adapter에서 ExtractedBackground를 이 형식으로 넘겨줌.
     """
 
     name: Optional[str] = None
@@ -24,27 +33,28 @@ class CandidateBackground:
 @dataclass
 class SelfIntroInput:
     """
-    자기소개서 생성을 위한 입력 파라미터.
+    자기소개서 생성기의 입력. roles/competencies/background 필수, 나머지는 기본값 있음.
     """
 
-    roles: List[str]
-    competencies: List[str]
+    roles: List[str]  # 추천 직무 (예: ["데이터 분석가"])
+    competencies: List[str]  # 직무역량 (예: ["데이터 분석", "문제해결"])
     background: CandidateBackground
     language: Language = "ko"
-    min_word_count: int = 600
+    min_word_count: int = 600  # 참고용 (템플릿은 고정 분량)
     focus: Focus = "strength"  # strength(역량) | experience(경험) | values(가치관)
 
 
 @dataclass
 class SelfIntroOutput:
     """
-    자기소개서 생성 결과.
+    생성기 내부 출력: 추론 문단 + 자기소개서 본문. 서비스에서 SelfIntroResponse로 감쌈.
     """
 
-    reasoning: str
-    draft: str
+    reasoning: str  # 직무/역량 매핑, 가정 등 설명
+    draft: str  # 자기소개서 본문
 
 
+# --- 직무/역량 한 줄 설명 (한·영). 프롬프트·reasoning 생성 시 사용 ---
 ROLE_SUMMARIES_KO = {
     "데이터 분석가": "데이터 기반 의사결정, 통계 분석, 가설 검증, 비즈니스 인사이트 도출에 강점을 요구하는 직무입니다.",
     "백엔드 개발자": "안정적인 서버 설계, 데이터 모델링, 성능 및 보안에 대한 이해가 중요한 직무입니다.",
@@ -73,12 +83,14 @@ COMPETENCY_SUMMARIES_EN = {
 
 
 def _join_list(items: Optional[List[str]], sep: str = ", ") -> str:
+    """리스트를 구분자로 이어 붙인 문자열. None/빈 리스트면 ''."""
     if not items:
         return ""
     return sep.join(items)
 
 
 def _build_reasoning_ko(input_data: SelfIntroInput) -> str:
+    """한국어 reasoning 문단: 직무 설명 + 역량 설명 + 흐름 설계 + (경험/강점 없을 때) 가정 문장."""
     roles = input_data.roles
     comps = input_data.competencies
     bg = input_data.background
@@ -131,6 +143,7 @@ def _build_reasoning_ko(input_data: SelfIntroInput) -> str:
 
 
 def _build_reasoning_en(input_data: SelfIntroInput) -> str:
+    """영어 reasoning 문단. 구조는 _build_reasoning_ko와 동일, 영문 문장."""
     roles = input_data.roles
     comps = input_data.competencies
     bg = input_data.background
@@ -183,7 +196,7 @@ def _build_reasoning_en(input_data: SelfIntroInput) -> str:
 
 
 def _build_draft_ko_strength(input_data: SelfIntroInput) -> str:
-    """역량 중심 초안."""
+    """역량 중심 초안: 도입 → 역량 발휘 경험 → 실패/성장 → 학습 체계 → 결론 (한국어)."""
     bg = input_data.background
     roles = _join_list(input_data.roles, ", ")
     comps = _join_list(input_data.competencies, ", ")
@@ -235,7 +248,7 @@ def _build_draft_ko_strength(input_data: SelfIntroInput) -> str:
 
 
 def _build_draft_ko_experience(input_data: SelfIntroInput) -> str:
-    """경험 중심 초안: 구체적 에피소드·상황-과제-행동-결과 강조."""
+    """경험 중심 초안: 구체적 에피소드·상황-과제-행동-결과(STAR) 강조 (한국어)."""
     bg = input_data.background
     roles = _join_list(input_data.roles, ", ")
     comps = _join_list(input_data.competencies, ", ")
@@ -282,7 +295,7 @@ def _build_draft_ko_experience(input_data: SelfIntroInput) -> str:
 
 
 def _build_draft_ko_values(input_data: SelfIntroInput) -> str:
-    """가치관 중심 초안: 상담에서 추출한 가치관·태도·협업 강조."""
+    """가치관 중심 초안: 상담에서 추출한 가치관·태도·협업 강조 (한국어)."""
     bg = input_data.background
     roles = _join_list(input_data.roles, ", ")
     comps = _join_list(input_data.competencies, ", ")
@@ -323,6 +336,7 @@ def _build_draft_ko_values(input_data: SelfIntroInput) -> str:
 
 
 def _build_draft_ko(input_data: SelfIntroInput) -> str:
+    """한국어 초안: focus에 따라 strength / experience / values 중 하나의 템플릿 호출."""
     focus = getattr(input_data, "focus", "strength") or "strength"
     if focus == "experience":
         return _build_draft_ko_experience(input_data)
@@ -332,6 +346,7 @@ def _build_draft_ko(input_data: SelfIntroInput) -> str:
 
 
 def _build_draft_en(input_data: SelfIntroInput) -> str:
+    """영어 초안: 역량 중심 구조로 본문 생성 (현재 focus 분기 없음, 한 종류만)."""
     bg = input_data.background
     roles = _join_list(input_data.roles, ", ")
     comps = _join_list(input_data.competencies, ", ")
@@ -388,8 +403,8 @@ def _build_draft_en(input_data: SelfIntroInput) -> str:
 
 def generate_self_introduction(input_data: SelfIntroInput) -> SelfIntroOutput:
     """
-    추천된 직무와 역량, 지원자 배경 정보를 기반으로
-    Reasoning 섹션과 자기소개서 초안을 생성합니다.
+    추천 직무·역량·배경으로 reasoning 문단 + 자기소개서 초안(draft) 생성.
+    language가 "ko"면 한국어, 아니면 영어. focus는 한국어일 때만 strength/experience/values 구분.
     """
     if input_data.language == "ko":
         reasoning = _build_reasoning_ko(input_data)
@@ -403,9 +418,8 @@ def generate_self_introduction(input_data: SelfIntroInput) -> SelfIntroOutput:
 
 def generate_self_introduction_text(input_data: SelfIntroInput) -> str:
     """
-    외부에서는 최종 자기소개서 텍스트만 필요할 때 사용하는 헬퍼 함수.
-    - 내부적으로는 여전히 Reasoning까지 생성하지만, 반환값에는 draft(자기소개서 본문)만 포함됩니다.
-    - 결과 문자열에는 'Reasoning', 'STAR', 'S/T/A/R' 등의 포맷 용어나 주석이 포함되지 않습니다.
+    draft(자기소개서 본문)만 필요할 때 사용. 내부적으로는 reasoning까지 만들지만 반환은 draft만.
+    결과 문자열에는 'Reasoning', 'STAR' 같은 포맷 용어는 포함되지 않음.
     """
     result = generate_self_introduction(input_data)
     return result.draft
