@@ -451,7 +451,7 @@ export default function RoadmapPage() {
                                         <p className="text-sm text-amber-800">
                                             로드맵 생성 시 자격증 추천이 함께 산출됩니다. 로드맵을 생성하거나 갱신해 주세요.
                                         </p>
-                                        <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                                        <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3 space-y-1.5">
                                             <p className="text-xs text-blue-800 leading-relaxed">
                                                 <span className="font-semibold">💡 안내:</span> 더 많은 자격증 정보는 <a 
                                                     href="https://www.q-net.or.kr" 
@@ -459,6 +459,15 @@ export default function RoadmapPage() {
                                                     rel="noopener noreferrer"
                                                     className="font-semibold underline hover:text-blue-900"
                                                 >Q-Net(한국산업인력공단)</a>에서 확인하실 수 있습니다.
+                                            </p>
+                                            <p className="text-xs text-blue-800 leading-relaxed">
+                                                연간 시험일정(기사·산업기사·기능사 등):{' '}
+                                                <a 
+                                                    href="https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03" 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="font-semibold underline hover:text-blue-900"
+                                                >연간 국가기술자격 시험일정</a>
                                             </p>
                                         </div>
                                     </div>
@@ -532,11 +541,55 @@ export default function RoadmapPage() {
                                                         <span className="text-sm text-gray-600">{selectedCert.details.difficulty}</span>
                                                     </div>
                                                 )}
-                                                {selectedCert.details.examSchedule && (
-                                                    <div className="flex items-start gap-2">
-                                                        <span className="font-semibold text-sm text-gray-700 min-w-[60px]">시험일정:</span>
-                                                        <span className="text-sm text-gray-600">{selectedCert.details.examSchedule}</span>
+                                                {(selectedCert.details.examScheduleWritten !== undefined || selectedCert.details.examSchedulePractical !== undefined || selectedCert.details.examSchedule) && (
+                                                    <div className="space-y-1.5">
+                                                        <span className="font-semibold text-sm text-gray-700 block">시험일정</span>
+                                                        {selectedCert.details.examScheduleWritten !== undefined && (
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="text-sm text-gray-600 font-medium min-w-[48px]">필기:</span>
+                                                                <span className="text-sm text-gray-600">
+                                                                    {selectedCert.details.examScheduleWritten || '—'}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {selectedCert.details.examSchedulePractical !== undefined && (
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="text-sm text-gray-600 font-medium min-w-[48px]">실기:</span>
+                                                                <span className="text-sm text-gray-600">
+                                                                    {selectedCert.details.examSchedulePractical || '—'}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {selectedCert.details.examScheduleWritten === undefined && selectedCert.details.examSchedulePractical === undefined && selectedCert.details.examSchedule && (
+                                                            <span className="text-sm text-gray-600">
+                                                                {String(selectedCert.details.examSchedule).replace(/^시험일정:\s*/, '')}
+                                                            </span>
+                                                        )}
+                                                        <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-gray-100">
+                                                            실제 일정과 상이할 수 있으니 Q-Net에서 확인하세요.{' '}
+                                                            <a
+                                                                href="https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="font-medium underline hover:text-amber-900"
+                                                            >
+                                                                연간 국가기술자격 시험일정(기사·산업기사 등)
+                                                            </a>
+                                                        </p>
                                                     </div>
+                                                )}
+                                                {selectedCert?.type === '자격증' && selectedCert.details.examScheduleWritten === undefined && selectedCert.details.examSchedulePractical === undefined && !selectedCert.details.examSchedule && (
+                                                    <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-gray-100">
+                                                        실제 일정과 상이할 수 있으니 Q-Net에서 확인하세요.{' '}
+                                                        <a
+                                                            href="https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="font-medium underline hover:text-amber-900"
+                                                        >
+                                                            연간 국가기술자격 시험일정(기사·산업기사 등)
+                                                        </a>
+                                                    </p>
                                                 )}
                                             </div>
                                         )}
