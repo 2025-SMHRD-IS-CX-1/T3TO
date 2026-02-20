@@ -1,7 +1,7 @@
 import {
     LayoutDashboard,
     Map,
-    FileText,
+    Sparkles,
     Calendar,
     Users,
     MessageSquare,
@@ -36,5 +36,5 @@ export const clientMenuItems: MenuItemDef[] = [
     { name: "대시보드", href: "/dashboard", icon: LayoutDashboard, requiresClient: true },
     { name: "상담 관리", href: "/consultations", icon: MessageSquare, dbEntity: "consultations", requiresClient: true },
     { name: "로드맵", href: "/roadmap", icon: Map, dbEntity: "career_roadmaps", requiresClient: true },
-    { name: "자기소개서", href: "/cover-letter", icon: FileText, dbEntity: "resume_drafts", requiresClient: true },
+    { name: "AI자기소개서", href: "/cover-letter", icon: Sparkles, dbEntity: "resume_drafts", requiresClient: true },
 ]
