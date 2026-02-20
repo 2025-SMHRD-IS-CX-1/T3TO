@@ -37,9 +37,10 @@ function Calendar({
                     buttonVariants({ variant: "ghost" }),
                     "h-9 w-9 p-0 opacity-80 hover:opacity-100 pointer-events-auto text-purple-600 shrink-0"
                 ),
-                weekdays: "flex w-full mb-4",
+                weekdays:
+                    "flex w-full mb-4 [&>*:first-child]:text-red-600 [&>*:last-child]:text-blue-600 [&>*:nth-child(n+2):nth-child(-n+6)]:text-gray-900",
                 weekday:
-                    "text-purple-400 w-full font-bold text-[0.9rem] flex items-center justify-center uppercase tracking-wider",
+                    "w-full font-bold text-[0.9rem] flex items-center justify-center uppercase tracking-wider",
                 week: "flex w-full mt-2",
                 day: "flex-1 text-center text-sm p-0 relative h-16 flex items-center justify-center",
                 day_button: cn(

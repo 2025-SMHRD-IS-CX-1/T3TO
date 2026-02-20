@@ -26,6 +26,7 @@ export interface JobInfo {
     requirements?: string
     trends?: string
     skills?: string
+    certifications?: string
     sources: SearchResult[]
 }
 
@@ -169,6 +170,7 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
         `${jobTitle} 채용 요구사항 역량`,
         `${jobTitle} 최신 트렌드 2025 2026`,
         `${jobTitle} 필수 스킬 기술`,
+        `${jobTitle} 필수 자격증 요구사항`,
     ]
 
     const allResults: SearchResult[] = []
@@ -195,13 +197,35 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
         .join('\n\n')
         .slice(0, 1000)
 
+    const certifications = allResults
+        .filter((r) => r.content.includes('자격증') || r.content.includes('자격') || r.content.includes('인증'))
+        .map((r) => r.content)
+        .join('\n\n')
+        .slice(0, 800)
+
     const result = {
         jobTitle,
         requirements: requirements || undefined,
         trends: trends || undefined,
         skills: skills || undefined,
+        certifications: certifications || undefined,
         sources: allResults.slice(0, 5),
     }
-    console.log(`[Tavily API] 직무 정보 검색 완료 - 요구사항: ${!!requirements}, 트렌드: ${!!trends}, 스킬: ${!!skills}`)
+    console.log(`[Tavily API] 직무 정보 검색 완료 - 요구사항: ${!!requirements}, 트렌드: ${!!trends}, 스킬: ${!!skills}, 자격증: ${!!certifications}`)
     return result
+}
+
+/** Q-Net API 미제공 시 연간 국가기술자격 시험일정 Tavily 검색 (기사·산업기사 등) */
+export async function searchExamSchedule(): Promise<{ summary?: string; url?: string; results: SearchResult[] }> {
+    if (!TAVILY_API_KEY) {
+        console.warn('[Tavily API] TAVILY_API_KEY가 없어 시험일정 검색을 건너뜁니다')
+        return { url: 'https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03', results: [] }
+    }
+    const query = 'Q-Net 한국산업인력공단 연간 국가기술자격 시험일정 기사 산업기사 기능사'
+    const results = await searchWeb(query, 5)
+    const qnetResult = results.find((r) => r.url?.includes('q-net') || r.url?.includes('hrdkorea'))
+    const summary = results[0]?.content?.slice(0, 600) || qnetResult?.content?.slice(0, 600)
+    const url = qnetResult?.url || 'https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03'
+    console.log('[Tavily API] 시험일정 검색 완료 - 요약:', !!summary, '연결 URL:', url)
+    return { summary, url, results }
 }

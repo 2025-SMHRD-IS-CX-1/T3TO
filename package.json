@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cache:qnet": "node --env-file=.env.local scripts/cache-qnet.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
