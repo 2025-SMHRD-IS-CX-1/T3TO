@@ -53,7 +53,7 @@ export function RoadmapTimeline({ steps }: RoadmapTimelineProps) {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}
-                            className="relative flex items-start gap-6 group"
+                            className="relative flex items-start gap-6 group rounded-xl p-2 -ml-2 transition-colors hover:bg-gray-50/50"
                         >
                             {/* Status Icon */}
                             <div

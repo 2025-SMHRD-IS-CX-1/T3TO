@@ -45,7 +45,7 @@ export default function DashboardPage() {
     const [isDeleting, setIsDeleting] = useState(false)
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
     const [isSavingEdit, setIsSavingEdit] = useState(false)
-const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; tags: string[] }[]>([])
+    const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; tags: string[] }[]>([])
 
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -116,7 +116,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [urlClientId, counselorId, clients]) // clients 의존성 추가하여 목록 로드 후 find 실행되도록 함
 
-// 선택된 내담자의 자기소개서 초안 목록
+    // 선택된 내담자의 자기소개서 초안 목록
     useEffect(() => {
         if (!selectedClientId) {
             setDrafts([])
@@ -275,7 +275,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                 <CardContent>
                     <div className="flex items-center gap-4">
                         <Select value={selectedClientId} onValueChange={handleClientSelect}>
-                            <SelectTrigger className="w-full max-w-md">
+                            <SelectTrigger className="w-full max-w-md cursor-pointer">
                                 <SelectValue placeholder="내담자를 선택하세요" />
                             </SelectTrigger>
                             <SelectContent>
@@ -410,7 +410,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                         {selectedClient && (
                             <Button asChild>
                                 <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
-로드맵 생성
+                                    로드맵 생성
                                 </Link>
                             </Button>
                         )}
@@ -522,8 +522,8 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-skill_vector">보유 기술 (스택)</Label>
                                     <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector ?? ''} placeholder="예: React, Node.js, Python (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
-                                    </div>
-                                    <div className="space-y-2">
+                                </div>
+                                <div className="space-y-2">
                                     <Label htmlFor="edit-recommended_careers">희망 직무</Label>
                                     <Input id="edit-recommended_careers" name="recommended_careers" defaultValue={selectedClient.recommended_careers ?? ''} placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
                                 </div>
@@ -568,7 +568,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                 </Card>
             ) : (
                 <>
-{/* Stats Cards - 내담자 정보, 로드맵 진행률, 다가오는 일정 */}
+                    {/* Stats Cards - 내담자 정보, 로드맵 진행률, 다가오는 일정 */}
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <Card
                             className="cursor-pointer transition-colors hover:bg-gray-50/80"
@@ -633,13 +633,13 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                             <CardHeader>
                                 <CardTitle>추천 로드맵</CardTitle>
                             </CardHeader>
-<CardContent className="flex flex-col flex-1 min-h-0">
+                            <CardContent className="flex flex-col flex-1 min-h-0">
                                 {roadmapData && roadmapData.milestones ? (() => {
                                     try {
                                         const milestones = JSON.parse(roadmapData.milestones)
                                         const firstStep = milestones[0]
                                         return (
-<div className="flex flex-col h-full">
+                                            <div className="flex flex-col h-full">
                                                 <div className="border-l-4 border-purple-600 pl-4">
                                                     <h3 className="font-semibold text-gray-900 mb-2">{firstStep?.title || '로드맵'}</h3>
                                                     <p className="text-sm text-gray-600 line-clamp-2">{firstStep?.description || ''}</p>
@@ -652,7 +652,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                                                         </div>
                                                     )}
                                                 </div>
-<div className="mt-auto flex justify-end pt-4 border-t">
+                                                <div className="mt-auto flex justify-end pt-4 border-t">
                                                     <Button variant="outline" size="sm" asChild>
                                                         <Link
                                                             href={
@@ -680,7 +680,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                                                 </div>
                                                 <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
                                                 <p className="text-xs text-muted-foreground mt-2 mb-4">
-"로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
+                                                    "로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
                                                 </p>
                                                 <Button variant="outline" asChild>
                                                     <Link
@@ -737,7 +737,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                             <CardContent>
                                 {drafts.length === 0 ? (
                                     <Link href={`/cover-letter?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`} className="block">
-                                        <div className="flex flex-col items-center justify-center py-8 text-center cursor-pointer hover:opacity-80">
+                                        <div className="flex flex-col items-center justify-center py-8 text-center cursor-pointer hover:bg-gray-50/50 rounded-lg transition-colors">
                                             <div className="text-2xl font-bold text-gray-900">0개 초안</div>
                                             <p className="text-sm text-muted-foreground mt-1">클릭하여 작성·조회</p>
                                         </div>

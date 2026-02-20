@@ -174,7 +174,7 @@ export default function SchedulePage() {
                     </div>
                 </div>
             )}
-            
+
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">일정 관리</h1>
