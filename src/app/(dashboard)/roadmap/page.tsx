@@ -290,7 +290,7 @@ export default function RoadmapPage() {
                                 disabled={isLoading || isGenerating}
                             >
                                 <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || isGenerating) && "animate-spin")} />
-                                AI 갱신
+                                갱신
                             </Button>
                             <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrint}>
                                 <Printer className="h-3.5 w-3.5" />
@@ -641,13 +641,6 @@ export default function RoadmapPage() {
                                         )}
                                     </DialogContent>
                                 </Dialog>
-                                <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                                    <p className="text-xs text-blue-800 leading-relaxed font-medium">
-                                        💡 <strong>Tip:</strong> {certs.some(c => c.name === '정보처리기사')
-                                            ? "전공 지식을 증명할 수 있는 정보처리기사를 최우선으로 취득하시는 것을 추천드립니다."
-                                            : "목표 직무에 필요한 핵심 도구 활용 능력을 우선적으로 확보하는 것이 중요합니다."}
-                                    </p>
-                                </div>
                             </CardContent>
                         </Card>
                     </div>
