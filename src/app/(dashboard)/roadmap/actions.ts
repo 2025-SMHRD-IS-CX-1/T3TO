@@ -57,11 +57,17 @@ export async function getClientProfile(profileId: string, counselorId?: string |
 }
 
 export async function createInitialRoadmap(profileId?: string, clientData?: any, counselorId?: string | null, updateOnly: boolean = false) {
+    const totalStart = Date.now()
     const supabase = await createClient()
     const userIdStr = await getEffectiveUserId(counselorId)
     if (!userIdStr) return { error: 'Unauthorized' }
 
-    const ragContext = profileId ? await getRoadmapRagContext(supabase, profileId, userIdStr) : null
+    let t = Date.now()
+    const ragContext = profileId
+        ? await getRoadmapRagContext(supabase, profileId, userIdStr, clientData ? [clientData] : null)
+        : null
+    console.log(`[createInitialRoadmap] getRoadmapRagContext: ${Date.now() - t}ms`)
+
     const userData = ragContext ?? {
         counseling: [],
         analysis: [],
@@ -77,7 +83,9 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         getExamSchedule: getExamSchedule,
         getJobCompetencyList,
     }
+    t = Date.now()
     const result = await runRoadmap(userData, adapters)
+    console.log(`[createInitialRoadmap] runRoadmap 전체: ${Date.now() - t}ms`)
     const info = result.info
     const dynamicSkills = result.dynamicSkills
     // Q-Net API에서 동적으로 필터링된 자격증만 사용 (디폴트 자격증 추가하지 않음)
@@ -88,6 +96,7 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
     console.log('[Roadmap] 최종 로드맵 데이터 준비 완료')
     console.log('[Roadmap] 목표 직무:', targetJob, '목표 기업:', targetCompany)
     console.log('[Roadmap] 마일스톤 수:', info.length)
+    console.log(`[createInitialRoadmap] 총 소요: ${Date.now() - totalStart}ms`)
 
     // 기존 활성 로드맵 확인
     const { data: existingRoadmap } = await supabase

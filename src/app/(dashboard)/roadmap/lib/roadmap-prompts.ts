@@ -302,15 +302,19 @@ export type JobInfoFromTavily = {
     certifications?: string
 } | null
 
-/** 자격증 추천용 사용자 컨텍스트 빌더 */
+/** 자격증 추천용 사용자 컨텍스트 빌더 (학력·경력에 따른 자격조건 반영) */
 export function buildCertificationRecommendationContext(params: {
     targetJob: string
     major: string
     analysisList: Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
     qualifications: unknown[]
     jobInfoFromTavily?: JobInfoFromTavily
+    education_level?: string
+    work_experience_years?: number
+    /** Q-Net API 미제공 시 Tavily 시험일정 검색 결과 */
+    examScheduleTavilyFallback?: { summary?: string; url?: string }
 }): string {
-    const { targetJob, major, analysisList, qualifications, jobInfoFromTavily } = params
+    const { targetJob, major, analysisList, qualifications, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback } = params
     
     // 상담 분석에서 키워드 추출
     const analysisText = analysisList
@@ -356,21 +360,32 @@ export function buildCertificationRecommendationContext(params: {
         .filter(Boolean)
         .join('\n')
 
+    const educationNote = education_level
+        ? `\n- **자격조건**: 내담자 학력 "${education_level}"${work_experience_years > 0 ? `, 직종 경력 ${work_experience_years}년` : ''}에 따라 취득 가능한 자격만 추천하라. 고졸→기능사 위주(경력 2년 이상이면 산업기사 포함), 대학재학→기능사·산업기사, 대학졸업→기능사·산업기사·기사. 아래 목록은 이미 위 조건으로 필터된 자격증만 포함한다.`
+        : ''
+
+    const tavilyScheduleNote = examScheduleTavilyFallback?.summary
+        ? `\n- **시험일정 참고**(Q-Net API 미제공으로 Tavily 검색 활용): ${examScheduleTavilyFallback.summary.slice(0, 400)}${examScheduleTavilyFallback.url ? ` (상세: ${examScheduleTavilyFallback.url})` : ''}`
+        : examScheduleTavilyFallback?.url
+          ? `\n- **시험일정**: 연간 시험일정은 Q-Net 사이트에서 확인 (Tavily 검색 링크: ${examScheduleTavilyFallback.url})`
+          : ''
+
     return `[RAG 컨텍스트 - Tavily 직무정보 + DB 데이터 + Q-Net API 결과]
 ${tavilySection}[RAG 컨텍스트 구성요소 1: DB 데이터 - 내담자 프로필 및 상담 정보]
 - 목표 직무(희망 직무): ${targetJob || '없음'}
 - 전공: ${major || '없음'}
-- 상담 분석 결과 (강점, 관심 키워드, 가치관): ${analysisText || '없음'}
+- 학력: ${education_level || '미입력'}${work_experience_years > 0 ? `\n- 직종 경력: ${work_experience_years}년` : ''}
+- 상담 분석 결과 (강점, 관심 키워드, 가치관): ${analysisText || '없음'}${educationNote}${tavilyScheduleNote}
 
-[RAG 컨텍스트 구성요소 2: Q-Net API 결과 - 실제 자격증 목록]
+[RAG 컨텍스트 구성요소 2: Q-Net API 결과 - 실제 자격증 목록 (학력·경력에 취득 가능한 것만 포함)]
 **중요**: 아래 목록에 있는 자격증에서만 추천하세요. 이 목록에 없는 자격증은 절대 추천하지 마세요.
 
 ${qualListText || '(Q-Net API 자격증 목록 없음)'}
 
 [작성 지침 - RAG 컨텍스트(Tavily + DB + Q-Net API) 종합 활용]
 - Tavily 직무 정보가 있으면: 시장에서 요구하는 자격증·스킬을 반영하여 추천
-- DB 데이터(프로필, 상담 분석)를 참고해 내담자의 목표 직무, 전공, 강점, 관심사를 파악하고
-- Q-Net API 자격증 목록에서만 관련성 높은 자격증을 선별해라
+- DB 데이터(프로필, 학력, 경력, 상담 분석)를 참고해 내담자의 목표 직무, 전공, 강점, 관심사를 파악하고, **자격조건에 맞는 자격증만** 선별해라
+- Q-Net API 자격증 목록(위 조건으로 이미 필터됨)에서만 관련성 높은 자격증을 추천해라
 - 각 자격증의 관련성 점수(1-10)와 추천 이유를 제공하되, Tavily 시장 정보·프로필·상담 내역을 종합 분석한 근거를 명시해라
 - **핵심**: Q-Net API 목록에 없는 자격증은 절대 추천하지 말 것 (환각 금지).`
 }
