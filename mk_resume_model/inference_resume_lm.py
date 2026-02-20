@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 파인튜닝된 resume_lm 체크포인트로 자기소개서 생성.
-train_resume_model.py와 동일한 프롬프트 형식 사용.
+
+- train_resume_model.py와 동일한 프롬프트 형식 사용 (PROMPT_PREFIX + [입력] + 직무/역량/학력/경험/강점 + [자기소개서]).
+- load_model: 체크포인트에서 토크나이저·모델 로드.
+- generate: input_dict로 프롬프트 만들고 [자기소개서] 뒤부터 EOS 전까지 생성해 본문만 반환.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-# train_resume_model.py와 동일한 구분자
+# train_resume_model.py와 동일한 구분자 (학습 시 completion 시작 지점)
 PROMPT_PREFIX = "직무·역량·배경에 따른 자기소개서 초안을 작성하세요.\n\n"
 INPUT_PREFIX = "[입력]\n"
 OUTPUT_PREFIX = "\n[자기소개서]\n"
@@ -15,7 +18,7 @@ EOS = "<|endoftext|>"
 
 
 def _serialize_input(inp: dict) -> str:
-    """모델 입력용 문자열로 변환 (train_resume_model.serialize_input과 동일)."""
+    """roles/competencies/background를 '직무: ... 역량: ... 학력: ...' 형태 한 줄씩 문자열로 변환 (학습 시와 동일)."""
     roles = inp.get("roles") or []
     comps = inp.get("competencies") or []
     bg = inp.get("background") or {}
@@ -30,7 +33,7 @@ def _serialize_input(inp: dict) -> str:
 
 
 def load_model(checkpoint_path: str | Path, *, use_cpu: bool = False):
-    """체크포인트에서 토크나이저와 모델 로드."""
+    """체크포인트 디렉터리에서 토크나이저·Causal LM 로드. pad_token 없으면 eos_token으로 설정. use_cpu=True면 GPU 미사용."""
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     path = Path(checkpoint_path)
@@ -63,8 +66,8 @@ def generate(
     pad_token_id: int | None = None,
 ) -> str:
     """
-    input_dict(roles, competencies, background)로 프롬프트를 만들고
-    [자기소개서] 뒤부터 EOS 전까지 생성해 반환.
+    input_dict(roles, competencies, background)로 프롬프트 문자열을 만든 뒤 모델에 넣고,
+    생성 결과에서 [자기소개서] 뒤부터 EOS 전까지 잘라서 본문만 반환.
     """
     import torch
 

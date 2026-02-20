@@ -2,8 +2,9 @@
 """
 크롤링한 자기소개서 텍스트 파일을 파싱해서 (input, reference) 쌍으로 만듭니다.
 
-1) 메타데이터만 사용: 회사/직무/학교/전공 라인에서 roles, background 일부 추출
-2) OpenAI 사용 시: 본문에서 competencies, background 상세 역추출 (OPENAI_API_KEY 필요)
+- 출력: JSONL. 각 줄 = {"input": {...}, "reference": "자기소개서 본문"}. train_resume_model.py의 입력으로 사용.
+- 모드 1) 메타만: 회사/직무/학교/전공 라인에서 roles, background 일부 추출 (규칙 기반).
+- 모드 2) --use-llm: OpenAI로 본문에서 roles, competencies, background 역추출 (OPENAI_API_KEY 필요).
 
 사용법:
   python build_input_from_crawl.py [크롤링파일경로] [--output 출력.jsonl] [--use-llm]
@@ -19,8 +20,9 @@ import re
 import sys
 from pathlib import Path
 
-# 프로젝트 루트 기준 상대 경로
 SCRIPT_DIR = Path(__file__).resolve().parent
+
+
 def _default_crawl_path() -> Path:
     if os.environ.get("CRAWL_TXT_PATH"):
         return Path(os.environ["CRAWL_TXT_PATH"]).expanduser()
@@ -44,7 +46,8 @@ ENTRY_HEADER_RE = re.compile(r"^([^/\n]+)\s*/\s*([^/]+)\s*/\s*(\d{4}\s*[상하]�
 def parse_crawl_file(path: str | Path) -> list[dict]:
     """
     크롤링 txt 파일을 읽어서 엔트리 리스트로 반환.
-    각 엔트리: {"header_line", "meta_line", "body_text", "company", "job", "period"}
+    각 엔트리: company, job, period, header_line, meta_line(다음 줄: 학교/전공 등), body_text(본문).
+    본문 100자 미만이면 스킵.
     """
     path = Path(path)
     if not path.exists():
@@ -91,7 +94,7 @@ def parse_crawl_file(path: str | Path) -> list[dict]:
 
 
 def parse_meta_line(meta_line: str) -> dict:
-    """메타 라인에서 학교, 전공, 학점 등 추출. 형식: 학교 / 학과 / 학점 4.1/4.5 / ..."""
+    """메타 라인에서 학교, 전공, 학점 등 추출. 형식: 학교 / 학과 / 학점 4.1/4.5 / ... '인턴','공모전' 등 키워드로 experiences 리스트 생성."""
     parts = [p.strip() for p in meta_line.split("/")]
     school = parts[0] if parts else ""
     major = parts[1] if len(parts) > 1 else ""
@@ -107,7 +110,7 @@ def parse_meta_line(meta_line: str) -> dict:
 
 
 def job_to_roles_and_competencies(job: str) -> tuple[list[str], list[str]]:
-    """직무 문자열에서 roles 후보, competencies 후보 매핑 (간단 규칙)."""
+    """직무 문자열에서 roles 1개, competencies 리스트 추출. 마케팅/기획/영업 등 키워드로 comp_map에서 역량 매핑."""
     role = job.split("(")[0].split("_")[0].strip()
     if not role:
         role = "일반직"
@@ -135,7 +138,7 @@ def job_to_roles_and_competencies(job: str) -> tuple[list[str], list[str]]:
 
 
 def build_input_from_metadata(entry: dict) -> dict:
-    """엔트리에서 메타데이터만으로 input dict 생성 (모델 입력 형식)."""
+    """엔트리에서 메타데이터만으로 input dict 생성. roles, competencies, background, language, focus. train/examples 형식과 호환."""
     meta = parse_meta_line(entry.get("meta_line", ""))
     roles, competencies = job_to_roles_and_competencies(entry.get("job", ""))
     return {
@@ -154,7 +157,7 @@ def build_input_from_metadata(entry: dict) -> dict:
 
 
 def extract_input_with_openai(entry: dict) -> dict | None:
-    """OpenAI API로 본문에서 roles, competencies, background 역추출. 실패 시 None."""
+    """OpenAI API로 본문(body_text)에서 roles, competencies, background JSON 역추출. 실패/키 없으면 None, 그러면 build_input_from_metadata 사용."""
     try:
         from openai import OpenAI
     except ImportError:
