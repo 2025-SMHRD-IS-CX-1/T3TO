@@ -255,7 +255,7 @@ export async function generateAIDrafts(clientId: string) {
     try {
         if (roadmap.required_skills && typeof roadmap.required_skills === 'string') {
             const skills = JSON.parse(roadmap.required_skills) as { title?: string }[]
-            competenciesFromRoadmap = (skills || []).map((s: { title?: string }) => s.title).filter((t): t is string => !!t)
+            competenciesFromRoadmap = (skills || []).map((s: { title?: string }) => s.title).filter((x): x is string => Boolean(x))
         }
     } catch {
         // ignore

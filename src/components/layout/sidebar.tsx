@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import { LayoutDashboard, Map, FileText, Calendar, Users, Settings, MessageSquare, UserCog, Shield } from "lucide-react"
+import { LayoutDashboard, Map, Sparkles, Calendar, Users, Settings, MessageSquare, UserCog, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import { ClientOnly } from "@/components/client-only"
@@ -31,7 +31,7 @@ const clientSpecificNavigation = [
     { name: "대시보드", href: "/dashboard", icon: LayoutDashboard },
     { name: "상담 관리", href: "/consultations", icon: MessageSquare },
     { name: "로드맵", href: "/roadmap", icon: Map },
-    { name: "자기소개서", href: "/cover-letter", icon: FileText },
+    { name: "AI자기소개서", href: "/cover-letter", icon: Sparkles },
 ]
 
 type AdminContext = { role: 'admin' | 'user' | null; counselors: { id: string; email: string | null }[] }
