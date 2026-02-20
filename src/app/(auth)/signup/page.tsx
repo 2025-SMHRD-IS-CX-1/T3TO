@@ -174,15 +174,15 @@ export default function SignupPage() {
                     <CardDescription>새로운 계정을 생성하고 시작하세요</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form action={handleSubmit} className="grid w-full items-center gap-4">
+                    <form action={handleSubmit} className="grid w-full items-center gap-4" autoComplete="off">
                         <div className="flex flex-col space-y-1.5">
-                            <Input id="name" name="name" placeholder="이름" required />
+                            <Input id="name" name="name" placeholder="이름" required autoComplete="off" />
                         </div>
                         <div className="flex flex-col space-y-1.5">
-                            <Input id="email" name="email" placeholder="이메일" type="email" required />
+                            <Input id="email" name="email" placeholder="이메일" type="email" required autoComplete="off" />
                         </div>
                         <div className="flex flex-col space-y-1.5">
-                            <Input id="password" name="password" type="password" placeholder="비밀번호" required />
+                            <Input id="password" name="password" type="password" placeholder="비밀번호" required autoComplete="new-password" />
                         </div>
 
                         {/* 정보보안 동의 */}

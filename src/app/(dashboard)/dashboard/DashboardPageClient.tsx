@@ -45,7 +45,7 @@ export default function DashboardPageClient() {
     const [isDeleting, setIsDeleting] = useState(false)
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
     const [isSavingEdit, setIsSavingEdit] = useState(false)
-const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; tags: string[] }[]>([])
+    const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; tags: string[] }[]>([])
 
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -74,7 +74,7 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [urlClientId, counselorId, selectedClientId])
 
-// 선택된 내담자의 자기소개서 초안 목록
+    // 선택된 내담자의 자기소개서 초안 목록
     useEffect(() => {
         if (!selectedClientId) {
             setDrafts([])
@@ -466,11 +466,11 @@ const [drafts, setDrafts] = useState<{ id: string; title: string; date: string; 
                                 <h4 className="text-sm font-bold text-gray-900">추가 분석 정보</h4>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-career_orientation">진로 성향</Label>
-                                    <Textarea id="edit-career_orientation" name="career_orientation" defaultValue={selectedClient.career_orientation ?? ''} placeholder="예: 안정적인 대기업 환경 선호" />
+                                    <Textarea id="edit-career_orientation" name="career_orientation" defaultValue={selectedClient.career_orientation?.toString().trim().startsWith('최신 상담 반영:') ? '' : (selectedClient.career_orientation ?? '')} placeholder="예: 안정적인 대기업 환경 선호" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-skill_vector">보유 기술 (스택)</Label>
-                                    <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector ?? ''} placeholder="예: React, Node.js, Python (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
+                                    <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector?.toString().trim().startsWith('분석된 보유 기술:') ? '' : (selectedClient.skill_vector ?? '')} placeholder="예: React, Node.js, Python (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
                                     </div>
                                     <div className="space-y-2">
                                     <Label htmlFor="edit-recommended_careers">희망 직무</Label>
