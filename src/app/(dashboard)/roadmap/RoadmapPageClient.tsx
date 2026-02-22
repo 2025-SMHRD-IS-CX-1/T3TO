@@ -290,7 +290,7 @@ export default function RoadmapPageClient() {
                                 disabled={isLoading || isGenerating}
                             >
                                 <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || isGenerating) && "animate-spin")} />
-                                AI 갱신
+                                갱신
                             </Button>
                             <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrint}>
                                 <Printer className="h-3.5 w-3.5" />
@@ -541,55 +541,17 @@ export default function RoadmapPageClient() {
                                                         <span className="text-sm text-gray-600">{selectedCert.details.difficulty}</span>
                                                     </div>
                                                 )}
-                                                {(selectedCert.details.examScheduleWritten !== undefined || selectedCert.details.examSchedulePractical !== undefined || selectedCert.details.examSchedule) && (
-                                                    <div className="space-y-1.5">
-                                                        <span className="font-semibold text-sm text-gray-700 block">시험일정</span>
-                                                        {selectedCert.details.examScheduleWritten !== undefined && (
-                                                            <div className="flex items-start gap-2">
-                                                                <span className="text-sm text-gray-600 font-medium min-w-[48px]">필기:</span>
-                                                                <span className="text-sm text-gray-600">
-                                                                    {selectedCert.details.examScheduleWritten || '—'}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {selectedCert.details.examSchedulePractical !== undefined && (
-                                                            <div className="flex items-start gap-2">
-                                                                <span className="text-sm text-gray-600 font-medium min-w-[48px]">실기:</span>
-                                                                <span className="text-sm text-gray-600">
-                                                                    {selectedCert.details.examSchedulePractical || '—'}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {selectedCert.details.examScheduleWritten === undefined && selectedCert.details.examSchedulePractical === undefined && selectedCert.details.examSchedule && (
-                                                            <span className="text-sm text-gray-600">
-                                                                {String(selectedCert.details.examSchedule).replace(/^시험일정:\s*/, '')}
-                                                            </span>
-                                                        )}
-                                                        <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-gray-100">
-                                                            실제 일정과 상이할 수 있으니 Q-Net에서 확인하세요.{' '}
-                                                            <a
-                                                                href="https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03"
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="font-medium underline hover:text-amber-900"
-                                                            >
-                                                                연간 국가기술자격 시험일정(기사·산업기사 등)
-                                                            </a>
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                {selectedCert?.type === '자격증' && selectedCert.details.examScheduleWritten === undefined && selectedCert.details.examSchedulePractical === undefined && !selectedCert.details.examSchedule && (
-                                                    <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-gray-100">
-                                                        실제 일정과 상이할 수 있으니 Q-Net에서 확인하세요.{' '}
+                                                {selectedCert?.type === '자격증' && (
+                                                    <div className="flex items-start gap-2">
                                                         <a
                                                             href="https://www.q-net.or.kr/crf021.do?id=crf02101&scheType=03"
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="font-medium underline hover:text-amber-900"
+                                                            className="text-sm font-medium text-amber-700 underline hover:text-amber-900"
                                                         >
-                                                            연간 국가기술자격 시험일정(기사·산업기사 등)
+                                                            시험일정 확인
                                                         </a>
-                                                    </p>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -641,13 +603,6 @@ export default function RoadmapPageClient() {
                                         )}
                                     </DialogContent>
                                 </Dialog>
-                                <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                                    <p className="text-xs text-blue-800 leading-relaxed font-medium">
-                                        💡 <strong>Tip:</strong> {certs.some(c => c.name === '정보처리기사')
-                                            ? "전공 지식을 증명할 수 있는 정보처리기사를 최우선으로 취득하시는 것을 추천드립니다."
-                                            : "목표 직무에 필요한 핵심 도구 활용 능력을 우선적으로 확보하는 것이 중요합니다."}
-                                    </p>
-                                </div>
                             </CardContent>
                         </Card>
                     </div>
