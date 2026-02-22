@@ -3,11 +3,6 @@
 import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getRoadmapModel } from '@/lib/ai-models'
-import {
-    getAllQualifications,
-    getExamSchedule,
-    getJobCompetencyList,
-} from '@/lib/qnet-api'
 import { searchCompanyInfo, searchJobInfo } from '@/lib/web-search'
 import { runRoadmap, getRoadmapRagContext } from './lib'
 
@@ -79,16 +74,12 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         model: getRoadmapModel(),
         searchCompany: searchCompanyInfo,
         searchJob: searchJobInfo,
-        getQualifications: () => getAllQualifications(5),
-        getExamSchedule: getExamSchedule,
-        getJobCompetencyList,
     }
     t = Date.now()
     const result = await runRoadmap(userData, adapters)
     console.log(`[createInitialRoadmap] runRoadmap 전체: ${Date.now() - t}ms`)
     const info = result.info
     const dynamicSkills = result.dynamicSkills
-    // Q-Net API에서 동적으로 필터링된 자격증만 사용 (디폴트 자격증 추가하지 않음)
     const dynamicCerts = result.dynamicCerts ?? []
     const targetJob = result.targetJob
     const targetCompany = result.targetCompany
@@ -141,10 +132,12 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         return { error: error.message }
     }
 
-    // 캐시 무효화로 UI 동기화
+    // 캐시 무효화로 UI 동기화. revalidatePath 호출 시 해당 경로의 서버 컴포넌트(레이아웃 포함)가 재실행되며,
+    // (dashboard) layout에서 getAdminContext()가 다시 호출되어 역할(role)·상담사 목록이 갱신됩니다.
+    // 그래서 로드맵 생성/갱신 직후에도 사이드바·네비의 권한/메뉴가 최신 상태로 유지됩니다.
     revalidatePath('/roadmap')
     revalidatePath('/admin/clients')
     revalidatePath('/dashboard')
-    
+
     return { success: true }
 }

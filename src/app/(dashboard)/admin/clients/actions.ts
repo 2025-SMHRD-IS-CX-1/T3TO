@@ -3,6 +3,15 @@
 import { createClient as createSupabaseClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+/** 대시보드/상담에서 쓰인 placeholder 문구는 저장하지 않고 null로 처리 */
+function stripPlaceholderText(value: string | null | undefined): string | null {
+    if (value == null || typeof value !== 'string') return null
+    const v = value.trim()
+    if (v.startsWith('최신 상담 반영:')) return null
+    if (v.startsWith('분석된 보유 기술:')) return null
+    return v || null
+}
+
 export async function getClients(counselorId?: string | null) {
     const supabase = await createSupabaseClient()
     const userIdStr = await getEffectiveUserId(counselorId)
@@ -176,8 +185,8 @@ export async function createClientProfile(formData: FormData, counselorId?: stri
                 education_level: educationLevel || null,
                 major: major || null,
                 work_experience_years: parseInt(workExperience) || 0,
-                career_orientation: careerOrientation || null,
-                skill_vector: skillVector || null,
+                career_orientation: stripPlaceholderText(careerOrientation) || null,
+                skill_vector: stripPlaceholderText(skillVector) || null,
                 recommended_careers: recommendedCareers || null,
                 target_company: targetCompany || null,
             }
@@ -282,8 +291,8 @@ export async function updateClientProfile(id: string, formData: FormData, counse
             education_level: educationLevel || null,
             major: major || null,
             work_experience_years: parseInt(workExperience) || 0,
-            career_orientation: careerOrientation || null,
-            skill_vector: skillVector || null,
+            career_orientation: stripPlaceholderText(careerOrientation) || null,
+            skill_vector: stripPlaceholderText(skillVector) || null,
             recommended_careers: recommendedCareers || null,
             target_company: targetCompany || null,
         })

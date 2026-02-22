@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, Search, User, LogOut, Settings, Trash2, Check } from "lucide-react"
+import { Bell, Search, LogOut, Trash2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { ClientOnly } from "@/components/client-only"
@@ -11,6 +11,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Separator } from "@/components/ui/separator"
 import {
     Dialog,
     DialogContent,
@@ -19,7 +20,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
 import { deleteAccount } from "@/app/(auth)/actions"
 
 const NOTIFICATION_EVENT = "cb-notification-check"
@@ -134,7 +134,7 @@ export function Navbar() {
     }, [])
 
     return (
-        <div className="flex h-16 items-center justify-between bg-white/90 px-6 shadow-[0_1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm">
+        <div className="flex h-16 items-center justify-between bg-white/90 px-6 shadow-[0_1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm print:hidden">
             <div className="flex items-center flex-1">
                 {/* Breadcrumb removed as requested */}
             </div>
@@ -230,24 +230,15 @@ export function Navbar() {
                             </div>
                         </div>
                         <Separator className="my-1" />
-                        <DropdownMenuItem className="cursor-pointer">
-                            <User className="mr-2 h-4 w-4" />
-                            <span>내 프로필 설정</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer">
-                            <Settings className="mr-2 h-4 w-4" />
-                            <span>시스템 설정</span>
-                        </DropdownMenuItem>
-                        <Separator className="my-1" />
                         <DropdownMenuItem
-                            className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
+                            className="cursor-pointer font-semibold text-gray-900 bg-gray-50 hover:bg-red-50 hover:text-red-600 focus:bg-red-50 focus:text-red-600 border border-gray-200 rounded-md my-1"
                             onClick={async () => {
                                 const supabase = createClient()
                                 await supabase.auth.signOut()
                                 window.location.href = '/login'
                             }}
                         >
-                            <LogOut className="mr-2 h-4 w-4" />
+                            <LogOut className="mr-2 h-5 w-5" />
                             <span>로그아웃</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -262,7 +253,7 @@ export function Navbar() {
                 </ClientOnly>
             </div>
 
-            {/* 회원탈퇴 확인 다이얼로그 */}
+            {/* 회원탈퇴 확인 다이얼로그 - 우측 상단 계정 탭에서만 진입 */}
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -284,13 +275,11 @@ export function Navbar() {
                             onClick={async () => {
                                 setIsDeleting(true)
                                 const result = await deleteAccount()
-                                
                                 if (result.error) {
                                     alert(`회원탈퇴 실패: ${result.error}`)
                                     setIsDeleting(false)
                                     setIsDeleteDialogOpen(false)
                                 } else {
-                                    // 성공 시 로그인 페이지로 이동
                                     window.location.href = '/login'
                                 }
                             }}
