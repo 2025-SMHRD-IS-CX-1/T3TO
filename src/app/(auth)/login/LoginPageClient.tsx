@@ -62,6 +62,17 @@ export default function LoginPageClient() {
 
         const supabase = createClient()
 
+        const saveRememberMe = () => {
+            if (rememberMe) {
+                const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
+                    .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
+                localStorage.setItem('saved_accounts', JSON.stringify(updated))
+                localStorage.setItem('remembered_email', email)
+            } else {
+                localStorage.removeItem('remembered_email')
+            }
+        }
+
         const tryServerSignin = async (): Promise<boolean> => {
             const r = await fetch('/api/auth/signin', {
                 method: 'POST',
@@ -69,29 +80,40 @@ export default function LoginPageClient() {
                 body: JSON.stringify({ email, password }),
             })
             const j = await r.json().catch(() => ({}))
-            if (r.ok && j.success) return true
+            if (r.ok && j.success) {
+                saveRememberMe()
+                router.push('/dashboard')
+                return true
+            }
             setError((j as { error?: string }).error || '서버 로그인 실패')
             return false
         }
 
         try {
+            const r = await fetch('/api/auth/signin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            })
+            const j = await r.json().catch(() => ({}))
+            if (r.ok && j.success) {
+                saveRememberMe()
+                router.push('/dashboard')
+                return
+            }
+            if (r.status === 401 || r.status === 400) {
+                setError((j as { error?: string }).error || '이메일 또는 비밀번호가 올바르지 않습니다.')
+                setLoading(false)
+                return
+            }
+
             const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
             if (authError) {
                 const msg = authError.message || ''
                 if (msg === 'fetch failed' || msg.includes('fetch failed') || msg.includes('Failed to fetch')) {
                     const serverOk = await tryServerSignin()
-                    if (serverOk) {
-                        syncLoginUser().catch(() => {})
-                        if (rememberMe) {
-                            const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                                .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
-                            localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                            localStorage.setItem('remembered_email', email)
-                        } else localStorage.removeItem('remembered_email')
-                        window.location.href = '/dashboard'
-                        return
-                    }
+                    if (serverOk) return
                     setLoading(false)
                     return
                 }
@@ -111,33 +133,14 @@ export default function LoginPageClient() {
             }
 
             syncLoginUser().catch(() => {})
-
-            if (rememberMe) {
-                const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                    .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
-                localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                localStorage.setItem('remembered_email', email)
-            } else {
-                localStorage.removeItem('remembered_email')
-            }
-
+            saveRememberMe()
             window.location.href = '/dashboard'
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err)
             if (typeof msg === 'string' && msg.includes('NEXT_REDIRECT')) return
             if (typeof msg === 'string' && (msg === 'Failed to fetch' || msg.includes('fetch failed') || msg.includes('Failed to fetch'))) {
                 const serverOk = await tryServerSignin()
-                if (serverOk) {
-                    syncLoginUser().catch(() => {})
-                    if (rememberMe) {
-                        const updated = [...savedAccounts.filter(a => a.email !== email), { email, lastLogin: Date.now() }]
-                            .sort((a, b) => b.lastLogin - a.lastLogin).slice(0, 3)
-                        localStorage.setItem('saved_accounts', JSON.stringify(updated))
-                        localStorage.setItem('remembered_email', email)
-                    } else localStorage.removeItem('remembered_email')
-                    window.location.href = '/dashboard'
-                    return
-                }
+                if (serverOk) return
                 setError('Supabase 서버에 연결할 수 없습니다. ① 인터넷 연결 확인 ② 새 탭에서 주소 열어 보기: ' + supabaseUrl + ' ③ .env.local 확인 후 npm run dev 재시작.')
             } else {
                 setError(msg || '로그인 중 오류가 발생했습니다.')
