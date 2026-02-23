@@ -24,6 +24,21 @@ function sanitizeDraftContent(text: string): string {
         .trim()
 }
 
+/** 단락마다 첫 줄 들여쓰기 추가 (실제 작성한 문서처럼) — 전각 공백 1칸 */
+function addParagraphIndentation(text: string): string {
+    if (!text || typeof text !== 'string') return text
+    const paragraphs = text.split(/\n\s*\n/)
+    const indent = '\u3000' // 전각 공백(U+3000) — 한글 문서에서 단락 첫 줄 들여쓰기용
+    return paragraphs
+        .map(p => {
+            const trimmed = p.trim()
+            if (!trimmed) return ''
+            return indent + trimmed
+        })
+        .filter(Boolean)
+        .join('\n\n')
+}
+
 /** 상담 분석 문구가 placeholder일 때 제거 (실제 강점/가치관만 사용) */
 function useInsightLine(insights: string, lineIndex: number, fallback: string): string {
     if (!insights) return fallback
@@ -371,7 +386,7 @@ export async function generateAIDrafts(clientId: string) {
             // 다듬기 실패 시 원문 유지
         }
     }
-    versions = versions.map(v => ({ ...v, content: sanitizeDraftContent(v.content) }))
+    versions = versions.map(v => ({ ...v, content: addParagraphIndentation(sanitizeDraftContent(v.content)) }))
 
     // 4. 해당 내담자(profile_id) + 현재 로드맵의 기존 초안 전부 삭제 후, 새 3종만 삽입 (갱신)
     const { error: deleteError } = await supabase
