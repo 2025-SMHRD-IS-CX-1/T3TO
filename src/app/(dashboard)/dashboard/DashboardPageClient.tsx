@@ -246,7 +246,7 @@ export default function DashboardPageClient() {
                                         새로운 내담자의 기본 정보를 입력하여 시스템에 등록합니다.
                                     </DialogDescription>
                                 </DialogHeader>
-                                <form onSubmit={handleAddClient} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                                <form onSubmit={handleAddClient} className="space-y-4 p-1 py-4 max-h-[70vh] overflow-y-auto">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="name">이름 *</Label>
@@ -351,7 +351,7 @@ export default function DashboardPageClient() {
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                                 onClick={() => setDeleteConfirmOpen(true)}
                             >
                                 삭제
@@ -462,7 +462,7 @@ export default function DashboardPageClient() {
                         </DialogDescription>
                     </DialogHeader>
                     {selectedClient && (
-                        <form onSubmit={handleEditProfile} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                        <form onSubmit={handleEditProfile} className="space-y-4 p-1 py-4 max-h-[70vh] overflow-y-auto">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-name">이름 *</Label>
