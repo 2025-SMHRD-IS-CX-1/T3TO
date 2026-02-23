@@ -61,7 +61,7 @@ class SelfIntroRequest:
     counseling: CounselingContent  # 상담 원문/요약
     ai_analysis: AIAnalysisResult  # 추천 직무·역량·(선택)추출 배경
     language: str = "ko"  # 출력 언어: "ko" | "en"
-    min_word_count: int = 600  # 목표 최소 글자 수 (템플릿 생성기는 참고용)
+    min_word_count: int = 800  # 목표 최소 글자 수 (템플릿 생성기는 참고용)
     focus: str = "strength"  # 작성 초점: "strength"(역량) | "experience"(경험) | "values"(가치관)
 
     def validate(self) -> None:
