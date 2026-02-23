@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import type { RoadmapStep } from "./timeline"
 import { Star, Send, CheckCircle2 } from "lucide-react"
 
-const QUARTERS = ["Q1", "Q2", "Q3", "Q4"] as const
+const QUARTERS = ["1분기", "2분기", "3분기", "4분기"] as const
 const QUARTER_COLORS = [
     "bg-red-100 border-red-200 text-red-900",
     "bg-orange-100 border-orange-200 text-orange-900",
@@ -60,7 +60,7 @@ export function RoadmapGantt({ steps, year = new Date().getFullYear() }: Roadmap
                                 QUARTER_COLORS[i]
                             )}
                         >
-                            {q} {year}
+                            {year} {q}
                         </div>
                     ))}
                 </div>
@@ -68,7 +68,7 @@ export function RoadmapGantt({ steps, year = new Date().getFullYear() }: Roadmap
                 {/* Milestones row */}
                 <div className="grid grid-cols-[180px_1fr_1fr_1fr_1fr] border-b border-gray-200">
                     <div className="border-r border-gray-200 bg-gray-50/60 px-3 py-3">
-                        <p className="text-xs font-semibold text-gray-500">마일스톤</p>
+                        <p className="text-xs font-semibold text-gray-500">목표 달성율</p>
                         <p className="text-[10px] text-gray-400">주요 시점</p>
                     </div>
                     {[1, 2, 3, 4].map((q) => {

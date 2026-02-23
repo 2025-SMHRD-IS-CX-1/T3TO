@@ -1,22 +1,23 @@
 "use client"
 
-import { motion } from "motion/react"
-import { Check, Circle, Clock, ArrowRight, ChevronRight, CheckCircle2, Lock } from "lucide-react"
+import { useState } from "react"
+import { motion } from "framer-motion"
+import { Check, Lock, ChevronRight, CheckCircle2, Clock, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogFooter,
 } from "@/components/ui/dialog"
-import { useState } from "react"
 
+/** 로드맵 단계 타입 — roadmap page / roadmap-gantt에서 사용 */
 export interface RoadmapStep {
     id: string
     title: string

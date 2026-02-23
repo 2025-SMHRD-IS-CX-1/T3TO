@@ -3,7 +3,6 @@ export type { RagPlanStep, RagRoadmapResult, CompanyInfo, JobInfo, SearchResult 
 export type { RoadmapAdapters, RoadmapRagContext, RunRoadmapResult } from './roadmap-adapters'
 export {
     extractKeywordsFromAnalysis,
-    getConcreteRequiredCompetencies,
     computeCompetenciesFromProfile,
 } from './roadmap-competencies'
 export { filterRelevantQualifications } from './roadmap-qnet'
