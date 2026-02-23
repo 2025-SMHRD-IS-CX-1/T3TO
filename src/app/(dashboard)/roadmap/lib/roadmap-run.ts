@@ -93,6 +93,21 @@ export async function runRoadmap(
                 ? clientData.recommended_careers
                 : '희망 직무'
             const majorForCerts = clientData.major || ''
+
+            let tavilyCertContext: { summary: string; results: Array<{ title: string; url: string; content: string }> } | undefined
+            if (adapters.searchCertification) {
+                try {
+                    tavilyCertContext = await Promise.race([
+                        adapters.searchCertification(targetJobForCerts, majorForCerts),
+                        new Promise<{ summary: string; results: Array<{ title: string; url: string; content: string }> }>((resolve) =>
+                            setTimeout(() => resolve({ summary: '', results: [] }), 8000)
+                        ),
+                    ])
+                } catch (e) {
+                    console.warn('[runRoadmap] 자격증 Tavily 검색 실패:', e)
+                }
+            }
+
             const certsStart = Date.now()
             const dynamicCerts = await getCertificationsForRoadmap({
                 targetJob: targetJobForCerts,
@@ -101,6 +116,7 @@ export async function runRoadmap(
                 jobInfoFromTavily: jobInfoResult ?? undefined,
                 education_level: clientData.education_level || undefined,
                 work_experience_years: clientData.work_experience_years ?? 0,
+                tavilyCertContext,
             })
             console.log(`[runRoadmap] 자격증 추천( getCertificationsForRoadmap ): ${Date.now() - certsStart}ms`)
             const mapped = ragPlanToMilestones(
