@@ -6,7 +6,7 @@ import type { CompanyInfo, JobInfo } from './roadmap-types'
 import { computeCompetenciesFromProfile, extractKeywordsFromAnalysis } from './roadmap-competencies'
 import { filterRelevantQualifications } from './roadmap-qnet'
 import { GOAL_CONCRETIZATION_CONTENT } from './roadmap-prompts'
-import { recommendCertificationsWithRag, getCertificationsFromOpenAIFallback } from './roadmap-qnet-rag'
+import { recommendCertificationsWithRag, getCertificationsFromOpenAIFallback, getCertificationsFromTavilyContext } from './roadmap-qnet-rag'
 
 /** 검색 결과(CompanyInfo[])에서 제목·액션용 요약 추출 (실제 검색/RAG 기반 구체화용) */
 function summarizeFromSearch(companyInfos: CompanyInfo[], jobInfo: JobInfo | null): {
@@ -92,7 +92,7 @@ export async function buildRuleBasedRoadmap(
     }
     const phase1Desc = `목표 직무(${targetJob}) 달성을 위한 기초 역량을 다집니다.`
 
-    // 자격증 추천: Tavily + DB·상담 + Q-Net/OpenAI 종합 (로드맵 생성 시 함께 산출)
+    // 자격증 추천: Tavily 자격증 검색(Q-Net 대체) 또는 OpenAI 폴백
     const dynamicSkills = computeCompetenciesFromProfile(ruleProfile, ruleAnalysisList, targetJob, targetCompany)
     const jobInfoFromTavily = jobInfoResult ? {
         jobTitle: jobInfoResult.jobTitle,
@@ -111,6 +111,26 @@ export async function buildRuleBasedRoadmap(
             analysisList: ruleAnalysisList,
             jobInfoFromTavily,
         })
+    } else if (adapters.searchCertification) {
+        try {
+            const tavilyCertContext = await Promise.race([
+                adapters.searchCertification(targetJob, major),
+                new Promise<{ summary: string; results: Array<{ title: string; url: string; content: string }> }>((r) => setTimeout(() => r({ summary: '', results: [] }), 8000)),
+            ])
+            if (tavilyCertContext.summary.length > 0 || tavilyCertContext.results.length > 0) {
+                dynamicCerts = await getCertificationsFromTavilyContext({
+                    targetJob,
+                    major,
+                    analysisList: ruleAnalysisList,
+                    tavilyCertContext,
+                    jobInfoFromTavily,
+                })
+            } else {
+                dynamicCerts = await getCertificationsFromOpenAIFallback({ targetJob, major, analysisList: ruleAnalysisList, jobInfoFromTavily })
+            }
+        } catch {
+            dynamicCerts = await getCertificationsFromOpenAIFallback({ targetJob, major, analysisList: ruleAnalysisList, jobInfoFromTavily })
+        }
     } else {
         dynamicCerts = await getCertificationsFromOpenAIFallback({
             targetJob,
