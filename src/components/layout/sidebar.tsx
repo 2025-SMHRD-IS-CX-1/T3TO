@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import { LayoutDashboard, Map, Sparkles, Calendar, Users, Settings, LogOut, MessageSquare, UserCog, Shield, Trash2 } from "lucide-react"
+import { LayoutDashboard, Map, Sparkles, Calendar, Users, Settings, MessageSquare, UserCog, Shield, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ClientOnly } from "@/components/client-only"
 import {
@@ -38,6 +38,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const router = useRouter()
+
     const clientId = searchParams.get('clientId')
     const counselorId = searchParams.get('counselorId')
     const isAdmin = adminContext?.role === 'admin'
@@ -82,7 +83,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                             }
                         >
                             <Select value={counselorId || ''} onValueChange={onCounselorChange}>
-                                <SelectTrigger className="w-full bg-white">
+                                <SelectTrigger className="w-full bg-white cursor-pointer">
                                     <UserCog className="mr-2 h-4 w-4 text-gray-500" />
                                     <SelectValue placeholder="상담사를 선택하세요" />
                                 </SelectTrigger>
@@ -129,7 +130,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                                 "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                                 isActive
                                                     ? "bg-purple-50 text-purple-900"
-                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                                    : "text-gray-700 hover:bg-purple-50 hover:text-purple-900"
                                             )}
                                         >
                                             <div
@@ -156,7 +157,10 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                             </h3>
                             <div className="space-y-1">
                                 {counselorNavigation.map((item) => {
-                                    const isActive = pathname === item.href
+                                    // 내담자 관리 메뉴는 하위 페이지(로드맵, 상담일지 등)에서도 활성화
+                                    const isClientManagement = item.href === '/dashboard'
+                                    const isRelatedPage = ['/consultations', '/roadmap', '/cover-letter'].some(path => pathname?.startsWith(path))
+                                    const isActive = pathname === item.href || (isClientManagement && isRelatedPage)
                                     const Icon = item.icon
                                     return (
                                         <Link
@@ -166,7 +170,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                                 "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                                 isActive
                                                     ? "bg-purple-50 text-purple-900"
-                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                                    : "text-gray-700 hover:bg-purple-50 hover:text-purple-900"
                                             )}
                                         >
                                             <div

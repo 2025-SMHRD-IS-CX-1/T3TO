@@ -25,10 +25,10 @@ function Calendar({
             classNames={{
                 months: "flex flex-col space-y-4 w-full",
                 month: "grid w-full gap-4 grid-cols-[auto_1fr_auto] grid-rows-[auto_auto]",
-                month_caption: "flex justify-center pt-1 items-center",
+                month_caption: "flex justify-center items-center relative",
                 month_grid: "w-full border-collapse col-span-3",
                 caption_label: "text-lg font-bold text-gray-900 px-4 py-1.5 bg-purple-50 rounded-full",
-                nav: "flex items-center gap-1 absolute inset-x-0 justify-between pointer-events-none px-2",
+                nav: "flex items-center justify-between absolute inset-0 pointer-events-none px-2",
                 button_previous: cn(
                     buttonVariants({ variant: "ghost" }),
                     "h-9 w-9 p-0 opacity-80 hover:opacity-100 pointer-events-auto text-purple-600 shrink-0"
@@ -48,7 +48,7 @@ function Calendar({
                     "h-14 w-14 p-0 font-semibold rounded-xl transition-all flex flex-col items-center justify-center relative hover:bg-purple-50 text-gray-700"
                 ),
                 selected:
-                    "bg-purple-600 text-white hover:bg-purple-700 hover:text-white focus:bg-purple-600 focus:text-white shadow-lg ring-4 ring-purple-100",
+                    "bg-white text-gray-900 ring-2 ring-purple-600 ring-inset hover:bg-purple-50 hover:text-gray-900 focus:bg-purple-50 focus:text-gray-900",
                 today: "after:content-[''] after:absolute after:bottom-2 after:w-1.5 after:h-1.5 after:bg-purple-400 after:rounded-full font-black text-purple-900",
                 outside:
                     "text-gray-300 opacity-40",

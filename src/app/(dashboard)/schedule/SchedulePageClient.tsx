@@ -174,7 +174,7 @@ export default function SchedulePageClient() {
                     </div>
                 </div>
             )}
-            
+
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">일정 관리</h1>
@@ -507,7 +507,11 @@ export default function SchedulePageClient() {
                         </div>
                     ) : selectedDateEvents.length > 0 ? (
                         selectedDateEvents.map((event) => (
-                            <Card key={event.id} className="border-l-4 border-l-purple-500">
+                            <Card
+                                key={event.id}
+                                className="border-l-4 border-l-purple-500 cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-l-purple-600 group"
+                                onClick={() => setDetailEvent(event)}
+                            >
                                 <CardHeader className="pb-3 px-4 sm:px-6">
                                     <div className="flex flex-wrap justify-between items-start gap-2">
                                         <div className="min-w-0 flex-1">
@@ -526,8 +530,11 @@ export default function SchedulePageClient() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="h-8 w-8 p-0 shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
-                                            onClick={() => handleDeleteEvent(event.id)}
+                                            className="h-8 w-8 p-0 shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 opacity-60 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteEvent(event.id);
+                                            }}
                                             title="일정 삭제"
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -560,7 +567,7 @@ export default function SchedulePageClient() {
                                             }
                                         }}
                                     >
-                                        온라인상담
+                                        온라인 상담
                                     </Button>
                                 </CardContent>
                             </Card>

@@ -1,5 +1,11 @@
 import type { CompanyInfo, JobInfo } from './roadmap-types'
 
+/** 자격증 검색 결과 (Tavily 등 웹 검색으로 Q-Net API 대체 시 사용) */
+export interface CertificationSearchResult {
+    summary: string
+    results: Array<{ title: string; url: string; content: string }>
+}
+
 /**
  * 로드맵을 **하나의 독립 모듈**로 쓰기 위한 어댑터.
  * Next/Supabase에 묶이지 않고, 이 인터페이스만 구현하면 동일 로드맵 기능을 유지한 채 이식 가능.
@@ -13,6 +19,12 @@ export interface RoadmapAdapters {
     searchCompany?: (companyNames: string[]) => Promise<CompanyInfo[]>
     /** 목표 직무명 → 직무 요구사항/스킬 검색 (선택) */
     searchJob?: (jobTitle: string) => Promise<JobInfo | null>
+    /** Q-Net 자격증 목록 (선택, 없으면 빈 배열) */
+    getQualifications?: () => Promise<unknown[]>
+    /** Q-Net 시험 일정 (선택) */
+    getExamSchedule?: (targetNames?: string[]) => Promise<unknown[]>
+    /** 목표 직무·전공 → 자격증 정보 검색 (선택, Q-Net API 대체용 Tavily 검색) */
+    searchCertification?: (targetJob: string, major?: string) => Promise<CertificationSearchResult>
 }
 
 /** RAG 컨텍스트 — DB/API에서 가져올 내담자 데이터. 어댑터에서 이 형태로 넘기면 됨 */

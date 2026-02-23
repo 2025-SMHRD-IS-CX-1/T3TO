@@ -79,9 +79,18 @@ export async function runRoadmap(
         console.log(`[runRoadmap] OpenAI RAG 로드맵 생성: ${Date.now() - ragStart}ms`)
 
         if (ragResult?.plan?.length) {
-            const qualifications: unknown[] = []
-            const examSchedule: unknown[] = []
+            const qnetStart = Date.now()
+            const [qualifications, examSchedule] = await Promise.race([
+                Promise.all([
+                    adapters.getQualifications?.() ?? Promise.resolve([]),
+                    adapters.getExamSchedule?.() ?? Promise.resolve([]),
+                ]),
+                new Promise<[unknown[], unknown[]]>((resolve) =>
+                    setTimeout(() => resolve([[], []]), (global as any).QNET_TIMEOUT_MS ?? 10000)
+                ),
+            ])
             const jobCompetency: unknown[] = []
+            console.log(`[runRoadmap] Q-Net(자격증+시험일정): ${Date.now() - qnetStart}ms`)
             const first = ragResult.plan[0] as Record<string, unknown>
             first.자격정보 = qualifications.slice(0, 3)
             first.시험일정 = examSchedule.slice(0, 3)
@@ -93,6 +102,21 @@ export async function runRoadmap(
                 ? clientData.recommended_careers
                 : '희망 직무'
             const majorForCerts = clientData.major || ''
+
+            let tavilyCertContext: { summary: string; results: Array<{ title: string; url: string; content: string }> } | undefined
+            if (adapters.searchCertification) {
+                try {
+                    tavilyCertContext = await Promise.race([
+                        adapters.searchCertification(targetJobForCerts, majorForCerts),
+                        new Promise<{ summary: string; results: Array<{ title: string; url: string; content: string }> }>((resolve) =>
+                            setTimeout(() => resolve({ summary: '', results: [] }), 8000)
+                        ),
+                    ])
+                } catch (e) {
+                    console.warn('[runRoadmap] 자격증 Tavily 검색 실패:', e)
+                }
+            }
+
             const certsStart = Date.now()
             const dynamicCerts = await getCertificationsForRoadmap({
                 targetJob: targetJobForCerts,
@@ -101,6 +125,7 @@ export async function runRoadmap(
                 jobInfoFromTavily: jobInfoResult ?? undefined,
                 education_level: clientData.education_level || undefined,
                 work_experience_years: clientData.work_experience_years ?? 0,
+                tavilyCertContext,
             })
             console.log(`[runRoadmap] 자격증 추천( getCertificationsForRoadmap ): ${Date.now() - certsStart}ms`)
             const mapped = ragPlanToMilestones(
