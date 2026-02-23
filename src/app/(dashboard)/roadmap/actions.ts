@@ -7,7 +7,7 @@ import {
     getAllQualifications,
     getExamSchedule,
 } from '@/lib/qnet-api'
-import { searchCompanyInfo, searchJobInfo } from '@/lib/web-search'
+import { searchCompanyInfo, searchJobInfo, searchCertificationInfo } from '@/lib/web-search'
 import { runRoadmap, getRoadmapRagContext } from './lib'
 
 export async function getRoadmap(profileId?: string, counselorId?: string | null) {
@@ -80,6 +80,7 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         searchJob: searchJobInfo,
         getQualifications: () => getAllQualifications(5),
         getExamSchedule: getExamSchedule,
+        searchCertification: searchCertificationInfo,
     }
     t = Date.now()
     const result = await runRoadmap(userData, adapters)

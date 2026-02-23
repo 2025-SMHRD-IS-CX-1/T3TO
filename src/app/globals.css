@@ -182,3 +182,26 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* 로드맵 출력 시 텍스트 겹침 방지 */
+@media print {
+  .roadmap-print-area {
+    max-width: 100% !important;
+  }
+  .roadmap-print-area .print-grid-single {
+    grid-template-columns: 1fr !important;
+  }
+  .roadmap-print-area .print-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .roadmap-print-area .print-text-wrap {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    min-width: 0;
+  }
+  .roadmap-print-area .roadmap-step-desc {
+    -webkit-line-clamp: unset;
+    display: block;
+  }
+}
