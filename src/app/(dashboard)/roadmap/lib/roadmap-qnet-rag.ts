@@ -8,7 +8,9 @@ import { filterQualificationsByEligibility, getExamScheduleWrittenAndPractical }
 import {
     CERT_RECOMMENDATION_SYSTEM_PROMPT,
     CERT_OPENAI_FALLBACK_SYSTEM_PROMPT,
+    CERT_TAVILY_CONTEXT_SYSTEM_PROMPT,
     buildCertificationRecommendationContext,
+    buildTavilyCertRecommendationContext,
 } from './roadmap-prompts'
 
 interface RecommendCertificationsOpts {
@@ -180,6 +182,82 @@ export async function recommendCertificationsWithRag(
     }
 }
 
+/** Tavily 자격증 검색 결과를 RAG로 사용해 자격증 추천 (Q-Net API 대체) */
+export async function getCertificationsFromTavilyContext(opts: {
+    targetJob: string
+    major: string
+    analysisList: Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
+    tavilyCertContext: { summary: string; results: Array<{ title: string; url: string; content: string }> }
+    jobInfoFromTavily?: { jobTitle: string; requirements?: string; trends?: string; skills?: string; certifications?: string } | null
+}): Promise<Array<{
+    type: string
+    name: string
+    status: string
+    color: string
+    details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
+}>> {
+    const { targetJob, major, analysisList, tavilyCertContext, jobInfoFromTavily } = opts
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    if (!openaiApiKey) {
+        console.warn('[자격증 Tavily RAG] OPENAI_API_KEY가 없어 OpenAI 폴백으로 대체')
+        return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined })
+    }
+
+    const userPrompt = buildTavilyCertRecommendationContext({
+        targetJob,
+        major,
+        analysisList,
+        tavilyCertContext,
+        jobInfoFromTavily: jobInfoFromTavily ?? undefined,
+    })
+
+    try {
+        const openai = new OpenAI({ apiKey: openaiApiKey })
+        const model = getRoadmapModel()
+        console.log('[자격증 Tavily RAG] 웹 검색 결과 기반 LLM 추천')
+        const res = await openai.chat.completions.create({
+            model,
+            messages: [
+                { role: 'system', content: CERT_TAVILY_CONTEXT_SYSTEM_PROMPT },
+                { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+        })
+
+        const text = res.choices[0]?.message?.content?.trim() || ''
+        const parsed = JSON.parse(text) as { recommended?: Array<{ qualName: string; relevanceScore: number; reason: string }> }
+        if (!parsed.recommended || !Array.isArray(parsed.recommended)) return []
+
+        const colors = [
+            'text-blue-600 bg-blue-50',
+            'text-green-600 bg-green-50',
+            'text-orange-600 bg-orange-50',
+            'text-purple-600 bg-purple-50',
+            'text-red-600 bg-red-50',
+        ]
+        const statuses = ['취득 권장', '취득 추천', '관심 분야']
+
+        return parsed.recommended.slice(0, 5).map((rec, i) => ({
+            type: '자격증',
+            name: rec.qualName,
+            status: rec.relevanceScore >= 8 ? statuses[0] : rec.relevanceScore >= 6 ? statuses[1] : statuses[2],
+            color: colors[i % colors.length],
+            details: {
+                description: rec.reason || `${rec.qualName} 관련 자격증입니다.`,
+                examScheduleWritten: '',
+                examSchedulePractical: '',
+                difficulty: '난이도: 중',
+                written: '필기: 100점 만점에 60점 이상',
+                practical: '실기: 100점 만점에 60점 이상',
+            },
+        }))
+    } catch (error) {
+        console.error('[자격증 Tavily RAG] 에러:', error)
+        return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined })
+    }
+}
+
 /** Q-Net API 실패 시 OpenAI로 자격증 추천 (LLM 지식 기반) */
 export async function getCertificationsFromOpenAIFallback(opts: {
     targetJob: string
@@ -268,7 +346,7 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
     }
 }
 
-/** 로드맵 생성 시 사용 - Tavily + DB·상담 + OpenAI 기반 자격증 추천 (단일 진입점). 학력·경력 반영. */
+/** 로드맵 생성 시 사용 - Tavily 검색(Q-Net 대체) 또는 Q-Net API + DB·상담 기반 자격증 추천. */
 export async function getCertificationsForRoadmap(opts: {
     targetJob: string
     major: string
@@ -279,6 +357,8 @@ export async function getCertificationsForRoadmap(opts: {
     examScheduleTavilyFallback?: { summary?: string; url?: string }
     getAllQualifications?: () => Promise<unknown[]>
     getExamSchedule?: () => Promise<unknown[]>
+    /** Tavily 자격증 검색 결과 (Q-Net API 대체, 있으면 우선 사용) */
+    tavilyCertContext?: { summary: string; results: Array<{ title: string; url: string; content: string }> }
 }): Promise<Array<{
     type: string
     name: string
@@ -286,13 +366,22 @@ export async function getCertificationsForRoadmap(opts: {
     color: string
     details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
 }>> {
-    const { targetJob, major, analysisList, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback, getAllQualifications = () => Promise.resolve([]), getExamSchedule = () => Promise.resolve([]) } = opts
+    const { targetJob, major, analysisList, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback, getAllQualifications = () => Promise.resolve([]), getExamSchedule = () => Promise.resolve([]), tavilyCertContext } = opts
     const [qualifications, examSchedule] = await Promise.all([
         getAllQualifications(),
         getExamSchedule(),
     ])
 
     if (qualifications.length === 0) {
+        if (tavilyCertContext && (tavilyCertContext.summary.length > 0 || tavilyCertContext.results.length > 0)) {
+            return getCertificationsFromTavilyContext({
+                targetJob,
+                major,
+                analysisList,
+                tavilyCertContext,
+                jobInfoFromTavily: jobInfoFromTavily ?? null,
+            })
+        }
         return getCertificationsFromOpenAIFallback({
             targetJob,
             major,

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Map, Calendar, ArrowRight, User, Plus, Loader2 } from "lucide-react"
+import { Map, Calendar, ArrowRight, User, Plus, Loader2, Target, Building2 } from "lucide-react"
 import Link from "next/link"
 import {
     Select,
@@ -122,7 +122,7 @@ export default function DashboardPageClient() {
 
     const handleAddClient = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        
+
         setIsSubmitting(true)
 
         const form = e.currentTarget
@@ -207,7 +207,7 @@ export default function DashboardPageClient() {
                     </div>
                 </div>
             )}
-            
+
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">
@@ -246,7 +246,7 @@ export default function DashboardPageClient() {
                                         새로운 내담자의 기본 정보를 입력하여 시스템에 등록합니다.
                                     </DialogDescription>
                                 </DialogHeader>
-                                <form onSubmit={handleAddClient} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                                <form onSubmit={handleAddClient} className="space-y-4 p-1 py-4 max-h-[70vh] overflow-y-auto">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="name">이름 *</Label>
@@ -347,25 +347,80 @@ export default function DashboardPageClient() {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                            disabled={!selectedClientId}
-                            onClick={() => setDeleteConfirmOpen(true)}
-                        >
-                            삭제
-                        </Button>
+                        {selectedClientId && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                onClick={() => setDeleteConfirmOpen(true)}
+                            >
+                                삭제
+                            </Button>
+                        )}
                         {selectedClient && (
                             <Button asChild>
                                 <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
-로드맵 생성
+                                    로드맵 생성
                                 </Link>
                             </Button>
                         )}
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Career Goal Card */}
+            {selectedClient && (
+                <Card className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-0 shadow-lg">
+                    <CardContent className="p-6">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="p-3 bg-white/20 rounded-full shrink-0">
+                                    <Target className="h-8 w-8 text-white" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="text-lg font-medium text-purple-100 mb-1">최종 커리어 목표</h2>
+                                    <div className="text-3xl font-bold tracking-tight truncate md:whitespace-normal">
+                                        {roadmapData?.target_job || "목표 직무 미설정"}
+                                    </div>
+                                    {roadmapData?.target_company && (
+                                        <div className="flex items-center gap-2 mt-2 text-purple-100">
+                                            <Building2 className="h-4 w-4 shrink-0" />
+                                            <span className="font-medium truncate">{roadmapData.target_company}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-8 bg-white/10 p-4 rounded-xl backdrop-blur-sm shrink-0">
+                                <div className="text-center">
+                                    <div className="text-sm text-purple-200 mb-1 whitespace-nowrap">달성률</div>
+                                    <div className="text-2xl font-bold">
+                                        {(() => {
+                                            try {
+                                                const milestones = JSON.parse(roadmapData?.milestones || '[]')
+                                                const completed = milestones.filter((m: any) => m.status === 'completed').length
+                                                const total = milestones.length
+                                                return total > 0 ? Math.round((completed / total) * 100) : 0
+                                            } catch { return 0 }
+                                        })()}%
+                                    </div>
+                                </div>
+                                <div className="w-px h-10 bg-white/20" />
+                                <div className="text-center">
+                                    <div className="text-sm text-purple-200 mb-1 whitespace-nowrap">잔여 활동</div>
+                                    <div className="text-2xl font-bold">
+                                        {(() => {
+                                            try {
+                                                const milestones = JSON.parse(roadmapData?.milestones || '[]')
+                                                return milestones.filter((m: any) => m.status !== 'completed').length
+                                            } catch { return 0 }
+                                        })()}개
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* 내담자 삭제 확인 다이얼로그 */}
             <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
@@ -407,7 +462,7 @@ export default function DashboardPageClient() {
                         </DialogDescription>
                     </DialogHeader>
                     {selectedClient && (
-                        <form onSubmit={handleEditProfile} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                        <form onSubmit={handleEditProfile} className="space-y-4 p-1 py-4 max-h-[70vh] overflow-y-auto">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-name">이름 *</Label>
@@ -471,8 +526,8 @@ export default function DashboardPageClient() {
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-skill_vector">보유 기술 (스택)</Label>
                                     <Textarea id="edit-skill_vector" name="skill_vector" defaultValue={selectedClient.skill_vector?.toString().trim().startsWith('분석된 보유 기술:') ? '' : (selectedClient.skill_vector ?? '')} placeholder="예: React, Node.js, Python (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
-                                    </div>
-                                    <div className="space-y-2">
+                                </div>
+                                <div className="space-y-2">
                                     <Label htmlFor="edit-recommended_careers">희망 직무</Label>
                                     <Input id="edit-recommended_careers" name="recommended_careers" defaultValue={selectedClient.recommended_careers ?? ''} placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
                                 </div>
@@ -517,7 +572,7 @@ export default function DashboardPageClient() {
                 </Card>
             ) : (
                 <>
-{/* Stats Cards - 내담자 정보, 로드맵 진행률, 다가오는 일정 */}
+                    {/* Stats Cards - 내담자 정보, 로드맵 진행률, 다가오는 일정 */}
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <Card
                             className="cursor-pointer transition-colors hover:bg-gray-50/80"
@@ -582,26 +637,19 @@ export default function DashboardPageClient() {
                             <CardHeader>
                                 <CardTitle>추천 로드맵</CardTitle>
                             </CardHeader>
-<CardContent className="flex flex-col flex-1 min-h-0">
+                            <CardContent className="flex flex-col flex-1 min-h-0">
                                 {roadmapData && roadmapData.milestones ? (() => {
                                     try {
                                         const milestones = JSON.parse(roadmapData.milestones)
                                         const firstStep = milestones[0]
                                         return (
-<div className="flex flex-col h-full">
+                                            <div className="flex flex-col h-full">
                                                 <div className="border-l-4 border-purple-600 pl-4">
                                                     <h3 className="font-semibold text-gray-900 mb-2">{firstStep?.title || '로드맵'}</h3>
                                                     <p className="text-sm text-gray-600 line-clamp-2">{firstStep?.description || ''}</p>
-                                                    {roadmapData.target_job && (
-                                                        <div className="mt-2 flex items-center gap-2">
-                                                            <Badge variant="outline" className="text-xs">
-                                                                목표: {roadmapData.target_job}
-                                                                {roadmapData.target_company && ` @ ${roadmapData.target_company}`}
-                                                            </Badge>
-                                                        </div>
-                                                    )}
+
                                                 </div>
-<div className="mt-auto flex justify-end pt-4 border-t">
+                                                <div className="mt-auto flex justify-end pt-4 border-t">
                                                     <Button variant="outline" size="sm" asChild>
                                                         <Link
                                                             href={
@@ -629,7 +677,7 @@ export default function DashboardPageClient() {
                                                 </div>
                                                 <p className="text-sm font-medium text-gray-900">로드맵이 아직 생성되지 않았습니다</p>
                                                 <p className="text-xs text-muted-foreground mt-2 mb-4">
-"로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
+                                                    "로드맵 생성" 버튼을 클릭하여 로드맵을 만들어보세요.
                                                 </p>
                                                 <Button variant="outline" asChild>
                                                     <Link

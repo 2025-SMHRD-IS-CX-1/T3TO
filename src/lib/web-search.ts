@@ -215,3 +215,51 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
     return result
 }
 
+/** 자격증 검색 결과 (Q-Net API 대체용 Tavily 검색) */
+export interface CertificationSearchResult {
+    summary: string
+    results: SearchResult[]
+}
+
+/**
+ * 목표 직무·전공 기준 자격증 정보 Tavily 검색 (Q-Net API 대체)
+ * 로드맵 자격증 추천 시 RAG 컨텍스트로 사용
+ */
+export async function searchCertificationInfo(
+    targetJob: string,
+    major?: string
+): Promise<CertificationSearchResult> {
+    if (!TAVILY_API_KEY) {
+        console.warn('[Tavily API] TAVILY_API_KEY가 없어 자격증 검색을 건너뜁니다')
+        return { summary: '', results: [] }
+    }
+
+    const queries: string[] = []
+    if (targetJob && targetJob !== '희망 직무' && targetJob !== '없음' && targetJob !== '미정') {
+        queries.push(`${targetJob} 관련 자격증 국가기술자격 추천`)
+        queries.push(`${targetJob} 필수 자격증 Q-Net`)
+    }
+    if (major && major !== '정보 없음' && major !== '전공 분야') {
+        queries.push(`${major} 전공 관련 자격증 한국산업인력공단`)
+    }
+    if (queries.length === 0) {
+        queries.push('한국 국가기술자격증 정보처리기사 빅데이터분석기사 추천')
+    }
+    queries.push('한국산업인력공단 Q-Net 시험일정 2025')
+
+    const allResults: SearchResult[] = []
+    for (const query of queries.slice(0, 4)) {
+        const searchResults = await searchWeb(query, 3)
+        allResults.push(...searchResults)
+    }
+
+    const summaryParts = allResults
+        .filter((r) => r.content && r.content.length > 50)
+        .map((r) => r.content)
+        .slice(0, 8)
+    const summary = summaryParts.join('\n\n').slice(0, 3000)
+
+    console.log(`[Tavily API] 자격증 검색 완료 - 쿼리 ${queries.length}개, 결과 ${allResults.length}건, 요약 ${summary.length}자`)
+    return { summary, results: allResults.slice(0, 15) }
+}
+

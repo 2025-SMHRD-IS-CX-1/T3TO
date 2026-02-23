@@ -188,7 +188,7 @@ export default function ConsultationsPageClient() {
                     </div>
                 </div>
             )}
-            
+
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">상담 관리</h1>
@@ -296,7 +296,7 @@ export default function ConsultationsPageClient() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-gray-400 hover:text-purple-600 h-8 w-8 p-0"
+                                                className="text-gray-400 hover:text-purple-600 hover:bg-purple-50 h-8 w-8 p-0"
                                                 onClick={(e) => handleEditClick(e, item)}
                                                 title="상담 기록 수정"
                                             >
@@ -305,7 +305,7 @@ export default function ConsultationsPageClient() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-gray-400 hover:text-red-600 h-8 w-8 p-0"
+                                                className="text-gray-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
                                                 onClick={(e) => handleDeleteConsultation(e, item.consultation_id)}
                                                 title="상담 기록 삭제"
                                             >
