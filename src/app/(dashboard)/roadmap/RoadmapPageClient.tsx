@@ -274,8 +274,8 @@ export default function RoadmapPageClient() {
                 </Card>
             )}
 
-            <div ref={roadmapCaptureRef}>
-                <div className="flex flex-row items-center justify-between gap-4">
+            <div ref={roadmapCaptureRef} className="roadmap-print-area">
+                <div className="flex flex-row items-center justify-between gap-4 print:flex-col print:items-start">
                     <h1 className="text-3xl font-bold tracking-tight text-gray-900 whitespace-nowrap">
                         {clientData ? `${clientData.client_name}님의 커리어 로드맵` : "나의 커리어 로드맵"}
                     </h1>
@@ -313,14 +313,14 @@ export default function RoadmapPageClient() {
                         </CardContent>
                     </Card>
 
-                    {/* 구간별 상세 카드 (단기·중기·장기) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
+                    {/* 구간별 상세 카드 (단기·중기·장기) — 출력 시에도 항목이 잘리지 않도록 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 print:grid-cols-1">
                         {[
                             { term: "단기", range: "1~3개월", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1) },
                             { term: "중기", range: "3~12개월", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2) },
                             { term: "장기", range: "1년 이상", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2) }
                         ].map((milestone, idx) => (
-                            <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col", milestone.color)}>
+                            <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col print-break-avoid", milestone.color)}>
                                 <div className="font-bold text-sm mb-1">{milestone.term}</div>
                                 <div className="text-xs opacity-90 mb-3">{milestone.range}</div>
                                 <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
@@ -340,7 +340,7 @@ export default function RoadmapPageClient() {
                                                 <h4 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h4>
                                                 <div className="relative">
                                                     <p className={cn(
-                                                        "text-xs text-gray-600",
+                                                        "text-xs text-gray-600 break-words roadmap-step-desc",
                                                         step.description && step.description.length > 100 ? "line-clamp-2 cursor-pointer" : ""
                                                     )}
                                                     onClick={() => {
@@ -402,10 +402,10 @@ export default function RoadmapPageClient() {
                         ))}
                     </div>
 
-                    {/* Detailed Analysis Sections */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Detailed Analysis Sections — 출력 시 1열로 배치해 텍스트 겹침 방지 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 print-grid-single">
                         {/* Competencies */}
-                        <Card className="shadow-md border-gray-200">
+                        <Card className="shadow-md border-gray-200 print-break-avoid">
                             <CardHeader className="bg-gray-50/50 border-b">
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Sparkles className="h-5 w-5 text-purple-600" />
@@ -417,20 +417,26 @@ export default function RoadmapPageClient() {
                                     {(skills.length > 0 ? skills : [
                                         { title: "데이터 파악 중", desc: "내담자 분석을 통해 역량을 도출하고 있습니다.", level: 50 }
                                     ]).map((item, i) => (
-                                        <li key={i} className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-semibold text-gray-800 tracking-tight">{item.title}</span>
-                                                <span className="text-xs font-bold text-purple-600">{item.level}%</span>
+                                        <li key={i} className="space-y-2 print-break-avoid">
+                                            <div className="flex justify-between items-center gap-2 min-w-0">
+                                                <span className="font-semibold text-gray-800 tracking-tight print-text-wrap">{item.title}</span>
+                                                <span className="text-xs font-bold text-purple-600 shrink-0">{item.level}%</span>
                                             </div>
-                                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden relative">
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${item.level}%` }}
                                                     transition={{ duration: 1, delay: i * 0.1 }}
-                                                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-600"
+                                                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 print:hidden"
+                                                />
+                                                {/* 출력 시 프로그레스 바 표시 (인쇄에서 motion 미적용으로 겹침 방지) */}
+                                                <div
+                                                    className="hidden print:!block absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-600"
+                                                    style={{ width: `${item.level}%` }}
+                                                    aria-hidden
                                                 />
                                             </div>
-                                            <p className="text-xs text-muted-foreground">{item.desc}</p>
+                                            <p className="text-xs text-muted-foreground print-text-wrap break-words">{item.desc}</p>
                                         </li>
                                     ))}
                                 </ul>
@@ -438,7 +444,7 @@ export default function RoadmapPageClient() {
                         </Card>
 
                         {/* Certificates & Qualifications */}
-                        <Card className="shadow-md border-gray-200">
+                        <Card className="shadow-md border-gray-200 print-break-avoid">
                             <CardHeader className="bg-gray-50/50 border-b">
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Download className="h-5 w-5 text-blue-600" />

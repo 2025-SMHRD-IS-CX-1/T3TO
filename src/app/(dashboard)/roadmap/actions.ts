@@ -3,7 +3,7 @@
 import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getRoadmapModel } from '@/lib/ai-models'
-import { searchCompanyInfo, searchJobInfo } from '@/lib/web-search'
+import { searchCompanyInfo, searchJobInfo, searchCertificationInfo } from '@/lib/web-search'
 import { runRoadmap, getRoadmapRagContext } from './lib'
 
 export async function getRoadmap(profileId?: string, counselorId?: string | null) {
@@ -74,6 +74,7 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         model: getRoadmapModel(),
         searchCompany: searchCompanyInfo,
         searchJob: searchJobInfo,
+        searchCertification: searchCertificationInfo,
     }
     t = Date.now()
     const result = await runRoadmap(userData, adapters)
