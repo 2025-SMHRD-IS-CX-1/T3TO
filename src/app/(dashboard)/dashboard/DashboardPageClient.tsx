@@ -222,23 +222,21 @@ export default function DashboardPageClient() {
                     <CardTitle className="text-base">내담자 선택</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center gap-4">
-                        <Select value={selectedClientId} onValueChange={handleClientSelect}>
-                            <SelectTrigger className="w-full max-w-md">
-                                <SelectValue placeholder="내담자를 선택하세요" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {clients.map((client) => (
-                                    <SelectItem key={client.id} value={client.id}>
-                                        {client.name} ({client.email})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                            <Button variant="secondary" onClick={() => setIsAddDialogOpen(true)}>
-                                <Plus className="h-4 w-4" /> 내담자 추가
-                            </Button>
+                    {!loading && clients.length === 0 ? (
+                        <div className="space-y-4">
+                            <p className="text-sm text-muted-foreground">등록된 내담자가 없습니다. 첫 내담자를 추가해 주세요.</p>
+                            <Select value="">
+                                <SelectTrigger className="w-full max-w-md opacity-60 cursor-not-allowed" disabled>
+                                    <SelectValue placeholder="내담자를 선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="_none" disabled>내담자 없음</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white shadow-md ring-2 ring-purple-200 ring-offset-2" onClick={() => setIsAddDialogOpen(true)}>
+                                    <Plus className="h-5 w-5 mr-2" /> 내담자 추가
+                                </Button>
                             <DialogContent className="sm:max-w-[600px]">
                                 <DialogHeader>
                                     <DialogTitle>신규 내담자 등록</DialogTitle>
@@ -347,24 +345,152 @@ export default function DashboardPageClient() {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        {selectedClientId && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                                onClick={() => setDeleteConfirmOpen(true)}
-                            >
-                                삭제
-                            </Button>
-                        )}
-                        {selectedClient && (
-                            <Button asChild>
-                                <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
-                                    로드맵 생성
-                                </Link>
-                            </Button>
-                        )}
-                    </div>
+                            </div>
+                    ) : (
+                        <div className="flex items-center gap-4">
+                            <Select value={selectedClientId} onValueChange={handleClientSelect}>
+                                <SelectTrigger className="w-full max-w-md">
+                                    <SelectValue placeholder="내담자를 선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {clients.map((client) => (
+                                        <SelectItem key={client.id} value={client.id}>
+                                            {client.name} ({client.email})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                                <Button variant="secondary" onClick={() => setIsAddDialogOpen(true)}>
+                                    <Plus className="h-4 w-4" /> 내담자 추가
+                                </Button>
+                                <DialogContent className="sm:max-w-[600px]">
+                                    <DialogHeader>
+                                        <DialogTitle>신규 내담자 등록</DialogTitle>
+                                        <DialogDescription>
+                                            새로운 내담자의 기본 정보를 입력하여 시스템에 등록합니다.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleAddClient} className="space-y-4 p-1 py-4 max-h-[70vh] overflow-y-auto">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="name">이름 *</Label>
+                                                <Input id="name" name="name" placeholder="홍길동" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email">이메일 *</Label>
+                                                <Input id="email" name="email" type="email" placeholder="hong@example.com" required />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="gender">성별</Label>
+                                                <select id="gender" name="gender" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                                    <option value="">선택 안 함</option>
+                                                    <option value="남성">남성</option>
+                                                    <option value="여성">여성</option>
+                                                    <option value="기타">기타</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="age_group">나이</Label>
+                                                <Input
+                                                    id="age_group"
+                                                    name="age_group"
+                                                    type="number"
+                                                    min={15}
+                                                    max={100}
+                                                    placeholder="만 25"
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="education_level">학력</Label>
+                                                <select id="education_level" name="education_level" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                                    <option value="">선택 안 함</option>
+                                                    <option value="고등학교 졸업">고등학교 졸업</option>
+                                                    <option value="전문대 졸업">전문대 졸업</option>
+                                                    <option value="대학교 재학">대학교 재학</option>
+                                                    <option value="대학교 졸업">대학교 졸업</option>
+                                                    <option value="석사">석사</option>
+                                                    <option value="박사">박사</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="major">전공</Label>
+                                                <Input id="major" name="major" placeholder="컴퓨터공학" />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="work_experience">경력 사항 (경력 기술서 내용 등)</Label>
+                                            <Textarea
+                                                id="work_experience"
+                                                name="work_experience"
+                                                placeholder="본인의 주요 경력 사항을 기술해주세요. (예: OO사 서비스 기획 3년, OO 프로젝트 리딩 등)"
+                                                className="h-24"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-4 pt-2 border-t mt-4">
+                                            <h4 className="text-sm font-bold text-gray-900">추가 분석 정보</h4>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="career_orientation">진로 성향</Label>
+                                                <Textarea id="career_orientation" name="career_orientation" placeholder="예: 안정적인 대기업 환경 선호, 대인 관계 중시" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="skill_vector">보유 기술 (스택)</Label>
+                                                <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="recommended_careers">희망 직무</Label>
+                                                <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="target_company">목표 기업</Label>
+                                                <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아 (IT) / 현대건설, 삼성물산 (건설) / 메디트로닉스, 지멘스헬스케어 (의료) / 롯데, 신세계 (유통)" />
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                                                취소
+                                            </Button>
+                                            <Button type="submit" disabled={isSubmitting}>
+                                                {isSubmitting ? (
+                                                    <>
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장 중...
+                                                    </>
+                                                ) : (
+                                                    "등록하기"
+                                                )}
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                            {selectedClientId && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                    onClick={() => setDeleteConfirmOpen(true)}
+                                >
+                                    삭제
+                                </Button>
+                            )}
+                            {selectedClient && (
+                                <Button asChild>
+                                    <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
+                                        로드맵 생성
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
