@@ -2,11 +2,9 @@
 
 import Link from "next/link"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import { LayoutDashboard, Map, Sparkles, Calendar, Users, Settings, MessageSquare, UserCog, Shield } from "lucide-react"
+import { LayoutDashboard, Map, Sparkles, Calendar, Users, Settings, MessageSquare, UserCog, Shield, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
-
 import { ClientOnly } from "@/components/client-only"
-
 import {
     Select,
     SelectContent,
@@ -64,9 +62,9 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     }
 
     return (
-        <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)]">
+        <div className="flex w-[280px] flex-col bg-white shadow-[4px_0_18px_rgba(148,163,184,0.16)] print:hidden">
             <div className="flex h-16 items-center px-4 border-b border-gray-100">
-                <Link href={getHref('/dashboard')} className="flex items-center justify-center">
+                <Link href={getHref("/dashboard")} className="flex items-center justify-center">
                     <img src="/logo.png" alt="Career Bridge" className="h-12 w-auto object-contain mix-blend-multiply" />
                 </Link>
             </div>
@@ -244,7 +242,20 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                     </div>
                 </nav>
             </div>
-
+            <div className="p-4 bg-white/95 shadow-[0_-1px_0_rgba(148,163,184,0.16)] backdrop-blur-sm">
+                <button
+                    onClick={async () => {
+                        const { createClient } = await import('@/lib/supabase/client')
+                        const supabase = createClient()
+                        await supabase.auth.signOut()
+                        window.location.href = '/login'
+                    }}
+                    className="w-full group flex items-center justify-center px-3 py-3 text-sm font-semibold text-gray-900 rounded-lg border-2 border-gray-200 bg-gray-50 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
+                >
+                    <LogOut className="mr-2 h-5 w-5" />
+                    로그아웃
+                </button>
+            </div>
         </div>
     )
 }

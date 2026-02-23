@@ -268,7 +268,7 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
     }
 }
 
-/** 로드맵 생성 시 사용 - Tavily + DB·상담 + Q-Net/OpenAI 기반 자격증 추천 (단일 진입점). 학력·경력 반영. Q-Net API 미제공 시 Tavily 시험일정 검색 활용 */
+/** 로드맵 생성 시 사용 - Tavily + DB·상담 + OpenAI 기반 자격증 추천 (단일 진입점). 학력·경력 반영. */
 export async function getCertificationsForRoadmap(opts: {
     targetJob: string
     major: string
@@ -276,10 +276,9 @@ export async function getCertificationsForRoadmap(opts: {
     jobInfoFromTavily?: { jobTitle: string; requirements?: string; trends?: string; skills?: string; certifications?: string } | null
     education_level?: string
     work_experience_years?: number
-    /** Q-Net 시험일정 API 미제공 시 Tavily 검색 결과 */
     examScheduleTavilyFallback?: { summary?: string; url?: string }
-    getAllQualifications: () => Promise<unknown[]>
-    getExamSchedule: () => Promise<unknown[]>
+    getAllQualifications?: () => Promise<unknown[]>
+    getExamSchedule?: () => Promise<unknown[]>
 }): Promise<Array<{
     type: string
     name: string
@@ -287,7 +286,7 @@ export async function getCertificationsForRoadmap(opts: {
     color: string
     details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
 }>> {
-    const { targetJob, major, analysisList, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback, getAllQualifications, getExamSchedule } = opts
+    const { targetJob, major, analysisList, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback, getAllQualifications = () => Promise.resolve([]), getExamSchedule = () => Promise.resolve([]) } = opts
     const [qualifications, examSchedule] = await Promise.all([
         getAllQualifications(),
         getExamSchedule(),

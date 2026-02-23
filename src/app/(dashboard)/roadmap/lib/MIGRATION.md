@@ -20,7 +20,7 @@
 |------|-----------|--------|
 | RAG 컨텍스트 수집 | `getRoadmapRagContext(supabase, profileId, userId)` | **본인 DB/API**에서 `{ counseling, analysis, profile, roadmap }` 형태로 준비해 넘기면 됨 |
 | 웹 검색 (기업/직무) | `@/lib/web-search` (Tavily) | **선택**. `RoadmapAdapters.searchCompany`, `searchJob` 구현하거나, 없으면 DB 데이터만으로 생성 |
-| 자격증/시험일정 | `@/lib/qnet-api` | **선택**. `getQualifications`, `getExamSchedule` 구현하거나 빈 배열 |
+| 자격증/시험일정 | (제거됨) | **선택**. 어댑터에서 `getQualifications`, `getExamSchedule` 구현하거나 빈 배열 반환 |
 | LLM 호출 | `actions.ts` 내부 `generateRoadmapWithRag` | **동일 시그니처 유지**. `openaiApiKey` + `model`만 넘기면 됨 |
 
 ## 3. 어댑터만 맞추면 되는 진입점 (개념)
@@ -34,14 +34,12 @@ import { computeCompetenciesFromProfile, filterRelevantQualifications, extractKe
 // 1) RAG 컨텍스트: 본인 DB/API에서 조회
 const userData: RoadmapRagContext = await yourGetRagContext(profileId, userId)
 
-// 2) 어댑터: OpenAI + (선택) 웹검색, Q-Net
+// 2) 어댑터: OpenAI + (선택) 웹검색
 const adapters: RoadmapAdapters = {
   openaiApiKey: process.env.OPENAI_API_KEY!,
   model: 'gpt-4o-mini',
   searchCompany: yourSearchCompany,  // 없으면 undefined
   searchJob: yourSearchJob,          // 없으면 undefined
-  getQualifications: yourGetQualifications,
-  getExamSchedule: yourGetExamSchedule,
 }
 
 // 3) 현재 createInitialRoadmap 안에서 하는 흐름과 동일:

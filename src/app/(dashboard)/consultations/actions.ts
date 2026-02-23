@@ -240,15 +240,7 @@ async function analyzeConsultation(consultationId: string, profileId: string, co
         weaknesses: analysis.weaknesses,
     })
 
-    // [AI 분석 시뮬레이션] 상담 내용을 기반으로 내담자의 프로필을 업데이트합니다.
-    await supabase
-        .from('career_profiles')
-        .update({
-            career_orientation: "최신 상담 반영: " + (content.length > 50 ? content.substring(0, 50) + "..." : content),
-            skill_vector: "분석된 보유 기술: React, Supabase, AI API 연동",
-        })
-        .eq('profile_id', profileId)
-        .eq('user_id', user.id)
+    // [AI 분석] career_orientation/skill_vector는 placeholder 문구로 덮어쓰지 않음 (대시보드에서 사용자 입력만 저장)
 
     // [로드맵 자동 갱신] 최신화된 프로필을 바탕으로 로드맵을 즉시 다시 생성합니다.
     const latestProfile = await getClientProfile(profileId)

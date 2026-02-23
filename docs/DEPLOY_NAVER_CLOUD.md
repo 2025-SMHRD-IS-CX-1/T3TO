@@ -310,6 +310,38 @@ sudo apache2ctl configtest
 sudo systemctl reload apache2
 ```
 
+#### 7.1.1 Apache에서 443 포트 허용 (HTTPS 대비)
+
+443(HTTPS)을 쓰려면 Apache가 443을 Listen 하도록 하고 SSL 모듈을 켜야 합니다.
+
+1. **포트 설정** — `ports.conf`에 443 추가:
+   ```bash
+   sudo nano /etc/apache2/ports.conf
+   ```
+   다음 줄이 있는지 확인하고, 없으면 추가합니다.
+   ```apache
+   Listen 80
+   Listen 443
+   ```
+
+2. **SSL 모듈 활성화**:
+   ```bash
+   sudo a2enmod ssl
+   sudo apache2ctl configtest
+   sudo systemctl reload apache2
+   ```
+
+3. **방화벽에서 443 허용** (서버에 ufw 사용 시):
+   ```bash
+   sudo ufw allow 443/tcp
+   sudo ufw status
+   sudo ufw reload
+   ```
+
+4. **네이버 클라우드 ACG**: Web 서버 ACG 인바운드에 **443(TCP)** 가 허용되어 있는지 확인합니다. (섹션 2 표 참고)
+
+이후 인증서를 발급받으면 **7.2 HTTPS(SSL)** 절대로 443 VirtualHost를 추가하면 됩니다.
+
 - **8000 포트**는 Web에서 노출하지 않습니다. Next가 WAS 내부에서 127.0.0.1:8000으로만 호출합니다.
 
 ### 7.2 HTTPS(SSL) — careerbridge.kr 연결 후
