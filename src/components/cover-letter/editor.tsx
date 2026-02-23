@@ -125,38 +125,74 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
         downloadBlob(blob, getDownloadFilename("txt"))
     }
 
-    const handleDownloadHtml = () => {
-        const title = drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서"
-        const escapedTitle = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        const escapedContent = (content ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>${escapedTitle}</title>
-<style>
-body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; line-height: 1.8; }
-h1 { font-size: 24px; margin-bottom: 20px; }
-p { white-space: pre-wrap; }
-</style>
-</head>
-<body>
-<h1>${escapedTitle}</h1>
-<p>${escapedContent}</p>
-</body>
-</html>`
-        const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" })
-        downloadBlob(blob, getDownloadFilename("html"))
+    /** RTF: 한글 등 비ASCII를 \\uN? 유니코드 이스케이프로 출력해 인코딩 깨짐 방지 */
+    const toRtfUnicode = (s: string): string => {
+        let out = ""
+        for (let i = 0; i < s.length; i++) {
+            const code = s.charCodeAt(i)
+            if (code >= 128) {
+                out += "\\u" + code + "?"
+            } else if (code === 92) {
+                out += "\\\\"
+            } else if (code === 123) {
+                out += "\\{"
+            } else if (code === 125) {
+                out += "\\}"
+            } else if (code === 10) {
+                out += "\\par\n"
+            } else if (code !== 13) {
+                out += s[i]
+            }
+        }
+        return out
     }
 
     const handleDownloadRtf = () => {
         const title = drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서"
-        const escapeRtf = (s: string) => s.replace(/\\/g, "\\\\").replace(/{/g, "\\{").replace(/}/g, "\\}")
-        const bodyRtf = escapeRtf((content ?? "").replace(/\n/g, "\\par\n"))
-        const titleRtf = escapeRtf(title)
-        const rtfContent = `{\\rtf1\\ansi\\deff0\n{\\fonttbl{\\f0 Malgun Gothic;}}\n\\f0\\fs24\n{\\b ${titleRtf}}\\par\n\\par\n${bodyRtf}\n}`
-        const blob = new Blob([rtfContent], { type: "application/rtf" })
+        const bodyRtf = toRtfUnicode(content ?? "")
+        const titleRtf = toRtfUnicode(title)
+        const rtfContent = `{\\rtf1\\ansi\\ansicpg65001\\deff0\n{\\fonttbl{\\f0\\fswiss Malgun Gothic;}}\n\\f0\\fs24\n{\\b ${titleRtf}}\\par\n\\par\n${bodyRtf}\n}`
+        const blob = new Blob(["\uFEFF" + rtfContent], { type: "application/rtf;charset=utf-8" })
         downloadBlob(blob, getDownloadFilename("rtf"))
+    }
+
+    const handleDownloadPdf = async () => {
+        const title = drafts.find(d => d.id === selectedDraftId)?.title || "자기소개서"
+        const container = document.createElement("div")
+        container.style.position = "absolute"
+        container.style.left = "-9999px"
+        container.style.top = "0"
+        container.style.width = "210mm"
+        container.style.padding = "20mm"
+        container.style.fontFamily = "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif"
+        container.style.fontSize = "11pt"
+        container.style.lineHeight = "1.8"
+        container.style.color = "#1f2937"
+        container.style.backgroundColor = "#fff"
+        container.style.whiteSpace = "pre-wrap"
+        container.style.wordBreak = "break-word"
+        container.innerHTML = `<h1 style="font-size:18pt;margin-bottom:16px;font-weight:700">${title.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</h1><div>${(content ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>")}</div>`
+        document.body.appendChild(container)
+        try {
+            const { default: html2canvas } = await import("html2canvas")
+            const { jsPDF } = await import("jspdf")
+            const canvas = await html2canvas(container, { scale: 2, backgroundColor: "#ffffff", logging: false })
+            const imgData = canvas.toDataURL("image/png", 1.0)
+            const pdf = new jsPDF({ unit: "mm", format: "a4" })
+            const pageW = pdf.internal.pageSize.getWidth()
+            const pageH = pdf.internal.pageSize.getHeight()
+            const margin = 10
+            const maxW = pageW - margin * 2
+            const maxH = pageH - margin * 2
+            const ratio = canvas.width / canvas.height
+            const imgW = ratio >= maxW / maxH ? maxW : maxH * ratio
+            const imgH = ratio >= maxW / maxH ? maxW / ratio : maxH
+            pdf.addImage(imgData, "PNG", margin, margin, imgW, imgH, undefined, "FAST")
+            const blob = pdf.output("blob")
+            downloadBlob(blob, getDownloadFilename("pdf"))
+        } finally {
+            document.body.removeChild(container)
+        }
     }
 
     const [isPolishing, setIsPolishing] = useState(false)
@@ -306,11 +342,11 @@ p { white-space: pre-wrap; }
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onSelect={() => handleDownloadPdf()}>
+                                            PDF 파일 (.pdf) - 바로 다운로드
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem onSelect={() => handleDownloadTxt()}>
                                             텍스트 파일 (.txt)
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => handleDownloadHtml()}>
-                                            HTML 파일 (.html) - PDF 인쇄 가능
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onSelect={() => handleDownloadRtf()}>
                                             RTF 파일 (.rtf) - Word/한글 호환
