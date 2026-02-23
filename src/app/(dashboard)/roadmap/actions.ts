@@ -3,10 +3,6 @@
 import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getRoadmapModel } from '@/lib/ai-models'
-import {
-    getAllQualifications,
-    getExamSchedule,
-} from '@/lib/qnet-api'
 import { searchCompanyInfo, searchJobInfo, searchCertificationInfo } from '@/lib/web-search'
 import { runRoadmap, getRoadmapRagContext } from './lib'
 
@@ -73,13 +69,14 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         profile: [clientData ?? {}],
         roadmap: [],
     }
+    // Q-Net API 미사용: 자격증·시험일정은 Tavily 검색 + OpenAI 폴백만 사용
     const adapters = {
         openaiApiKey: process.env.OPENAI_API_KEY ?? '',
         model: getRoadmapModel(),
         searchCompany: searchCompanyInfo,
         searchJob: searchJobInfo,
-        getQualifications: () => getAllQualifications(5),
-        getExamSchedule: getExamSchedule,
+        getQualifications: () => Promise.resolve([]),
+        getExamSchedule: () => Promise.resolve([]),
         searchCertification: searchCertificationInfo,
     }
     t = Date.now()
