@@ -269,7 +269,7 @@ p { white-space: pre-wrap; }
                         초안 생성
                     </Button>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-2 min-h-[100px]">
+                <div className="flex gap-3 overflow-x-auto p-1 pt-2 pb-2 min-h-[100px]">
                     {drafts.map((draft) => (
                         <div
                             key={draft.id}
@@ -277,7 +277,7 @@ p { white-space: pre-wrap; }
                             className={cn(
                                 "shrink-0 w-[200px] p-4 rounded-xl border cursor-pointer transition-all hover:border-purple-300 hover:bg-purple-50",
                                 selectedDraftId === draft.id
-                                    ? "border-purple-500 bg-purple-50 ring-1 ring-purple-500"
+                                    ? "border-purple-500 bg-purple-50 ring-2 ring-purple-500 ring-inset"
                                     : "bg-white"
                             )}
                         >
