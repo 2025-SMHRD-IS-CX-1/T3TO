@@ -130,7 +130,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                                 "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                                 isActive
                                                     ? "bg-purple-50 text-purple-900"
-                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                                    : "text-gray-700 hover:bg-purple-50 hover:text-purple-900"
                                             )}
                                         >
                                             <div
@@ -170,7 +170,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                                 "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors",
                                                 isActive
                                                     ? "bg-purple-50 text-purple-900"
-                                                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                                    : "text-gray-700 hover:bg-purple-50 hover:text-purple-900"
                                             )}
                                         >
                                             <div

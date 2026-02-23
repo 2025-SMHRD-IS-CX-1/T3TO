@@ -242,7 +242,7 @@ export function Navbar() {
                                 <span>로그아웃</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
+                                className="cursor-pointer font-semibold text-red-600 bg-red-50/50 hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700 border border-red-100 rounded-md my-1"
                                 onClick={() => setIsDeleteDialogOpen(true)}
                             >
                                 <Trash2 className="mr-2 h-4 w-4" />

@@ -347,15 +347,16 @@ export default function DashboardPageClient() {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                            disabled={!selectedClientId}
-                            onClick={() => setDeleteConfirmOpen(true)}
-                        >
-                            삭제
-                        </Button>
+                        {selectedClientId && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                onClick={() => setDeleteConfirmOpen(true)}
+                            >
+                                삭제
+                            </Button>
+                        )}
                         {selectedClient && (
                             <Button asChild>
                                 <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
@@ -372,26 +373,26 @@ export default function DashboardPageClient() {
                 <Card className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-0 shadow-lg">
                     <CardContent className="p-6">
                         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-white/20 rounded-full">
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="p-3 bg-white/20 rounded-full shrink-0">
                                     <Target className="h-8 w-8 text-white" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <h2 className="text-lg font-medium text-purple-100 mb-1">최종 커리어 목표</h2>
-                                    <div className="text-3xl font-bold tracking-tight">
+                                    <div className="text-3xl font-bold tracking-tight truncate md:whitespace-normal">
                                         {roadmapData?.target_job || "목표 직무 미설정"}
                                     </div>
                                     {roadmapData?.target_company && (
                                         <div className="flex items-center gap-2 mt-2 text-purple-100">
-                                            <Building2 className="h-4 w-4" />
-                                            <span className="font-medium">{roadmapData.target_company}</span>
+                                            <Building2 className="h-4 w-4 shrink-0" />
+                                            <span className="font-medium truncate">{roadmapData.target_company}</span>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-8 bg-white/10 p-4 rounded-xl backdrop-blur-sm">
+                            <div className="flex items-center gap-8 bg-white/10 p-4 rounded-xl backdrop-blur-sm shrink-0">
                                 <div className="text-center">
-                                    <div className="text-sm text-purple-200 mb-1">달성률</div>
+                                    <div className="text-sm text-purple-200 mb-1 whitespace-nowrap">달성률</div>
                                     <div className="text-2xl font-bold">
                                         {(() => {
                                             try {
@@ -405,7 +406,7 @@ export default function DashboardPageClient() {
                                 </div>
                                 <div className="w-px h-10 bg-white/20" />
                                 <div className="text-center">
-                                    <div className="text-sm text-purple-200 mb-1">잔여 활동</div>
+                                    <div className="text-sm text-purple-200 mb-1 whitespace-nowrap">잔여 활동</div>
                                     <div className="text-2xl font-bold">
                                         {(() => {
                                             try {
