@@ -47,8 +47,27 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: msg }, { status: 401 })
     }
 
-    if (!data.session) {
+    if (!data.session?.user) {
         return NextResponse.json({ error: '세션을 받지 못했습니다.' }, { status: 500 })
+    }
+
+    const user = data.session.user
+    const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
+    const role = (user.user_metadata?.role as string) || (user.app_metadata?.role as string) || 'counselor'
+    const { error: syncError } = await supabase
+        .from('users')
+        .upsert(
+            [{
+                user_id: userIdStr,
+                email: user.email ?? '',
+                login_id: user.email ?? userIdStr,
+                password_hash: 'SUPABASE_AUTH',
+                role,
+            }],
+            { onConflict: 'user_id' }
+        )
+    if (syncError) {
+        console.warn('Signin API: public.users sync failed', syncError.message)
     }
 
     return res
