@@ -173,123 +173,123 @@ export default function ClientsPageClient() {
 
                 <div className="flex flex-nowrap items-center gap-2">
                     <div className="flex items-center gap-2 flex-shrink-0">
-                    <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-                        setIsAddDialogOpen(open)
-                        if (!open) {
-                            setSelectedClient(null)
-                            setIsEditing(false)
-                        }
-                    }}>
-                    <Button onClick={handleOpenAddDialog}>
-                        <Plus className="mr-2 h-4 w-4" /> 신규 내담자 등록
-                    </Button>
-                    <DialogContent className="sm:max-w-[600px]">
-                        <DialogHeader>
-                            <DialogTitle>{isEditing ? "내담자 프로필 수정" : "신규 내담자 등록"}</DialogTitle>
-                            <DialogDescription>
-                                {isEditing ? "내담자의 정보를 최신 상태로 업데이트합니다." : "새로운 내담자의 기본 정보를 입력하여 시스템에 등록합니다."}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleAddClient} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">이름 *</Label>
-                                    <Input id="name" name="name" placeholder="홍길동" defaultValue={selectedClient?.name || ""} required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">이메일 *</Label>
-                                    <Input id="email" name="email" type="email" placeholder="hong@example.com" defaultValue={selectedClient?.email || ""} required />
-                                </div>
-                            </div>
+                        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+                            setIsAddDialogOpen(open)
+                            if (!open) {
+                                setSelectedClient(null)
+                                setIsEditing(false)
+                            }
+                        }}>
+                            <Button onClick={handleOpenAddDialog}>
+                                <Plus className="mr-2 h-4 w-4" /> 신규 내담자 등록
+                            </Button>
+                            <DialogContent className="sm:max-w-[600px]">
+                                <DialogHeader>
+                                    <DialogTitle>{isEditing ? "내담자 프로필 수정" : "신규 내담자 등록"}</DialogTitle>
+                                    <DialogDescription>
+                                        {isEditing ? "내담자의 정보를 최신 상태로 업데이트합니다." : "새로운 내담자의 기본 정보를 입력하여 시스템에 등록합니다."}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handleAddClient} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name">이름 *</Label>
+                                            <Input id="name" name="name" placeholder="홍길동" defaultValue={selectedClient?.name || ""} required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="email">이메일 *</Label>
+                                            <Input id="email" name="email" type="email" placeholder="hong@example.com" defaultValue={selectedClient?.email || ""} required />
+                                        </div>
+                                    </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="gender">성별</Label>
-                                    <select id="gender" name="gender" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient?.gender || ""}>
-                                        <option value="">선택 안 함</option>
-                                        <option value="남성">남성</option>
-                                        <option value="여성">여성</option>
-                                        <option value="기타">기타</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="age_group">나이</Label>
-                                    <Input
-                                        id="age_group"
-                                        name="age_group"
-                                        type="number"
-                                        min={15}
-                                        max={100}
-                                        placeholder="만 25"
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        defaultValue={selectedClient?.age_group && /^\d+$/.test(String(selectedClient.age_group)) ? selectedClient.age_group : ""}
-                                    />
-                                </div>
-                            </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="gender">성별</Label>
+                                            <select id="gender" name="gender" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient?.gender || ""}>
+                                                <option value="">선택 안 함</option>
+                                                <option value="남성">남성</option>
+                                                <option value="여성">여성</option>
+                                                <option value="기타">기타</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="age_group">나이</Label>
+                                            <Input
+                                                id="age_group"
+                                                name="age_group"
+                                                type="number"
+                                                min={15}
+                                                max={100}
+                                                placeholder="만 25"
+                                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                defaultValue={selectedClient?.age_group && /^\d+$/.test(String(selectedClient.age_group)) ? selectedClient.age_group : ""}
+                                            />
+                                        </div>
+                                    </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="education_level">학력</Label>
-                                    <select id="education_level" name="education_level" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient?.education_level || ""}>
-                                        <option value="">선택 안 함</option>
-                                        <option value="고등학교 졸업">고등학교 졸업</option>
-                                        <option value="전문대 졸업">전문대 졸업</option>
-                                        <option value="대학교 재학">대학교 재학</option>
-                                        <option value="대학교 졸업">대학교 졸업</option>
-                                        <option value="석사">석사</option>
-                                        <option value="박사">박사</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="major">전공</Label>
-                                    <Input id="major" name="major" placeholder="컴퓨터공학" defaultValue={selectedClient?.major || ""} />
-                                </div>
-                            </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="education_level">학력</Label>
+                                            <select id="education_level" name="education_level" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient?.education_level || ""}>
+                                                <option value="">선택 안 함</option>
+                                                <option value="고등학교 졸업">고등학교 졸업</option>
+                                                <option value="전문대 졸업">전문대 졸업</option>
+                                                <option value="대학교 재학">대학교 재학</option>
+                                                <option value="대학교 졸업">대학교 졸업</option>
+                                                <option value="석사">석사</option>
+                                                <option value="박사">박사</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="major">전공</Label>
+                                            <Input id="major" name="major" placeholder="컴퓨터공학" defaultValue={selectedClient?.major || ""} />
+                                        </div>
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="work_experience">경력 사항 (경력 기술서 내용 등)</Label>
-                                <Textarea
-                                    id="work_experience"
-                                    name="work_experience"
-                                    placeholder="본인의 주요 경력 사항을 기술해주세요. (예: OO사 서비스 기획 3년, OO 프로젝트 리딩 등)"
-                                    defaultValue={selectedClient?.work_experience || ""}
-                                    className="h-24"
-                                />
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="work_experience">경력 사항 (경력 기술서 내용 등)</Label>
+                                        <Textarea
+                                            id="work_experience"
+                                            name="work_experience"
+                                            placeholder="본인의 주요 경력 사항을 기술해주세요. (예: OO사 서비스 기획 3년, OO 프로젝트 리딩 등)"
+                                            defaultValue={selectedClient?.work_experience || ""}
+                                            className="h-24"
+                                        />
+                                    </div>
 
-                            <div className="space-y-4 pt-2 border-t mt-4">
-                                <h4 className="text-sm font-bold text-gray-900">추가 분석 정보</h4>
-                                <div className="space-y-2">
-                                    <Label htmlFor="career_orientation">진로 성향</Label>
-                                    <Textarea id="career_orientation" name="career_orientation" placeholder="예: 안정적인 대기업 환경 선호, 대인 관계 중시" defaultValue={selectedClient?.career_orientation || ""} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="skill_vector">보유 기술 (스택)</Label>
-                                    <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" defaultValue={selectedClient?.skill_vector || ""} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="recommended_careers">희망 직무</Label>
-                                    <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" defaultValue={selectedClient?.recommended_careers || ""} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="target_company">목표 기업</Label>
-                                    <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아 (IT) / 현대건설, 삼성물산 (건설) / 메디트로닉스, 지멘스헬스케어 (의료) / 롯데, 신세계 (유통)" defaultValue={selectedClient?.target_company || ""} />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button type="submit" disabled={isSubmitting}>
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장 중...
-                                        </>
-                                    ) : (
-                                        isEditing ? "수정하기" : "등록하기"
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                                    <div className="space-y-4 pt-2 border-t mt-4">
+                                        <h4 className="text-sm font-bold text-gray-900">추가 분석 정보</h4>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="career_orientation">진로 성향</Label>
+                                            <Textarea id="career_orientation" name="career_orientation" placeholder="예: 안정적인 대기업 환경 선호, 대인 관계 중시" defaultValue={selectedClient?.career_orientation || ""} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="skill_vector">보유 기술 (스택)</Label>
+                                            <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" defaultValue={selectedClient?.skill_vector || ""} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="recommended_careers">희망 직무</Label>
+                                            <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" defaultValue={selectedClient?.recommended_careers || ""} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="target_company">목표 기업</Label>
+                                            <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아 (IT) / 현대건설, 삼성물산 (건설) / 메디트로닉스, 지멘스헬스케어 (의료) / 롯데, 신세계 (유통)" defaultValue={selectedClient?.target_company || ""} />
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="submit" disabled={isSubmitting}>
+                                            {isSubmitting ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장 중...
+                                                </>
+                                            ) : (
+                                                isEditing ? "수정하기" : "등록하기"
+                                            )}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                     <Button
                         type="button"
@@ -484,7 +484,7 @@ export default function ClientsPageClient() {
                                 "flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 cursor-pointer transition-all group border-2",
                                 clientId === client.id
                                     ? "border-purple-600 bg-purple-50/50 shadow-md"
-                                    : "hover:border-purple-300 border-white hover:bg-purple-50/30"
+                                    : "hover:border-purple-300 border-transparent hover:bg-purple-50/30"
                             )}
                             onClick={() => router.push(`/admin/clients?${queryWithContext(client.id)}`)}
                         >
