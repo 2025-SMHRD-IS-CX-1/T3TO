@@ -167,5 +167,16 @@ export async function updateSession(request: NextRequest) {
         })
     }
 
+    // 로그아웃 후 뒤로가기/앞으로가기로 복원되는 것 방지: 보호 구역 응답은 캐시 금지
+    const pathname = request.nextUrl.pathname
+    const isProtectedPath = pathname.startsWith('/dashboard') || pathname.startsWith('/admin') ||
+        pathname.startsWith('/consultations') || pathname.startsWith('/schedule') ||
+        pathname.startsWith('/roadmap') || pathname.startsWith('/cover-letter')
+    if (isProtectedPath) {
+        supabaseResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        supabaseResponse.headers.set('Pragma', 'no-cache')
+        supabaseResponse.headers.set('Expires', '0')
+    }
+
     return supabaseResponse
 }
