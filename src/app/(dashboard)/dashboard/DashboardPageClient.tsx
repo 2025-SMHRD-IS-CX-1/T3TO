@@ -33,6 +33,12 @@ import { getDrafts } from "../cover-letter/actions"
 import { useAdminContext } from "@/components/layout/shell"
 import { notifyNotificationCheck } from "@/lib/utils"
 
+/** 대시보드 추천 로드맵에 표시할 단계 한 건 (title/description만 사용) */
+interface MilestoneStepDisplay {
+    title?: string
+    description?: string
+}
+
 /** milestones JSON 동기 파싱 (렌더에서 사용, actions.parseMilestones는 async Server Action) */
 function parseMilestonesSync(raw: string | null): { steps: unknown[]; stage_completion: StageCompletion } {
     const defaultCompletion: StageCompletion = { short: false, mid: false, long: false }
@@ -794,7 +800,7 @@ export default function DashboardPageClient() {
                                 {roadmapData && roadmapData.milestones ? (() => {
                                     try {
                                         const { steps } = parseMilestonesSync(roadmapData.milestones)
-                                        const firstStep = Array.isArray(steps) ? steps[0] : null
+                                        const firstStep = (Array.isArray(steps) ? steps[0] : null) as MilestoneStepDisplay | null
                                         return (
                                             <div className="flex flex-col h-full">
                                                 <div className="border-l-4 border-purple-600 pl-4">
