@@ -7,12 +7,29 @@ import { RoadmapGantt } from "@/components/roadmap/roadmap-gantt"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Download, Loader2, Sparkles, User, RefreshCw, Printer, Info } from "lucide-react"
-import { getRoadmap, createInitialRoadmap, getClientProfile } from "./actions"
+import { getRoadmap, createInitialRoadmap, getClientProfile, parseMilestones, updateStageCompletion, type StageCompletion } from "./actions"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
 import { motion } from "motion/react"
 import { useAdminContext } from "@/components/layout/shell"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+
+/** step.date(예: "2026. 2. 24.")가 오늘 기준 현재 분기에 포함되는지 */
+function isDateInCurrentQuarter(dateStr: string | undefined): boolean {
+    if (!dateStr || !String(dateStr).trim()) return false
+    const s = String(dateStr).trim().replace(/\s/g, '')
+    const parts = s.split(/[.\-/]/).filter(Boolean).map(Number)
+    if (parts.length < 2) return false
+    const [year, month] = parts
+    if (!year || !month || month < 1 || month > 12) return false
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1
+    const currentQ = Math.ceil(currentMonth / 3)
+    const stepQ = Math.ceil(month / 3)
+    return year === currentYear && stepQ === currentQ
+}
 
 export default function RoadmapPageClient() {
     const searchParams = useSearchParams()
@@ -35,6 +52,7 @@ export default function RoadmapPageClient() {
     const [isCertDialogOpen, setIsCertDialogOpen] = useState(false)
     const [selectedStep, setSelectedStep] = useState<RoadmapStep | null>(null)
     const [isStepDialogOpen, setIsStepDialogOpen] = useState(false)
+    const [stageCompletion, setStageCompletion] = useState<StageCompletion>({ short: false, mid: false, long: false })
 
     useEffect(() => {
         const fetchData = async () => {
@@ -44,6 +62,7 @@ export default function RoadmapPageClient() {
                 setCerts([])
                 setHasRoadmap(false)
                 setClientData(null)
+                setStageCompletion({ short: false, mid: false, long: false })
                 setIsLoading(false)
                 return
             }
@@ -52,7 +71,9 @@ export default function RoadmapPageClient() {
             const data = await getRoadmap(clientId, counselorId || undefined)
             if (data && data.milestones) {
                 try {
-                    setSteps(JSON.parse(data.milestones))
+                    const { steps: parsedSteps, stage_completion } = await parseMilestones(data.milestones)
+                    setSteps(parsedSteps as RoadmapStep[])
+                    setStageCompletion(stage_completion)
                     setSkills(data.required_skills ? JSON.parse(data.required_skills) : [])
                     setCerts(data.certifications != null && data.certifications !== ''
                         ? JSON.parse(data.certifications)
@@ -64,12 +85,14 @@ export default function RoadmapPageClient() {
                     setSkills([])
                     setCerts([])
                     setHasRoadmap(false)
+                    setStageCompletion({ short: false, mid: false, long: false })
                 }
             } else {
                 setSteps([])
                 setSkills([])
                 setCerts([])
                 setHasRoadmap(false)
+                setStageCompletion({ short: false, mid: false, long: false })
             }
             setIsLoading(false)
         }
@@ -83,7 +106,9 @@ export default function RoadmapPageClient() {
         
         const data = await getRoadmap(clientId || undefined, counselorId || undefined)
         if (data?.milestones) {
-            setSteps(JSON.parse(data.milestones))
+            const { steps: parsedSteps, stage_completion } = await parseMilestones(data.milestones)
+            setSteps(parsedSteps as RoadmapStep[])
+            setStageCompletion(stage_completion)
             if (data.required_skills) setSkills(JSON.parse(data.required_skills))
             if (data.certifications != null && data.certifications !== '') {
                 try {
@@ -309,32 +334,61 @@ export default function RoadmapPageClient() {
                     {/* 커리어 로드맵 - 가로 타임라인(분기) + 카테고리 그리드 */}
                     <Card className="overflow-hidden border-2 border-gray-200 shadow-lg">
                         <CardContent className="p-0">
-                            <RoadmapGantt steps={steps} year={roadmapViewMonth.getFullYear()} />
+                            <RoadmapGantt steps={steps} year={roadmapViewMonth.getFullYear()} stageCompletion={stageCompletion} />
                         </CardContent>
                     </Card>
 
                     {/* 구간별 상세 카드 (단기·중기·장기) — 출력 시에도 항목이 잘리지 않도록 */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 print:grid-cols-1">
                         {[
-                            { term: "단기", range: "1~3개월", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1) },
-                            { term: "중기", range: "3~12개월", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2) },
-                            { term: "장기", range: "1년 이상", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2) }
-                        ].map((milestone, idx) => (
+                            { termLabel: "단기(1~3개월)", color: "bg-blue-50 border-blue-200 text-blue-800", stepColor: "bg-blue-100/50 border-blue-100", steps: steps.slice(0, 1), key: "short" as const },
+                            { termLabel: "중기(3~12개월)", color: "bg-purple-50 border-purple-200 text-purple-800", stepColor: "bg-purple-100/50 border-purple-100", steps: steps.slice(1, 2), key: "mid" as const },
+                            { termLabel: "장기(1년 이상)", color: "bg-amber-50 border-amber-200 text-amber-800", stepColor: "bg-amber-100/50 border-amber-100", steps: steps.slice(2), key: "long" as const }
+                        ].map((milestone, idx) => {
+                            const completionKey = milestone.key
+                            const isChecked = stageCompletion[completionKey]
+                            const handleStageCheck = async (checked: boolean) => {
+                                const next: StageCompletion = { ...stageCompletion, [completionKey]: checked }
+                                setStageCompletion(next)
+                                if (clientId) {
+                                    const res = await updateStageCompletion(clientId, next, counselorId || undefined)
+                                    if (res.error) {
+                                        setStageCompletion(stageCompletion)
+                                        alert(res.error)
+                                    }
+                                }
+                            }
+                            return (
                             <div key={idx} className={cn("rounded-xl border-2 p-4 flex flex-col print-break-avoid", milestone.color)}>
-                                <div className="font-bold text-sm mb-1">{milestone.term}</div>
-                                <div className="text-xs opacity-90 mb-3">{milestone.range}</div>
+                                <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-gray-200/60">
+                                    <span className="font-bold text-sm">{milestone.termLabel}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <Checkbox
+                                            id={`stage-${completionKey}`}
+                                            checked={isChecked}
+                                            onCheckedChange={(v) => handleStageCheck(v === true)}
+                                        />
+                                        <label htmlFor={`stage-${completionKey}`} className="text-xs font-medium cursor-pointer select-none">
+                                            완료
+                                        </label>
+                                    </div>
+                                </div>
                                 <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
                                     {milestone.steps.length === 0 ? (
                                         <p className="text-xs text-gray-500">해당 구간 목표 없음</p>
                                     ) : (
-                                        milestone.steps.map((step, stepIdx) => (
+                                        milestone.steps.map((step, stepIdx) => {
+                                            // 완료 체크 시 완료, 해당 날짜가 현재 분기면 진행중, 아니면 대기
+                                            const stepBadgeLabel = isChecked ? '완료' : isDateInCurrentQuarter(step.date) ? '진행중' : '대기'
+                                            const stepBadgeVariant = stepBadgeLabel === '완료' ? 'success' : stepBadgeLabel === '진행중' ? 'purple' : 'secondary'
+                                            return (
                                             <div key={step.id} className={cn("rounded-lg border p-3 text-left", milestone.stepColor)}>
                                                 <div className="flex items-start justify-between gap-2 mb-1">
                                                     <span className="text-[10px] font-semibold text-gray-500 uppercase">
                                                         {step.date || `단계 ${stepIdx + 1}`}
                                                     </span>
-                                                    <Badge variant={step.status === 'completed' ? 'success' : step.status === 'in-progress' ? 'purple' : 'secondary'} className="text-[10px] shrink-0">
-                                                        {step.status === 'completed' ? '완료' : step.status === 'in-progress' ? '진행중' : '대기'}
+                                                    <Badge variant={stepBadgeVariant} className="text-[10px] shrink-0">
+                                                        {stepBadgeLabel}
                                                     </Badge>
                                                 </div>
                                                 <h4 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h4>
@@ -395,11 +449,13 @@ export default function RoadmapPageClient() {
                                                     </ul>
                                                 )}
                                             </div>
-                                        ))
+                                            )
+                                        })
                                     )}
                                 </div>
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
 
                     {/* Detailed Analysis Sections — 출력 시 1열로 배치해 텍스트 겹침 방지 */}
