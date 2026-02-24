@@ -28,9 +28,34 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { getClients, createClientProfile, deleteClient, updateClientProfile } from "../admin/clients/actions"
 import { getLatestEvent } from "../schedule/actions"
 import { getRoadmap } from "../roadmap/actions"
+import type { StageCompletion } from "../roadmap/actions"
 import { getDrafts } from "../cover-letter/actions"
 import { useAdminContext } from "@/components/layout/shell"
 import { notifyNotificationCheck } from "@/lib/utils"
+
+/** milestones JSON 동기 파싱 (렌더에서 사용, actions.parseMilestones는 async Server Action) */
+function parseMilestonesSync(raw: string | null): { steps: unknown[]; stage_completion: StageCompletion } {
+    const defaultCompletion: StageCompletion = { short: false, mid: false, long: false }
+    if (!raw || !raw.trim()) return { steps: [], stage_completion: defaultCompletion }
+    try {
+        const parsed = JSON.parse(raw) as unknown
+        if (Array.isArray(parsed)) return { steps: parsed, stage_completion: defaultCompletion }
+        if (parsed && typeof parsed === "object" && "steps" in parsed && Array.isArray((parsed as { steps: unknown[] }).steps)) {
+            const p = parsed as { steps: unknown[]; stage_completion?: Partial<StageCompletion> }
+            return {
+                steps: p.steps,
+                stage_completion: {
+                    short: !!p.stage_completion?.short,
+                    mid: !!p.stage_completion?.mid,
+                    long: !!p.stage_completion?.long,
+                },
+            }
+        }
+    } catch {
+        /* ignore */
+    }
+    return { steps: [], stage_completion: defaultCompletion }
+}
 
 export default function DashboardPageClient() {
     const [clients, setClients] = useState<any[]>([])
@@ -522,10 +547,9 @@ export default function DashboardPageClient() {
                                     <div className="text-2xl font-bold">
                                         {(() => {
                                             try {
-                                                const milestones = JSON.parse(roadmapData?.milestones || '[]')
-                                                const completed = milestones.filter((m: any) => m.status === 'completed').length
-                                                const total = milestones.length
-                                                return total > 0 ? Math.round((completed / total) * 100) : 0
+                                                const { steps, stage_completion } = parseMilestonesSync(roadmapData?.milestones ?? null)
+                                                const completed = [stage_completion.short, stage_completion.mid, stage_completion.long].filter(Boolean).length
+                                                return Math.round((completed / 3) * 100)
                                             } catch { return 0 }
                                         })()}%
                                     </div>
@@ -536,9 +560,10 @@ export default function DashboardPageClient() {
                                     <div className="text-2xl font-bold">
                                         {(() => {
                                             try {
-                                                const milestones = JSON.parse(roadmapData?.milestones || '[]')
-                                                return milestones.filter((m: any) => m.status !== 'completed').length
-                                            } catch { return 0 }
+                                                const { steps, stage_completion } = parseMilestonesSync(roadmapData?.milestones ?? null)
+                                                const completed = [stage_completion.short, stage_completion.mid, stage_completion.long].filter(Boolean).length
+                                                return Math.max(0, 3 - completed)
+                                            } catch { return 3 }
                                         })()}개
                                     </div>
                                 </div>
@@ -610,15 +635,17 @@ export default function DashboardPageClient() {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="edit-age_group">연령대</Label>
-                                    <select id="edit-age_group" name="age_group" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient.age_group ?? ''}>
-                                        <option value="">선택 안 함</option>
-                                        <option value="10대">10대</option>
-                                        <option value="20대">20대</option>
-                                        <option value="30대">30대</option>
-                                        <option value="40대">40대</option>
-                                        <option value="50대 이상">50대 이상</option>
-                                    </select>
+                                    <Label htmlFor="edit-age_group">나이</Label>
+                                    <Input
+                                        id="edit-age_group"
+                                        name="age_group"
+                                        type="number"
+                                        min={15}
+                                        max={100}
+                                        placeholder="만 25"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        defaultValue={selectedClient.age_group != null && /^\d+$/.test(String(selectedClient.age_group)) ? selectedClient.age_group : ''}
+                                    />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -726,15 +753,15 @@ export default function DashboardPageClient() {
                                 <CardContent>
                                     {roadmapData && roadmapData.milestones ? (() => {
                                         try {
-                                            const milestones = JSON.parse(roadmapData.milestones)
-                                            const completed = milestones.filter((m: any) => m.status === 'completed' || m.status === 'in-progress').length
-                                            const total = milestones.length
+                                            const { steps, stage_completion } = parseMilestonesSync(roadmapData.milestones)
+                                            const completed = [stage_completion.short, stage_completion.mid, stage_completion.long].filter(Boolean).length
+                                            const total = 3
                                             return <div className="text-2xl font-bold text-gray-900">{completed}/{total} 단계</div>
                                         } catch {
-                                            return <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                            return <div className="text-2xl font-bold text-gray-900">0/3 단계</div>
                                         }
                                     })() : (
-                                        <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                        <div className="text-2xl font-bold text-gray-900">0/3 단계</div>
                                     )}
                                     <p className="text-xs text-muted-foreground mt-1">클릭하여 로드맵 조회</p>
                                 </CardContent>
@@ -766,8 +793,8 @@ export default function DashboardPageClient() {
                             <CardContent className="flex flex-col flex-1 min-h-0">
                                 {roadmapData && roadmapData.milestones ? (() => {
                                     try {
-                                        const milestones = JSON.parse(roadmapData.milestones)
-                                        const firstStep = milestones[0]
+                                        const { steps } = parseMilestonesSync(roadmapData.milestones)
+                                        const firstStep = Array.isArray(steps) ? steps[0] : null
                                         return (
                                             <div className="flex flex-col h-full">
                                                 <div className="border-l-4 border-purple-600 pl-4">
