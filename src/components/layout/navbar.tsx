@@ -235,7 +235,7 @@ export function Navbar() {
                                 onClick={async () => {
                                     const supabase = createClient()
                                     await supabase.auth.signOut()
-                                    window.location.href = '/login'
+                                    window.location.replace('/login')
                                 }}
                             >
                                 <LogOut className="mr-2 h-5 w-5" />
@@ -281,7 +281,7 @@ export function Navbar() {
                                     setIsDeleting(false)
                                     setIsDeleteDialogOpen(false)
                                 } else {
-                                    window.location.href = '/login'
+                                    window.location.replace('/login')
                                 }
                             }}
                             disabled={isDeleting}

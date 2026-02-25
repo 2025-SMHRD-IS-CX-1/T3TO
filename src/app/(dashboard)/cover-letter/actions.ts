@@ -320,7 +320,7 @@ export async function generateAIDrafts(clientId: string) {
                 extracted_background: extractedBackground,
             },
             language: 'ko',
-            min_word_count: 600,
+            min_word_count: 800,
             focus,
             rag_context: ragContext,
         })

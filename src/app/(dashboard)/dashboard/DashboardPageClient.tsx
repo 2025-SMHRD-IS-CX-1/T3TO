@@ -28,9 +28,40 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { getClients, createClientProfile, deleteClient, updateClientProfile } from "../admin/clients/actions"
 import { getLatestEvent } from "../schedule/actions"
 import { getRoadmap } from "../roadmap/actions"
+import type { StageCompletion } from "../roadmap/actions"
 import { getDrafts } from "../cover-letter/actions"
 import { useAdminContext } from "@/components/layout/shell"
 import { notifyNotificationCheck } from "@/lib/utils"
+
+/** 대시보드 추천 로드맵에 표시할 단계 한 건 (title/description만 사용) */
+interface MilestoneStepDisplay {
+    title?: string
+    description?: string
+}
+
+/** milestones JSON 동기 파싱 (렌더에서 사용, actions.parseMilestones는 async Server Action) */
+function parseMilestonesSync(raw: string | null): { steps: unknown[]; stage_completion: StageCompletion } {
+    const defaultCompletion: StageCompletion = { short: false, mid: false, long: false }
+    if (!raw || !raw.trim()) return { steps: [], stage_completion: defaultCompletion }
+    try {
+        const parsed = JSON.parse(raw) as unknown
+        if (Array.isArray(parsed)) return { steps: parsed, stage_completion: defaultCompletion }
+        if (parsed && typeof parsed === "object" && "steps" in parsed && Array.isArray((parsed as { steps: unknown[] }).steps)) {
+            const p = parsed as { steps: unknown[]; stage_completion?: Partial<StageCompletion> }
+            return {
+                steps: p.steps,
+                stage_completion: {
+                    short: !!p.stage_completion?.short,
+                    mid: !!p.stage_completion?.mid,
+                    long: !!p.stage_completion?.long,
+                },
+            }
+        }
+    } catch {
+        /* ignore */
+    }
+    return { steps: [], stage_completion: defaultCompletion }
+}
 
 export default function DashboardPageClient() {
     const [clients, setClients] = useState<any[]>([])
@@ -222,23 +253,21 @@ export default function DashboardPageClient() {
                     <CardTitle className="text-base">내담자 선택</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center gap-4">
-                        <Select value={selectedClientId} onValueChange={handleClientSelect}>
-                            <SelectTrigger className="w-full max-w-md">
-                                <SelectValue placeholder="내담자를 선택하세요" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {clients.map((client) => (
-                                    <SelectItem key={client.id} value={client.id}>
-                                        {client.name} ({client.email})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                            <Button variant="secondary" onClick={() => setIsAddDialogOpen(true)}>
-                                <Plus className="h-4 w-4" /> 내담자 추가
-                            </Button>
+                    {!loading && clients.length === 0 ? (
+                        <div className="space-y-4">
+                            <p className="text-sm text-muted-foreground">등록된 내담자가 없습니다. 첫 내담자를 추가해 주세요.</p>
+                            <Select value="">
+                                <SelectTrigger className="w-full max-w-md opacity-60 cursor-not-allowed" disabled>
+                                    <SelectValue placeholder="내담자를 선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="_none" disabled>내담자 없음</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white shadow-md ring-2 ring-purple-200 ring-offset-2" onClick={() => setIsAddDialogOpen(true)}>
+                                    <Plus className="h-5 w-5 mr-2" /> 내담자 추가
+                                </Button>
                             <DialogContent className="sm:max-w-[600px]">
                                 <DialogHeader>
                                     <DialogTitle>신규 내담자 등록</DialogTitle>
@@ -347,24 +376,152 @@ export default function DashboardPageClient() {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        {selectedClientId && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                                onClick={() => setDeleteConfirmOpen(true)}
-                            >
-                                삭제
-                            </Button>
-                        )}
-                        {selectedClient && (
-                            <Button asChild>
-                                <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
-                                    로드맵 생성
-                                </Link>
-                            </Button>
-                        )}
-                    </div>
+                            </div>
+                    ) : (
+                        <div className="flex items-center gap-4">
+                            <Select value={selectedClientId} onValueChange={handleClientSelect}>
+                                <SelectTrigger className="w-full max-w-md">
+                                    <SelectValue placeholder="내담자를 선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {clients.map((client) => (
+                                        <SelectItem key={client.id} value={client.id}>
+                                            {client.name} ({client.email})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                                <Button variant="secondary" onClick={() => setIsAddDialogOpen(true)}>
+                                    <Plus className="h-4 w-4" /> 내담자 추가
+                                </Button>
+                                <DialogContent className="sm:max-w-[600px]">
+                                    <DialogHeader>
+                                        <DialogTitle>신규 내담자 등록</DialogTitle>
+                                        <DialogDescription>
+                                            새로운 내담자의 기본 정보를 입력하여 시스템에 등록합니다.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleAddClient} className="space-y-4 p-1 py-4 max-h-[70vh] overflow-y-auto">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="name">이름 *</Label>
+                                                <Input id="name" name="name" placeholder="홍길동" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email">이메일 *</Label>
+                                                <Input id="email" name="email" type="email" placeholder="hong@example.com" required />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="gender">성별</Label>
+                                                <select id="gender" name="gender" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                                    <option value="">선택 안 함</option>
+                                                    <option value="남성">남성</option>
+                                                    <option value="여성">여성</option>
+                                                    <option value="기타">기타</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="age_group">나이</Label>
+                                                <Input
+                                                    id="age_group"
+                                                    name="age_group"
+                                                    type="number"
+                                                    min={15}
+                                                    max={100}
+                                                    placeholder="만 25"
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="education_level">학력</Label>
+                                                <select id="education_level" name="education_level" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                                    <option value="">선택 안 함</option>
+                                                    <option value="고등학교 졸업">고등학교 졸업</option>
+                                                    <option value="전문대 졸업">전문대 졸업</option>
+                                                    <option value="대학교 재학">대학교 재학</option>
+                                                    <option value="대학교 졸업">대학교 졸업</option>
+                                                    <option value="석사">석사</option>
+                                                    <option value="박사">박사</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="major">전공</Label>
+                                                <Input id="major" name="major" placeholder="컴퓨터공학" />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="work_experience">경력 사항 (경력 기술서 내용 등)</Label>
+                                            <Textarea
+                                                id="work_experience"
+                                                name="work_experience"
+                                                placeholder="본인의 주요 경력 사항을 기술해주세요. (예: OO사 서비스 기획 3년, OO 프로젝트 리딩 등)"
+                                                className="h-24"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-4 pt-2 border-t mt-4">
+                                            <h4 className="text-sm font-bold text-gray-900">추가 분석 정보</h4>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="career_orientation">진로 성향</Label>
+                                                <Textarea id="career_orientation" name="career_orientation" placeholder="예: 안정적인 대기업 환경 선호, 대인 관계 중시" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="skill_vector">보유 기술 (스택)</Label>
+                                                <Textarea id="skill_vector" name="skill_vector" placeholder="예: React, Node.js, Python, SQL (IT) / AutoCAD, Revit (건축) / 의료기기 설계, 생체신호 분석 (의료공학) / 마케팅 분석, 데이터 시각화 (마케팅)" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="recommended_careers">희망 직무</Label>
+                                                <Input id="recommended_careers" name="recommended_careers" placeholder="예: 프론트엔드 개발자, 데이터 엔지니어 (IT) / 건축 설계사, 토목기사 (건설) / 의료기기 개발자, 임상연구원 (의료) / 마케팅 기획자, 브랜드 매니저 (마케팅)" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="target_company">목표 기업</Label>
+                                                <Input id="target_company" name="target_company" placeholder="예: 네이버, 토스, 구글 코리아 (IT) / 현대건설, 삼성물산 (건설) / 메디트로닉스, 지멘스헬스케어 (의료) / 롯데, 신세계 (유통)" />
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                                                취소
+                                            </Button>
+                                            <Button type="submit" disabled={isSubmitting}>
+                                                {isSubmitting ? (
+                                                    <>
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장 중...
+                                                    </>
+                                                ) : (
+                                                    "등록하기"
+                                                )}
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                            {selectedClientId && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="shrink-0 bg-white text-red-600 border-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                    onClick={() => setDeleteConfirmOpen(true)}
+                                >
+                                    삭제
+                                </Button>
+                            )}
+                            {selectedClient && (
+                                <Button asChild>
+                                    <Link href={`/roadmap?clientId=${selectedClientId}${counselorId ? `&counselorId=${counselorId}` : ''}`}>
+                                        로드맵 생성
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -396,10 +553,9 @@ export default function DashboardPageClient() {
                                     <div className="text-2xl font-bold">
                                         {(() => {
                                             try {
-                                                const milestones = JSON.parse(roadmapData?.milestones || '[]')
-                                                const completed = milestones.filter((m: any) => m.status === 'completed').length
-                                                const total = milestones.length
-                                                return total > 0 ? Math.round((completed / total) * 100) : 0
+                                                const { steps, stage_completion } = parseMilestonesSync(roadmapData?.milestones ?? null)
+                                                const completed = [stage_completion.short, stage_completion.mid, stage_completion.long].filter(Boolean).length
+                                                return Math.round((completed / 3) * 100)
                                             } catch { return 0 }
                                         })()}%
                                     </div>
@@ -410,9 +566,10 @@ export default function DashboardPageClient() {
                                     <div className="text-2xl font-bold">
                                         {(() => {
                                             try {
-                                                const milestones = JSON.parse(roadmapData?.milestones || '[]')
-                                                return milestones.filter((m: any) => m.status !== 'completed').length
-                                            } catch { return 0 }
+                                                const { steps, stage_completion } = parseMilestonesSync(roadmapData?.milestones ?? null)
+                                                const completed = [stage_completion.short, stage_completion.mid, stage_completion.long].filter(Boolean).length
+                                                return Math.max(0, 3 - completed)
+                                            } catch { return 3 }
                                         })()}개
                                     </div>
                                 </div>
@@ -484,15 +641,17 @@ export default function DashboardPageClient() {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="edit-age_group">연령대</Label>
-                                    <select id="edit-age_group" name="age_group" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={selectedClient.age_group ?? ''}>
-                                        <option value="">선택 안 함</option>
-                                        <option value="10대">10대</option>
-                                        <option value="20대">20대</option>
-                                        <option value="30대">30대</option>
-                                        <option value="40대">40대</option>
-                                        <option value="50대 이상">50대 이상</option>
-                                    </select>
+                                    <Label htmlFor="edit-age_group">나이</Label>
+                                    <Input
+                                        id="edit-age_group"
+                                        name="age_group"
+                                        type="number"
+                                        min={15}
+                                        max={100}
+                                        placeholder="만 25"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        defaultValue={selectedClient.age_group != null && /^\d+$/.test(String(selectedClient.age_group)) ? selectedClient.age_group : ''}
+                                    />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -600,15 +759,15 @@ export default function DashboardPageClient() {
                                 <CardContent>
                                     {roadmapData && roadmapData.milestones ? (() => {
                                         try {
-                                            const milestones = JSON.parse(roadmapData.milestones)
-                                            const completed = milestones.filter((m: any) => m.status === 'completed' || m.status === 'in-progress').length
-                                            const total = milestones.length
+                                            const { steps, stage_completion } = parseMilestonesSync(roadmapData.milestones)
+                                            const completed = [stage_completion.short, stage_completion.mid, stage_completion.long].filter(Boolean).length
+                                            const total = 3
                                             return <div className="text-2xl font-bold text-gray-900">{completed}/{total} 단계</div>
                                         } catch {
-                                            return <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                            return <div className="text-2xl font-bold text-gray-900">0/3 단계</div>
                                         }
                                     })() : (
-                                        <div className="text-2xl font-bold text-gray-900">0/0 단계</div>
+                                        <div className="text-2xl font-bold text-gray-900">0/3 단계</div>
                                     )}
                                     <p className="text-xs text-muted-foreground mt-1">클릭하여 로드맵 조회</p>
                                 </CardContent>
@@ -640,8 +799,8 @@ export default function DashboardPageClient() {
                             <CardContent className="flex flex-col flex-1 min-h-0">
                                 {roadmapData && roadmapData.milestones ? (() => {
                                     try {
-                                        const milestones = JSON.parse(roadmapData.milestones)
-                                        const firstStep = milestones[0]
+                                        const { steps } = parseMilestonesSync(roadmapData.milestones)
+                                        const firstStep = (Array.isArray(steps) ? steps[0] : null) as MilestoneStepDisplay | null
                                         return (
                                             <div className="flex flex-col h-full">
                                                 <div className="border-l-4 border-purple-600 pl-4">

@@ -55,7 +55,7 @@ class SelfIntroRequestSchema(BaseModel):
     counseling: CounselingContentSchema
     ai_analysis: AIAnalysisResultSchema
     language: str = Field("ko", description="출력 언어 (ko/en)")
-    min_word_count: int = Field(600, ge=0, description="최소 글자 수")
+    min_word_count: int = Field(800, ge=0, description="최소 글자 수")
     focus: Optional[str] = Field(
         "strength",
         description="작성 초점: strength(역량) / experience(경험) / values(가치관)",
