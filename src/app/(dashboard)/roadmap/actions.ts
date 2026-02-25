@@ -3,12 +3,33 @@
 import { createClient, getEffectiveUserId } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getRoadmapModel } from '@/lib/ai-models'
-import {
-    getAllQualifications,
-    getExamSchedule,
-} from '@/lib/qnet-api'
 import { searchCompanyInfo, searchJobInfo, searchCertificationInfo } from '@/lib/web-search'
 import { runRoadmap, getRoadmapRagContext } from './lib'
+
+/** 단기/중기/장기 단계별 사용자 완료 체크 (목표 달성율 표시용) */
+export type StageCompletion = { short: boolean; mid: boolean; long: boolean }
+
+/** milestones JSON 파싱: 배열이면 steps만, 객체면 steps + stage_completion (Server Action이므로 async) */
+export async function parseMilestones(raw: string | null): Promise<{ steps: unknown[]; stage_completion: StageCompletion }> {
+    const defaultCompletion: StageCompletion = { short: false, mid: false, long: false }
+    if (!raw || !raw.trim()) return { steps: [], stage_completion: defaultCompletion }
+    try {
+        const parsed = JSON.parse(raw) as unknown
+        if (Array.isArray(parsed)) return { steps: parsed, stage_completion: defaultCompletion }
+        if (parsed && typeof parsed === 'object' && 'steps' in parsed && Array.isArray((parsed as any).steps)) {
+            const p = parsed as { steps: unknown[]; stage_completion?: Partial<StageCompletion> }
+            return {
+                steps: p.steps,
+                stage_completion: {
+                    short: !!p.stage_completion?.short,
+                    mid: !!p.stage_completion?.mid,
+                    long: !!p.stage_completion?.long,
+                }
+            }
+        }
+    } catch (_) { /* ignore */ }
+    return { steps: [], stage_completion: defaultCompletion }
+}
 
 export async function getRoadmap(profileId?: string, counselorId?: string | null) {
     const supabase = await createClient()
@@ -73,13 +94,14 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         profile: [clientData ?? {}],
         roadmap: [],
     }
+    // Q-Net API 미사용: 자격증·시험일정은 Tavily 검색 + OpenAI 폴백만 사용
     const adapters = {
         openaiApiKey: process.env.OPENAI_API_KEY ?? '',
         model: getRoadmapModel(),
         searchCompany: searchCompanyInfo,
         searchJob: searchJobInfo,
-        getQualifications: () => getAllQualifications(5),
-        getExamSchedule: getExamSchedule,
+        getQualifications: () => Promise.resolve([]),
+        getExamSchedule: () => Promise.resolve([]),
         searchCertification: searchCertificationInfo,
     }
     t = Date.now()
@@ -96,10 +118,10 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
     console.log('[Roadmap] 마일스톤 수:', info.length)
     console.log(`[createInitialRoadmap] 총 소요: ${Date.now() - totalStart}ms`)
 
-    // 기존 활성 로드맵 확인
+    // 기존 활성 로드맵 확인 (갱신 시 기존 stage_completion 유지 위해 milestones 포함 조회)
     const { data: existingRoadmap } = await supabase
         .from('career_roadmaps')
-        .select('roadmap_id')
+        .select('roadmap_id, milestones')
         .eq('user_id', userIdStr)
         .eq('profile_id', profileId || null)
         .eq('is_active', true)
@@ -110,13 +132,21 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         return { error: '갱신할 로드맵이 없습니다. 먼저 로드맵을 생성해주세요.' }
     }
 
+    const parsedExisting = existingRoadmap?.milestones
+        ? await parseMilestones(existingRoadmap.milestones)
+        : null
+    const preservedCompletion = parsedExisting?.stage_completion ?? { short: false, mid: false, long: false }
+    const milestonesPayload = existingRoadmap
+        ? JSON.stringify({ steps: info, stage_completion: preservedCompletion })
+        : JSON.stringify(info)
+
     const roadmapData = {
         user_id: userIdStr,
         profile_id: profileId || null,
         target_job: targetJob,
         target_company: targetCompany,
         roadmap_stage: 'planning',
-        milestones: JSON.stringify(info),
+        milestones: milestonesPayload,
         required_skills: JSON.stringify(dynamicSkills),
         certifications: JSON.stringify(dynamicCerts),
         timeline_months: 6,
@@ -146,5 +176,40 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
     revalidatePath('/admin/clients')
     revalidatePath('/dashboard')
 
+    return { success: true }
+}
+
+/** 단기/중기/장기 체크박스 완료 상태만 업데이트 (목표 달성율 연동) */
+export async function updateStageCompletion(
+    profileId: string,
+    completion: StageCompletion,
+    counselorId?: string | null
+) {
+    const supabase = await createClient()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr || !profileId) return { error: '권한이 없습니다.' }
+
+    const { data: row, error: fetchError } = await supabase
+        .from('career_roadmaps')
+        .select('roadmap_id, milestones')
+        .eq('user_id', userIdStr)
+        .eq('profile_id', profileId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (fetchError || !row) return { error: '로드맵을 찾을 수 없습니다.' }
+
+    const { steps } = await parseMilestones(row.milestones)
+    const updatedMilestones = JSON.stringify({ steps, stage_completion: completion })
+
+    const { error: updateError } = await supabase
+        .from('career_roadmaps')
+        .update({ milestones: updatedMilestones, updated_at: new Date().toISOString() })
+        .eq('roadmap_id', row.roadmap_id)
+
+    if (updateError) return { error: updateError.message }
+    revalidatePath('/roadmap')
     return { success: true }
 }

@@ -248,7 +248,7 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                         const { createClient } = await import('@/lib/supabase/client')
                         const supabase = createClient()
                         await supabase.auth.signOut()
-                        window.location.href = '/login'
+                        window.location.replace('/login')
                     }}
                     className="w-full group flex items-center justify-center px-3 py-3 text-sm font-semibold text-gray-900 rounded-lg border-2 border-gray-200 bg-gray-50 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
                 >

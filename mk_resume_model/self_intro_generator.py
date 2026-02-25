@@ -40,7 +40,7 @@ class SelfIntroInput:
     competencies: List[str]  # 직무역량 (예: ["데이터 분석", "문제해결"])
     background: CandidateBackground
     language: Language = "ko"
-    min_word_count: int = 600  # 참고용 (템플릿은 고정 분량)
+    min_word_count: int = 800  # 참고용 (템플릿은 고정 분량)
     focus: Focus = "strength"  # strength(역량) | experience(경험) | values(가치관)
 
 

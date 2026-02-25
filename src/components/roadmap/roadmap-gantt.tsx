@@ -25,16 +25,22 @@ const STEP_QUARTER_RANGE: [number, number][] = [
     [3, 4], // step 2: 장기
 ]
 
+/** 단기/중기/장기 사용자 체크에 따른 완료 상태 (체크 시에만 위 목표 달성율에 완료 표시) */
+export type StageCompletion = { short: boolean; mid: boolean; long: boolean }
+
 interface RoadmapGanttProps {
     steps: RoadmapStep[]
     year?: number
+    /** 단기/중기/장기 체크 시에만 해당 단계 완료로 표시 */
+    stageCompletion?: StageCompletion
 }
 
-export function RoadmapGantt({ steps, year = new Date().getFullYear() }: RoadmapGanttProps) {
-    const milestones: { label: string; quarter: number }[] = [
-        { label: "1단계 완료", quarter: 2 },
-        { label: "2단계 완료", quarter: 4 },
-        { label: "목표 달성", quarter: 4 },
+export function RoadmapGantt({ steps, year = new Date().getFullYear(), stageCompletion }: RoadmapGanttProps) {
+    const completed = stageCompletion ?? { short: false, mid: false, long: false }
+    const milestones: { label: string; quarter: number; done: boolean }[] = [
+        { label: "1단계 완료", quarter: 2, done: completed.short },
+        { label: "2단계 완료", quarter: 4, done: completed.mid },
+        { label: "목표 달성", quarter: 4, done: completed.long },
     ]
 
     return (
@@ -81,10 +87,13 @@ export function RoadmapGantt({ steps, year = new Date().getFullYear() }: Roadmap
                                 {items.map((m, i) => (
                                     <span
                                         key={i}
-                                        className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-[10px] font-medium text-gray-700 shadow-sm border border-gray-200"
+                                        className={cn(
+                                            "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium shadow-sm border",
+                                            m.done ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-gray-50 border-gray-200 text-gray-500"
+                                        )}
                                         title={m.label}
                                     >
-                                        {q === 2 ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : q === 4 ? <Star className="h-3 w-3 text-amber-500" /> : <Send className="h-3 w-3 text-sky-500" />}
+                                        {m.done ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : q === 2 ? <CheckCircle2 className="h-3 w-3 text-gray-300" /> : q === 4 ? <Star className="h-3 w-3 text-gray-300" /> : <Send className="h-3 w-3 text-gray-300" />}
                                         {m.label}
                                     </span>
                                 ))}
