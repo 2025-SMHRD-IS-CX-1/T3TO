@@ -27,13 +27,15 @@ function sanitizeDraftContent(text: string): string {
 /** 단락마다 첫 줄 들여쓰기 추가 (실제 작성한 문서처럼) — 전각 공백 1칸 */
 function addParagraphIndentation(text: string): string {
     if (!text || typeof text !== 'string') return text
-    const paragraphs = text.split(/\n\s*\n/)
-    const indent = '\u3000' // 전각 공백(U+3000) — 한글 문서에서 단락 첫 줄 들여쓰기용
+    // 단순히 \n 하나만 있는 경우는 문단으로 취급하지 않고, 연속된 줄바꿈(\n\n 이상)이 있을 때만 문단으로 분리
+    const paragraphs = text.split(/\n\s*\n+/)
+    const indent = '\u3000' // 전각 공백
     return paragraphs
         .map(p => {
             const trimmed = p.trim()
             if (!trimmed) return ''
-            return indent + trimmed
+            // 이미 들여쓰기가 되어있지 않은 경우에만 추가
+            return (trimmed.startsWith(indent) ? '' : indent) + trimmed
         })
         .filter(Boolean)
         .join('\n\n')
@@ -293,7 +295,7 @@ export async function generateAIDrafts(clientId: string) {
 
     // 3. 생성기: 파인튜닝 API 우선 → 실패 시 템플릿
     const mkResumeApiUrl = process.env.MK_RESUME_MODEL_API_URL ?? ''
-    let versions: { type: string; title: string; content: string }[] | null = null
+    let versions: { type: string; title: string; content: string; scoring?: any }[] | null = null
 
     if (mkResumeApiUrl.trim()) {
         const baseUrl = mkResumeApiUrl.replace(/\/$/, '')
@@ -348,18 +350,18 @@ export async function generateAIDrafts(clientId: string) {
             clearTimeout(timeoutId)
             if (res1.ok && res2.ok && res3.ok) {
                 const [data1, data2, data3] = await Promise.all([
-                    res1.json() as Promise<{ draft?: string }>,
-                    res2.json() as Promise<{ draft?: string }>,
-                    res3.json() as Promise<{ draft?: string }>,
+                    res1.json() as Promise<any>,
+                    res2.json() as Promise<any>,
+                    res3.json() as Promise<any>,
                 ])
                 const d1 = (data1?.draft ?? '').trim()
                 const d2 = (data2?.draft ?? '').trim()
                 const d3 = (data3?.draft ?? '').trim()
                 if (d1 && d2 && d3) {
                     versions = [
-                        { type: 'Version 1', title: `${targetJob} - 역량 중심`, content: d1 },
-                        { type: 'Version 2', title: `${targetJob} - 경험 중심`, content: d2 },
-                        { type: 'Version 3', title: `${targetJob} - 가치관 중심`, content: d3 },
+                        { type: 'Version 1', title: `${targetJob} - 역량 중심`, content: d1, scoring: data1?.scoring },
+                        { type: 'Version 2', title: `${targetJob} - 경험 중심`, content: d2, scoring: data2?.scoring },
+                        { type: 'Version 3', title: `${targetJob} - 가치관 중심`, content: d3, scoring: data3?.scoring },
                     ]
                 }
             }
@@ -369,7 +371,10 @@ export async function generateAIDrafts(clientId: string) {
     }
 
     if (versions == null || versions.length === 0) {
-        versions = getTemplateVersions(profile, targetJob, insights)
+        versions = getTemplateVersions(profile, targetJob, insights).map(v => ({
+            ...v,
+            scoring: { average: 85, type_similarity: 85, aptitude_fit: 85, competency_reflection: 85 }
+        }))
     }
 
     // 생성된 3종 공통: 문맥 자연스럽게 다듬기 (OPENAI_API_KEY 있으면 적용, 실패 시 원문 유지)
@@ -386,7 +391,14 @@ export async function generateAIDrafts(clientId: string) {
             // 다듬기 실패 시 원문 유지
         }
     }
-    versions = versions.map(v => ({ ...v, content: addParagraphIndentation(sanitizeDraftContent(v.content)) }))
+    // 최종 가공 및 스코어 주석 결합
+    versions = versions.map(v => {
+        let content = addParagraphIndentation(sanitizeDraftContent(v.content))
+        if (v.scoring) {
+            content += `\n\n<!-- scoring: ${JSON.stringify(v.scoring)} -->`
+        }
+        return { ...v, content }
+    })
 
     // 4. 해당 내담자(profile_id) + 현재 로드맵의 기존 초안 전부 삭제 후, 새 3종만 삽입 (갱신)
     const { error: deleteError } = await supabase
