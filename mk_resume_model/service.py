@@ -17,6 +17,7 @@ from models.counseling import AIAnalysisResult, CounselingContent, ExtractedBack
 from models.output import SelfIntroResponse
 from adapter import to_self_intro_input
 from self_intro_generator import SelfIntroInput, generate_self_introduction
+from openai_generator import generate_with_openai
 
 _SERVICE_DIR = Path(__file__).resolve().parent
 _DEFAULT_CHECKPOINT = _SERVICE_DIR / "checkpoints" / "resume_lm"
@@ -85,6 +86,66 @@ def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
         SelfIntroResponse: draft(본문), reasoning(선택), word_count
     """
     input_data = to_self_intro_input(request)
+    
+    # 1. OpenAI 시도 (최우선)
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if api_key:
+        try:
+            model = os.environ.get("OPENAI_RESUME_MODEL", "gpt-4o-mini")
+            result = generate_with_openai(input_data, api_key, model=model)
+            
+            # 요청된 focus에 따른 결과 필터링
+            target_focus = input_data.focus  # strength, experience, values
+            focus_map = {
+                "strength": "역량 중심",
+                "experience": "경험 중심",
+                "values": "가치관 중심"
+            }
+            target_title = focus_map.get(target_focus)
+            
+            selected_version = None
+            if target_title:
+                for v in result.versions:
+                    if target_title in v.title:
+                        selected_version = v
+                        break
+            
+            reasoning = result.reasoning
+            if "(OpenAI 생성)" not in reasoning:
+                reasoning = f"(OpenAI 생성) {reasoning}"
+
+            # 특정 버전이 선택된 경우 (API 개별 호출 시)
+            if selected_version:
+                word_count = len(selected_version.draft.replace(" ", "").replace("\n", ""))
+                return SelfIntroResponse(
+                    draft=selected_version.draft,
+                    reasoning=reasoning,
+                    word_count=word_count,
+                    scoring=selected_version.scoring
+                )
+
+            # 전체 합본 반환 (하위 호환성 또는 묶음 요청 시)
+            combined_draft = ""
+            for v in result.versions:
+                combined_draft += f"### [{v.title}]\n\n{v.draft}\n\n"
+                combined_draft += "> **[적합도 분석 스코어링]**\n"
+                combined_draft += f"> - 자소서 유형 유사도: {v.scoring['type_similarity']}점\n"
+                combined_draft += f"> - 적성 및 직무 적합도: {v.scoring['aptitude_fit']}점\n"
+                combined_draft += f"> - 직무역량 반영도: {v.scoring['competency_reflection']}점\n"
+                combined_draft += f"> - **최종 적합도 평균: {v.scoring['average']}%**\n\n"
+                combined_draft += "---\n\n"
+            
+            word_count = len(combined_draft.replace(" ", "").replace("\n", ""))
+            return SelfIntroResponse(
+                draft=combined_draft.strip(),
+                reasoning=reasoning,
+                word_count=word_count,
+            )
+        except Exception as e:
+            # 실패 시 다음 단계로 폴백
+            print(f"OpenAI 생성 실패: {e}")
+
+    # 2. 파인튜닝 로컬 LM 시도
     draft_from_lm = _try_create_with_resume_lm(input_data)
     if draft_from_lm is not None:
         word_count = len(draft_from_lm.replace(" ", "").replace("\n", ""))
@@ -93,6 +154,8 @@ def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
             reasoning="(학습된 모델로 생성)",
             word_count=word_count,
         )
+
+    # 3. 마지막 수단: 템플릿 기반 생성기
     result = generate_self_introduction(input_data)
     word_count = len(result.draft.replace(" ", "").replace("\n", ""))  # 한글 기준 글자 수
     return SelfIntroResponse(

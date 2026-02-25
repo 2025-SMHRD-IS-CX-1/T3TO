@@ -19,3 +19,4 @@ class SelfIntroResponse:
     draft: str  # 자기소개서 초안 본문 (최종 사용자가 보는 글 전체)
     reasoning: Optional[str] = None  # 추론 과정 (디버깅/검토용, 선택적. 학습된 LM 사용 시 "(학습된 모델로 생성)" 등)
     word_count: int = 0  # 생성된 글자 수 (공백·줄바꿈 제외, 한글 기준)
+    scoring: Optional[dict] = None  # 적합도 스코어링 정보: {type_similarity, aptitude_fit, competency_reflection, average}

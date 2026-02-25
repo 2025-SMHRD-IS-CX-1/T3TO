@@ -68,6 +68,7 @@ class SelfIntroResponseSchema(BaseModel):
     draft: str = Field(..., description="자기소개서 초안 본문")
     reasoning: Optional[str] = Field(None, description="추론 과정")
     word_count: int = Field(0, description="생성된 글자 수")
+    scoring: Optional[dict] = Field(None, description="적합도 스코어링 정보")
 
 
 # --- FastAPI 앱 및 엔드포인트 ---
@@ -133,6 +134,7 @@ def generate_self_intro(request: SelfIntroRequestSchema) -> SelfIntroResponseSch
             draft=result.draft,
             reasoning=result.reasoning,
             word_count=result.word_count,
+            scoring=result.scoring,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
