@@ -11,6 +11,9 @@ class SelfIntroInput(BaseModel):
     language: str = "ko"
     focus: str = "strength"
     min_word_count: Optional[int] = 1000
+    # 이전 단계(로컬 LM/템플릿 등)에서 생성한 참고용 초안.
+    # 있으면 OpenAI 프롬프트에서 사실/구조를 유지하는 가이드로 사용된다.
+    base_draft: Optional[str] = None
 
 class SelfIntroVersion(BaseModel):
     title: str
@@ -95,6 +98,18 @@ def generate_with_openai(input_data: SelfIntroInput, api_key: str, model: str = 
 
 목표 분량: 버전당 공백 포함 1000자 ~ 1200자 (엄격 준수, 최소 800자 이상)
 """
+
+    # 이전 단계 생성기(로컬 LM/템플릿 등)가 만든 초안이 있으면,
+    # 사실 관계와 주요 에피소드를 보존해야 할 "참고 초안"으로 프롬프트에 추가한다.
+    if input_data.base_draft:
+        user_content = (
+            user_content
+            + "\n\n[기존 참고 초안]\n\"\"\"\n"
+            + input_data.base_draft
+            + "\n\"\"\"\n"
+            + "위 초안에 포함된 사실과 핵심 에피소드를 변경하거나 새로 만들지 말고, "
+            + "표현 방식과 구조만 개선하여 3가지 버전의 글을 작성하십시오.\n"
+        )
 
     response = client.chat.completions.create(
         model=model,

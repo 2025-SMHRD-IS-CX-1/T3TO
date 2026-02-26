@@ -558,7 +558,8 @@ export async function generateAIDrafts(clientId: string) {
                         type: d.type ?? 'Version',
                         title: d.title ?? targetJob,
                         content: d.content ?? '',
-                        scoring: { average: 88, type_similarity: 90, aptitude_fit: 85, competency_reflection: 90 }
+                        // RAG 경로에서는 아직 정량 스코어를 계산하지 않으므로 점수는 비워둔다.
+                        scoring: d.scoring ?? null,
                     }))
                 }
             }
@@ -568,9 +569,10 @@ export async function generateAIDrafts(clientId: string) {
     }
 
     if (versions == null || versions.length === 0) {
+        // 템플릿 경로 역시 정량 점수는 아직 없으므로 scoring은 null로 둔다.
         versions = getTemplateVersions(profile, targetJob, insights).map(v => ({
             ...v,
-            scoring: { average: 85, type_similarity: 85, aptitude_fit: 85, competency_reflection: 85 }
+            scoring: null,
         }))
     }
 
