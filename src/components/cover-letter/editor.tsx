@@ -55,8 +55,8 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
         if (match) {
             try { return JSON.parse(match[1]) } catch (e) { /* ignore parse error and fallback */ }
         }
-        // 기존 문서(메타데이터 없음) 또는 직접 작성한 문서인 경우 기본 점수 제공
-        return { type_similarity: 85, aptitude_fit: 85, competency_reflection: 85, average: 85 }
+        // 메타데이터가 없으면 점수 정보 없음으로 처리
+        return null
     }
     const cleanContent = (text: string) => {
         if (!text) return ""
