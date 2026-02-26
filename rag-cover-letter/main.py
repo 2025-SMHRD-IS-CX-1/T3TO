@@ -12,11 +12,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # .env 로드
+from pathlib import Path
 try:
     from dotenv import load_dotenv
+    # 우선 순위: 1. 현재 디렉토리 .env, 2. 프로젝트 루트 .env.local
     load_dotenv()
+    root_env = Path(__file__).resolve().parent.parent / ".env.local"
+    if root_env.exists():
+        load_dotenv(dotenv_path=root_env)
 except Exception:
     pass
+
 
 
 class GenerateRequest(BaseModel):

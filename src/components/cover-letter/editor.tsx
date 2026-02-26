@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
-import { saveDraft, deleteDraft, generateAIDrafts } from "@/app/(dashboard)/cover-letter/actions"
+import { saveDraft, deleteDraft, generateAIDrafts, getDrafts } from "@/app/(dashboard)/cover-letter/actions"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -116,10 +116,21 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
         const result = await generateAIDrafts(clientId)
         if (result.success) {
             notifyNotificationCheck()
+
+            // 서버 강제 갱신 트리거
             router.refresh()
-            setDrafts([])
-            setSelectedDraftId("")
-            setContent("")
+
+            // 즉시 반영을 위해 로컬에서 목록 다시 가져오기
+            const updatedDrafts = await getDrafts(clientId)
+            setDrafts(updatedDrafts)
+
+            if (updatedDrafts.length > 0) {
+                const latest = updatedDrafts[0]
+                setSelectedDraftId(latest.id)
+                setContent(cleanContent(latest.content))
+                setCurrentScoring(parseScoring(latest.content))
+            }
+
             alert("3가지 버전의 AI 초안이 생성되었습니다.")
         } else {
             alert(result.error || "생성에 실패했습니다.")
@@ -282,10 +293,25 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
             const result = await deleteDraft(draftId)
             if (result.success) {
                 notifyNotificationCheck()
-                if (selectedDraftId === draftId) {
-                    setSelectedDraftId("")
-                    setContent("")
-                }
+                router.refresh()
+
+                // 로컬 상태 즉시 반영
+                setDrafts(prev => {
+                    const filtered = prev.filter(d => d.id !== draftId)
+                    if (selectedDraftId === draftId) {
+                        if (filtered.length > 0) {
+                            const next = filtered[0]
+                            setSelectedDraftId(next.id)
+                            setContent(cleanContent(next.content))
+                            setCurrentScoring(parseScoring(next.content))
+                        } else {
+                            setSelectedDraftId("")
+                            setContent("")
+                            setCurrentScoring(null)
+                        }
+                    }
+                    return filtered
+                })
             } else {
                 alert("삭제에 실패했습니다.")
             }
