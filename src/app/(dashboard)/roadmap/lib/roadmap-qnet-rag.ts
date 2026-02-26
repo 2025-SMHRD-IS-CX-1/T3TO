@@ -48,17 +48,14 @@ export async function recommendCertificationsWithRag(
     const { qualifications, examSchedule, targetJob, major, analysisList, jobInfoFromTavily, education_level = '', work_experience_years = 0, examScheduleTavilyFallback } = opts
 
     if (qualifications.length === 0) {
-        console.log('[자격증 RAG] Q-Net API 결과가 없어 추천을 건너뜁니다')
         return []
     }
 
     // 학력·경력(직종 경력 포함)에 따른 자격조건 필터: 고졸→기능사 위주, 대학재학→기능사·산업기사, 대학졸업→기능사·산업기사·기사
     const eligibleQuals = filterQualificationsByEligibility(qualifications, education_level, work_experience_years)
     if (eligibleQuals.length === 0) {
-        console.log('[자격증 RAG] 학력·경력 조건에 맞는 자격증이 없어 추천을 건너뜁니다')
         return []
     }
-    console.log('[자격증 RAG] 자격조건 필터 후 추천 후보:', eligibleQuals.length, '개 (학력:', education_level || '미입력', ', 경력:', work_experience_years + '년)')
 
     // roadmap-prompts.ts의 메인 프롬프트 구조 활용 (Tavily 직무정보 + 학력·경력 + 시험일정 Tavily 폴백 반영)
     const userPrompt = buildCertificationRecommendationContext({
@@ -82,7 +79,6 @@ export async function recommendCertificationsWithRag(
         const openai = new OpenAI({ apiKey: openaiApiKey })
         const model = getRoadmapModel()
 
-        console.log('[자격증 RAG] LLM 호출 시작 - 자격증 수:', eligibleQuals.length)
         const res = await openai.chat.completions.create({
             model,
             messages: [
@@ -94,7 +90,6 @@ export async function recommendCertificationsWithRag(
         })
 
         const text = res.choices[0]?.message?.content?.trim() || ''
-        console.log('[자격증 RAG] LLM 응답 받음 - 길이:', text.length)
 
         let parsed: { recommended?: Array<{ qualName: string; relevanceScore: number; reason: string }> }
         try {
@@ -173,11 +168,9 @@ export async function recommendCertificationsWithRag(
             seenNames.add(qualName)
         }
 
-        console.log('[자격증 RAG] 추천 완료 - 최종 자격증 수:', recommendedCerts.length)
         return recommendedCerts
     } catch (error) {
         console.error('[자격증 RAG] 에러 발생:', error)
-        console.log('[자격증 RAG] 키워드 필터링으로 대체')
         return fallbackToKeywordFiltering(opts)
     }
 }
@@ -214,7 +207,6 @@ export async function getCertificationsFromTavilyContext(opts: {
     try {
         const openai = new OpenAI({ apiKey: openaiApiKey })
         const model = getRoadmapModel()
-        console.log('[자격증 Tavily RAG] 웹 검색 결과 기반 LLM 추천')
         const res = await openai.chat.completions.create({
             model,
             messages: [
@@ -302,7 +294,6 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
     try {
         const openai = new OpenAI({ apiKey: openaiApiKey })
         const model = getRoadmapModel()
-        console.log('[자격증 OpenAI 폴백] Q-Net 실패 → OpenAI로 자격증 추천')
         const res = await openai.chat.completions.create({
             model,
             messages: [
