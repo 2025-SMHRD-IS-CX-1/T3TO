@@ -150,6 +150,161 @@ export async function getDrafts(profileId?: string, counselorId?: string | null)
     }))
 }
 
+/** 자기소개서 적합도 점수용 컨텍스트 (내담자·직무·역량 정보) */
+export type DraftScoringContext = {
+    targetJob: string
+    targetCompany?: string
+    clientName: string
+    major?: string
+    competencies: string[]
+    insights: string
+}
+
+/** 점수 산출용 컨텍스트 조회 (profileId + userIdStr 기준) */
+async function getScoringContext(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    profileId: string,
+    userIdStr: string
+): Promise<DraftScoringContext | null> {
+    const { data: profile } = await supabase
+        .from('career_profiles')
+        .select('client_name, major, education_level, work_experience')
+        .eq('profile_id', profileId)
+        .eq('user_id', userIdStr)
+        .single()
+    if (!profile) return null
+
+    const { data: roadmap } = await supabase
+        .from('career_roadmaps')
+        .select('target_job, target_company, required_skills')
+        .eq('profile_id', profileId)
+        .eq('user_id', userIdStr)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    const targetJob = roadmap?.target_job || '직무'
+    let competencies: string[] = []
+    try {
+        if (roadmap?.required_skills && typeof roadmap.required_skills === 'string') {
+            const skills = JSON.parse(roadmap.required_skills) as { title?: string }[]
+            competencies = (skills || []).map((s: { title?: string }) => s.title).filter((x): x is string => Boolean(x))
+        }
+    } catch {
+        // ignore
+    }
+    if (competencies.length === 0) competencies = [targetJob + ' 역량', '문제해결', '커뮤니케이션']
+
+    const { data: latestConsultation } = await supabase
+        .from('consultations')
+        .select('consultation_id')
+        .eq('profile_id', profileId)
+        .eq('user_id', userIdStr)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    let insights = ''
+    if (latestConsultation?.consultation_id) {
+        const { data: analysis } = await supabase
+            .from('consultation_analysis')
+            .select('strengths, career_values')
+            .eq('consultation_id', latestConsultation.consultation_id)
+            .maybeSingle()
+        if (analysis) {
+            insights = `강점: ${analysis.strengths}\n가치관: ${(analysis as { career_values?: string }).career_values ?? ''}`
+        }
+    }
+
+    return {
+        targetJob,
+        targetCompany: roadmap?.target_company,
+        clientName: profile.client_name ?? '지원자',
+        major: profile.major ?? profile.education_level,
+        competencies,
+        insights: insights.trim(),
+    }
+}
+
+/** 단일 초안에 대해 3가지 기준(각 100점)으로 LLM 평가 후 평균 백분율 반환 */
+export async function scoreDraftContent(
+    draftContent: string,
+    context: DraftScoringContext
+): Promise<{ score: number; typeSimilarity: number; competencyReflection: number; jobFit: number } | { error: string }> {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) return { error: 'OPENAI_API_KEY가 설정되지 않았습니다.' }
+    const trimmed = typeof draftContent === 'string' ? draftContent.trim() : ''
+    if (!trimmed) return { error: '평가할 초안 내용이 없습니다.' }
+
+    const client = new OpenAI({ apiKey })
+    const model = getCoverLetterModel()
+    const systemPrompt = `당신은 채용 자기소개서 평가 전문가입니다. 주어진 자기소개서 초안을 아래 3가지 기준으로 각각 0~100점으로 평가한 뒤, 반드시 JSON만 한 줄로 출력하세요. 다른 설명이나 마크다운 없이 JSON만 출력합니다.
+
+평가 기준:
+1. typeSimilarity (자기소개서 유형 유사도): 일반적으로 채용에서 선호하는 자기소개서의 구조·스타일·톤(인사말, 역량/경험/가치관 서술, 마무리 등)과 얼마나 비슷한지 (100점 만점)
+2. competencyReflection (적성·직무역량 반영도): 내담자의 적성, 강점, 직무 역량이 초안에 얼마나 구체적으로 반영되어 있는지 (100점 만점)
+3. jobFit (추천 직무 적합도): 제시된 희망 직무/직업에 초안 내용이 얼마나 적합한지 (100점 만점)
+
+출력 형식 (따옴표와 키 이름 정확히 유지): {"typeSimilarity":숫자,"competencyReflection":숫자,"jobFit":숫자}`
+
+    const userContent = `[지원 직무] ${context.targetJob}${context.targetCompany ? ` / ${context.targetCompany}` : ''}
+[지원자] ${context.clientName}${context.major ? ` (전공/학력: ${context.major})` : ''}
+[직무 역량 키워드] ${context.competencies.join(', ')}
+${context.insights ? `[상담 기반 강점·가치관]\n${context.insights}` : ''}
+
+[평가할 자기소개서 초안]
+${trimmed}`
+
+    try {
+        const res = await client.chat.completions.create({
+            model,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userContent },
+            ],
+            temperature: 0.2,
+            max_tokens: 256,
+        })
+        const raw = res.choices[0]?.message?.content?.trim() ?? ''
+        const jsonMatch = raw.match(/\{[\s\S]*\}/)
+        const jsonStr = jsonMatch ? jsonMatch[0] : raw
+        const parsed = JSON.parse(jsonStr) as { typeSimilarity?: number; competencyReflection?: number; jobFit?: number }
+        const a = Math.min(100, Math.max(0, Number(parsed.typeSimilarity) || 0))
+        const b = Math.min(100, Math.max(0, Number(parsed.competencyReflection) || 0))
+        const c = Math.min(100, Math.max(0, Number(parsed.jobFit) || 0))
+        const score = Math.round((a + b + c) / 3)
+        return { score, typeSimilarity: a, competencyReflection: b, jobFit: c }
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return { error: `점수 산출 실패: ${msg}` }
+    }
+}
+
+/** 내담자별 초안 3개의 적합도 점수 조회 (클라이언트에서 호출, 점수 표시용) */
+export async function getDraftScores(
+    profileId: string | undefined,
+    counselorId: string | null | undefined
+): Promise<{ draftId: string; score: number; typeSimilarity: number; competencyReflection: number; jobFit: number }[]> {
+    if (!profileId) return []
+    const supabase = await createClient()
+    const userIdStr = await getEffectiveUserId(counselorId)
+    if (!userIdStr) return []
+
+    const drafts = await getDrafts(profileId, counselorId)
+    if (drafts.length === 0) return []
+
+    const context = await getScoringContext(supabase, profileId, userIdStr)
+    if (!context) return []
+
+    const results = await Promise.all(
+        drafts.map(async (draft) => {
+            const out = await scoreDraftContent(draft.content, context)
+            if ('error' in out) return { draftId: draft.id, score: 0, typeSimilarity: 0, competencyReflection: 0, jobFit: 0 }
+            return { draftId: draft.id, score: out.score, typeSimilarity: out.typeSimilarity, competencyReflection: out.competencyReflection, jobFit: out.jobFit }
+        })
+    )
+    return results
+}
+
 /** AI 다듬기: 본문을 자연스럽고 설득력 있게 수정 (실제 LLM 호출) */
 export async function polishDraftContent(text: string): Promise<{ content?: string; error?: string }> {
     const trimmed = typeof text === 'string' ? text.trim() : ''
