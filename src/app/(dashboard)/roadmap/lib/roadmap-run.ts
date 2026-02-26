@@ -49,7 +49,6 @@ export async function runRoadmap(
         ])
         companyInfosResult = companyInfos
         jobInfoResult = jobInfo
-        console.log(`[runRoadmap] Tavily(기업+직무 검색): ${Date.now() - tavilyStart}ms`)
 
         if (companyInfosResult.length > 0) {
             companyInfoText = companyInfosResult
@@ -76,7 +75,6 @@ export async function runRoadmap(
             companyInfosResult,
             jobInfoResult,
         })
-        console.log(`[runRoadmap] OpenAI RAG 로드맵 생성: ${Date.now() - ragStart}ms`)
 
         if (ragResult?.plan?.length) {
             const qnetStart = Date.now()
@@ -88,9 +86,8 @@ export async function runRoadmap(
                 new Promise<[unknown[], unknown[]]>((resolve) =>
                     setTimeout(() => resolve([[], []]), (global as any).QNET_TIMEOUT_MS ?? 10000)
                 ),
-            ])
+            ]            )
             const jobCompetency: unknown[] = []
-            console.log(`[runRoadmap] Q-Net(자격증+시험일정): ${Date.now() - qnetStart}ms`)
             const first = ragResult.plan[0] as Record<string, unknown>
             first.자격정보 = qualifications.slice(0, 3)
             first.시험일정 = examSchedule.slice(0, 3)
@@ -127,7 +124,6 @@ export async function runRoadmap(
                 work_experience_years: clientData.work_experience_years ?? 0,
                 tavilyCertContext,
             })
-            console.log(`[runRoadmap] 자격증 추천( getCertificationsForRoadmap ): ${Date.now() - certsStart}ms`)
             const mapped = ragPlanToMilestones(
                 ragResult,
                 clientData,

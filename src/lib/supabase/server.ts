@@ -71,15 +71,6 @@ export async function getCurrentUserRole(): Promise<'admin' | 'user' | null> {
     
     // 'counselor'를 'user'로 매핑 (기존 코드 호환성)
     const role = data.role === 'counselor' ? 'user' : (data.role === 'admin' ? 'admin' : null)
-    
-    console.log('[getCurrentUserRole] 역할 조회 성공:', {
-        userId: user.id,
-        userIdStr,
-        email: user.email,
-        role: data.role,
-        mappedRole: role
-    })
-    
     return role
 }
 

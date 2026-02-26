@@ -33,7 +33,6 @@ export async function generateRoadmapWithRag(
     })
 
     try {
-        console.log('[Roadmap RAG] LLM 호출 시작 - 컨텍스트 길이:', context.length)
         const res = await openai.chat.completions.create({
             model,
             messages: [
@@ -43,20 +42,13 @@ export async function generateRoadmapWithRag(
             temperature: 0,
         })
         const text = res.choices[0]?.message?.content?.trim() || ''
-        console.log('[Roadmap RAG] LLM 응답 받음 - 길이:', text.length, '처음 200자:', text.slice(0, 200))
         let jsonStr = text
         if (text.startsWith('```')) {
             const lines = text.split('\n')
             jsonStr = lines[0].includes('json') ? lines.slice(1, -1).join('\n') : text
         }
         const parsed = JSON.parse(jsonStr) as RagRoadmapResult
-        console.log('[Roadmap RAG] JSON 파싱 성공 - plan 수:', parsed?.plan?.length || 0)
         const evalResult = evaluateRoadmapOutput(parsed)
-        console.log(
-            '[Roadmap RAG] 정확성 평가:',
-            evalResult.score + '점',
-            evalResult.checks.map((c) => (c.ok ? '✓' : '✗') + c.label).join(', ')
-        )
         const allowedCompanies = (targetCompanyFromProfile || '')
             .split(/[,，、]/)
             .map((c) => c.trim())
@@ -66,13 +58,6 @@ export async function generateRoadmapWithRag(
             hasJobWeb: jobInfoText.length > 0,
             allowedCompanyNames: allowedCompanies,
         })
-        console.log(
-            '[Roadmap RAG] Context 활용도 평가:',
-            'citation 수=' + contextEval.citationCount,
-            'citation 포함=' + contextEval.citationIncluded,
-            'Faithfulness=' + (contextEval.faithfulnessScore * 100).toFixed(0) + '%',
-            contextEval.details.join(' | ')
-        )
         const jobRequirementsText =
             jobInfoResult != null && (jobInfoResult.requirements ?? jobInfoResult.skills)
                 ? [jobInfoResult.requirements, jobInfoResult.skills]
