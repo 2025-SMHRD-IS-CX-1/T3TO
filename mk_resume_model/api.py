@@ -7,7 +7,14 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from pathlib import Path
+from typing import Optional, List
+from dotenv import load_dotenv
+
+# .env.local 로드 (프로젝트 루트 디렉토리)
+env_path = Path(__file__).resolve().parent.parent / ".env.local"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -60,6 +67,8 @@ class SelfIntroRequestSchema(BaseModel):
         "strength",
         description="작성 초점: strength(역량) / experience(경험) / values(가치관)",
     )
+    rag_context: Optional[str] = Field(None, description="RAG 검색에서 추출한 추가 컨텍스트")
+
 
 
 class SelfIntroResponseSchema(BaseModel):
@@ -68,6 +77,7 @@ class SelfIntroResponseSchema(BaseModel):
     draft: str = Field(..., description="자기소개서 초안 본문")
     reasoning: Optional[str] = Field(None, description="추론 과정")
     word_count: int = Field(0, description="생성된 글자 수")
+    scoring: Optional[dict] = Field(None, description="적합도 스코어링 정보")
 
 
 # --- FastAPI 앱 및 엔드포인트 ---
@@ -126,13 +136,16 @@ def generate_self_intro(request: SelfIntroRequestSchema) -> SelfIntroResponseSch
         language=request.language,
         min_word_count=request.min_word_count,
         focus=(request.focus or "strength").strip().lower(),
+        rag_context=request.rag_context,
     )
+
     try:
         result: SelfIntroResponse = create_self_introduction(req)
         return SelfIntroResponseSchema(
             draft=result.draft,
             reasoning=result.reasoning,
             word_count=result.word_count,
+            scoring=result.scoring,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
