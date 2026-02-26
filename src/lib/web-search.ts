@@ -255,3 +255,31 @@ export async function searchCertificationInfo(
     return { summary, results: allResults.slice(0, 15) }
 }
 
+/**
+ * 실제 합격자 자기소개서 예시 검색 (자기소개서 초안 생성 시 RAG 예시 참고용)
+ * 직무가 있으면 해당 직무 합격 사례 위주로 검색
+ */
+export async function searchSelfIntroExamples(targetJob?: string): Promise<CertificationSearchResult> {
+    if (!TAVILY_API_KEY) {
+        return { summary: '', results: [] }
+    }
+    const jobSuffix = targetJob && targetJob !== '희망 직무' && targetJob !== '없음' && targetJob !== '미정'
+        ? ` ${targetJob}` : ''
+    const queries = [
+        `실제 합격자 자기소개서 예시${jobSuffix}`,
+        `합격 자기소개서 사례 STAR${jobSuffix}`,
+        `취업 합격 자기소개서 문단 예시`,
+    ]
+    const allResults: SearchResult[] = []
+    for (const query of queries) {
+        const searchResults = await searchWeb(query, 4)
+        allResults.push(...searchResults)
+    }
+    const summaryParts = allResults
+        .filter((r) => r.content && r.content.length > 30)
+        .map((r) => r.content)
+        .slice(0, 10)
+    const summary = summaryParts.join('\n\n').slice(0, 2500)
+    return { summary, results: allResults.slice(0, 12) }
+}
+

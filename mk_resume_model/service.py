@@ -107,7 +107,8 @@ def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
                 counseling_content=request.counseling.content,
                 language=input_data.language,
                 focus=input_data.focus,
-                min_word_count=request.min_word_count
+                min_word_count=request.min_word_count,
+                rag_context=request.rag_context,
             )
             
             result = generate_with_openai(openai_input, api_key, model=model)
