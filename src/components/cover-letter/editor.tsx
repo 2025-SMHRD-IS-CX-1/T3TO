@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
-import { saveDraft, deleteDraft, generateAIDrafts } from "@/app/(dashboard)/cover-letter/actions"
+import { saveDraft, deleteDraft, generateAIDrafts, getDraftScores } from "@/app/(dashboard)/cover-letter/actions"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,11 +26,12 @@ interface Draft {
 interface CoverLetterEditorProps {
     initialDrafts: Draft[]
     clientId?: string
+    counselorId?: string
     /** URL 등에서 지정된 초안 ID가 있으면 해당 초안을 선택한 상태로 열기 */
     initialSelectedDraftId?: string
 }
 
-export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraftId }: CoverLetterEditorProps) {
+export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initialSelectedDraftId }: CoverLetterEditorProps) {
     const router = useRouter()
     const [drafts, setDrafts] = useState<Draft[]>(initialDrafts)
     const resolvedInitialId =
@@ -45,6 +46,8 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [draftScores, setDraftScores] = useState<Record<string, { score: number; typeSimilarity: number; competencyReflection: number; jobFit: number }>>({})
+    const [scoresLoading, setScoresLoading] = useState(false)
 
     // Update state when initialDrafts changes (e.g. after save and revalidate)
     useEffect(() => {
@@ -59,6 +62,25 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
             setContent(draft.content)
         }
     }, [initialDrafts, selectedDraftId, initialSelectedDraftId])
+
+    // 내담자·초안 목록이 있으면 적합도 점수 조회 (3기준 평균 백분율)
+    useEffect(() => {
+        if (!clientId || drafts.length === 0) {
+            setDraftScores({})
+            return
+        }
+        setScoresLoading(true)
+        getDraftScores(clientId, counselorId ?? undefined)
+            .then((list) => {
+                const byId: Record<string, { score: number; typeSimilarity: number; competencyReflection: number; jobFit: number }> = {}
+                list.forEach((r) => {
+                    byId[r.draftId] = { score: r.score, typeSimilarity: r.typeSimilarity, competencyReflection: r.competencyReflection, jobFit: r.jobFit }
+                })
+                setDraftScores(byId)
+            })
+            .catch(() => setDraftScores({}))
+            .finally(() => setScoresLoading(false))
+    }, [clientId, drafts.length])
 
     const handleSelectDraft = (draft: Draft) => {
         setSelectedDraftId(draft.id)
@@ -304,13 +326,22 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
                                 </Button>
                             </div>
                             <p className="text-xs text-gray-500 mb-2">{draft.date}</p>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1 mb-2">
                                 {draft.tags.map((tag) => (
                                     <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-md bg-white border text-gray-600">
                                         #{tag}
                                     </span>
                                 ))}
                             </div>
+                            {scoresLoading ? (
+                                <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" /> 적합도 계산 중...
+                                </p>
+                            ) : draftScores[draft.id] != null ? (
+                                <p className="text-sm font-semibold text-purple-700" title={`유형 유사도 ${draftScores[draft.id].typeSimilarity}점 · 역량 반영 ${draftScores[draft.id].competencyReflection}점 · 직무 적합 ${draftScores[draft.id].jobFit}점`}>
+                                    적합도 {draftScores[draft.id].score}%
+                                </p>
+                            ) : null}
                         </div>
                     ))}
                 </div>
