@@ -164,8 +164,6 @@ export async function signup(formData: FormData) {
             let errorMessage = error.message
             if (error.message.includes('already registered') || error.message.includes('already exists')) {
                 // 이미 등록된 이메일인 경우, public.users에 있는지 확인
-                console.log('이미 등록된 이메일 감지. public.users 확인 중...')
-                
                 const { data: existingUser } = await supabase
                     .from('users')
                     .select('user_id, email')
@@ -195,14 +193,7 @@ export async function signup(formData: FormData) {
         // 트리거: on_auth_user_created → sync_auth_user_to_public()
         // 트리거가 작동하지 않는 경우를 대비해 확인만 수행
         const user = data.user
-        
-        console.log('=== Signup: 트리거 확인 ===')
-        console.log('Signup: auth.users 생성 완료', {
-            userId: user.id,
-            email: user.email,
-            name: name
-        })
-        
+
         // 트리거가 자동으로 public.users에 INSERT하므로 잠시 대기 후 확인
         // 트리거는 SECURITY DEFINER이므로 RLS 정책을 우회함
         await new Promise(resolve => setTimeout(resolve, 1000))  // 1초 대기 (트리거 실행 시간 확보)
@@ -214,18 +205,7 @@ export async function signup(formData: FormData) {
             .select('user_id, email, role')
             .eq('user_id', userIdForCheck)
             .single()
-        
-        console.log('Signup: 트리거 실행 확인', {
-            userId: user.id,
-            userIdForCheck,
-            userInDb: userInDb ? '데이터 있음' : '데이터 없음',
-            checkError: checkError ? {
-                message: checkError.message,
-                code: checkError.code,
-                details: checkError.details
-            } : null
-        })
-        
+
         // 트리거가 작동하지 않은 경우에만 수동으로 INSERT 시도
         if (!userInDb) {
             console.warn('Signup: 트리거가 작동하지 않거나 아직 실행 중. 수동 INSERT 시도')
@@ -266,7 +246,6 @@ export async function signup(formData: FormData) {
                 
                 // 중복 키 에러는 트리거가 이미 처리했을 수 있음
                 if (insertError.code === '23505' || insertError.message?.includes('duplicate key')) {
-                    console.log('Signup: 중복 키 에러 - 트리거가 이미 처리했을 수 있음')
                     // 다시 한 번 확인
                     const { data: retryCheck } = await supabase
                         .from('users')
@@ -275,7 +254,6 @@ export async function signup(formData: FormData) {
                         .single()
                     
                     if (retryCheck) {
-                        console.log('Signup: 확인 결과 트리거가 정상 작동했습니다.')
                         // 성공으로 처리
                     } else {
                         return { 
@@ -287,11 +265,7 @@ export async function signup(formData: FormData) {
                         error: `데이터베이스 저장 실패 (코드: ${insertError.code}): ${insertError.message}` 
                     }
                 }
-            } else {
-                console.log('Signup: 수동 INSERT 성공:', insertResult)
             }
-        } else {
-            console.log('Signup: 트리거가 정상 작동하여 users 테이블에 데이터가 생성되었습니다.')
         }
 
         // 회원가입 시 입력한 이름을 public.users.name에 바로 저장
@@ -316,16 +290,10 @@ export async function signup(formData: FormData) {
                 .select()
             if (updateNameError2) {
                 console.warn('Signup: name 업데이트(UUID) 실패:', updateNameError2.message)
-            } else {
-                console.log('Signup: public.users.name 저장 완료 (UUID):', name)
             }
-        } else if (updatedRows && updatedRows.length > 0) {
-            console.log('Signup: public.users.name 저장 완료:', name, updatedRows)
-        } else {
+        } else if (!(updatedRows && updatedRows.length > 0)) {
             console.warn('Signup: name 업데이트 시 매칭되는 행 없음. user_id 확인 필요:', userIdForCheck)
         }
-
-        console.log('Signup successful for user:', data.user?.email)
 
         // 회원가입 후 자동 로그인 방지: 세션 종료
         await supabase.auth.signOut()
@@ -382,7 +350,6 @@ export async function deleteAccount() {
 
         const userId = user.id
         const userIdStr = typeof userId === 'string' ? userId : String(userId)
-        console.log('DeleteAccount: 회원탈퇴 시작', { userId, email: user.email })
 
         // 1. RPC 호출 (회원탈퇴 버튼 클릭 시에만 예외적으로 auth.users 삭제 권한 사용)
         // 본인 계정만 삭제 가능, 트리거가 public.users 및 하위 데이터 자동 삭제
@@ -391,13 +358,11 @@ export async function deleteAccount() {
         })
 
         if (!rpcError) {
-            console.log('DeleteAccount: RPC 성공 → auth.users 삭제, 트리거로 public.users·하위 데이터 삭제')
             await supabase.auth.signOut()
             return { success: true }
         }
 
         // 2. RPC 실패 시: public.users 삭제 시도 → 트리거가 auth.users 삭제
-        console.log('DeleteAccount: RPC 실패, public.users 삭제로 시도:', rpcError.message)
         const { error: deletePublicError, data: deletePublicData } = await supabase
             .from('users')
             .delete()
@@ -411,7 +376,6 @@ export async function deleteAccount() {
             }
         }
 
-        console.log('DeleteAccount: public.users 삭제 성공, 트리거가 auth.users 삭제')
         await supabase.auth.signOut()
         return { success: true }
     } catch (err: any) {

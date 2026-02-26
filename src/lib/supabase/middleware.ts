@@ -31,12 +31,13 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Protected routes: redirect to login if not authenticated
+    // Protected routes: redirect to login if not authenticated (랜딩 "/" 은 비로그인 허용)
     const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
         request.nextUrl.pathname.startsWith('/signup') ||
         request.nextUrl.pathname.startsWith('/auth')
+    const isLandingPage = request.nextUrl.pathname === '/'
 
-    if (!user && !isAuthPage) {
+    if (!user && !isAuthPage && !isLandingPage) {
         const url = request.nextUrl.clone()
         url.pathname = '/login'
         return NextResponse.redirect(url)
@@ -46,14 +47,7 @@ export async function updateSession(request: NextRequest) {
     // DB를 지웠거나 동기화가 안 된 경우 로그인 페이지로 리다이렉트
     if (user && !isAuthPage) {
         const userIdStr = typeof user.id === 'string' ? user.id : String(user.id)
-        
-        console.log('[Middleware] public.users 조회 시도:', {
-            userId: user.id,
-            userIdStr,
-            email: user.email,
-            path: request.nextUrl.pathname
-        })
-        
+
         const { data: userInDb, error: dbError } = await supabase
             .from('users')
             .select('user_id, role')
@@ -102,13 +96,6 @@ export async function updateSession(request: NextRequest) {
                 url.pathname = '/login'
                 return NextResponse.redirect(url)
             }
-        } else {
-            console.log('[Middleware] public.users 조회 성공:', {
-                userId: user.id,
-                userIdStr,
-                email: user.email,
-                role: userInDb.role
-            })
         }
     }
 
@@ -157,14 +144,6 @@ export async function updateSession(request: NextRequest) {
             url.pathname = '/dashboard'
             return NextResponse.redirect(url)
         }
-        
-        console.log('[Middleware] 관리자 페이지 접근 허용:', {
-            userId: user.id,
-            userIdStr,
-            email: user.email,
-            role: profile.role,
-            path: request.nextUrl.pathname
-        })
     }
 
     // 로그아웃 후 뒤로가기/앞으로가기로 복원되는 것 방지: 보호 구역 응답은 캐시 금지

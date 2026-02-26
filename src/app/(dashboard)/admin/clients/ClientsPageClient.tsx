@@ -61,9 +61,7 @@ export default function ClientsPageClient() {
 
     const fetchClientsData = async () => {
         setIsLoading(true)
-        console.log('fetchClientsData: 내담자 목록 조회 시작', { counselorId })
         const data = await getClients(counselorId || undefined)
-        console.log('fetchClientsData: 내담자 목록 조회 완료', { count: data.length, counselorId })
         setClients(data)
         setIsLoading(false)
     }
