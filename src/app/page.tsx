@@ -101,6 +101,42 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* 실제 사용 화면 - 필요한 것만 한곳에서와 동일 4칸 구성 */}
+            <section className="border-t border-[var(--border)] bg-[var(--neutral-gray-100)] px-4 py-16 sm:px-6 sm:py-20">
+                <div className="mx-auto max-w-6xl">
+                    <h2 className="text-center text-2xl font-bold text-[var(--foreground)] sm:text-3xl">
+                        실제 사용 화면
+                    </h2>
+                    <p className="mt-2 text-center text-[var(--neutral-gray-600)]">
+                        화면에 표시된 내담자·로드맵 등은 예시이며, 실제 내담자 정보가 아닙니다.
+                    </p>
+                    <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:items-stretch">
+                        {[
+                            { title: "AI 로드맵", src: "/landing-roadmap.png", alt: "커리어 로드맵 - 단기·중기·장기 목표와 타임라인" },
+                            { title: "상담 관리", src: "/landing-consultations.png", alt: "상담 관리 - 내담자별 상담 기록 및 AI 분석" },
+                            { title: "자소서·커버레터", src: "/landing-coverletter.png", alt: "초안 목록 - 맞춤형 자소서 작성" },
+                            { title: "역량·자격증", src: "/landing-competencies.png", alt: "핵심 직무 역량 및 추천 자격증" },
+                        ].map((item) => (
+                            <div
+                                key={item.title}
+                                className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)] shadow-sm"
+                            >
+                                <div className="flex h-52 shrink-0 items-center justify-center overflow-hidden bg-[var(--neutral-gray-100)] sm:h-64">
+                                    <img
+                                        src={item.src}
+                                        alt={item.alt}
+                                        className="max-h-full max-w-full object-contain"
+                                    />
+                                </div>
+                                <h3 className="shrink-0 border-t border-[var(--border)] px-4 py-3 text-center font-semibold text-[var(--foreground)]">
+                                    {item.title}
+                                </h3>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* 기능 소개 */}
             <section className="px-4 py-16 sm:px-6 sm:py-20">
                 <div className="mx-auto max-w-6xl">
