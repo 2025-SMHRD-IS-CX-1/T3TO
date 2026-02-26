@@ -26,6 +26,7 @@ interface Draft {
 interface CoverLetterEditorProps {
     initialDrafts: Draft[]
     clientId?: string
+    counselorId?: string
     /** URL 등에서 지정된 초안 ID가 있으면 해당 초안을 선택한 상태로 열기 */
     initialSelectedDraftId?: string
 }
