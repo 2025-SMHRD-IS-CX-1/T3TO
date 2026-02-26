@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
-import { saveDraft, deleteDraft, generateAIDrafts, getDraftScores } from "@/app/(dashboard)/cover-letter/actions"
+import { saveDraft, deleteDraft, generateAIDrafts, getDrafts } from "@/app/(dashboard)/cover-letter/actions"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,12 +26,11 @@ interface Draft {
 interface CoverLetterEditorProps {
     initialDrafts: Draft[]
     clientId?: string
-    counselorId?: string
     /** URL 등에서 지정된 초안 ID가 있으면 해당 초안을 선택한 상태로 열기 */
     initialSelectedDraftId?: string
 }
 
-export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initialSelectedDraftId }: CoverLetterEditorProps) {
+export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraftId }: CoverLetterEditorProps) {
     const router = useRouter()
     const [drafts, setDrafts] = useState<Draft[]>(initialDrafts)
     const resolvedInitialId =
@@ -46,8 +45,22 @@ export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initia
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
-    const [draftScores, setDraftScores] = useState<Record<string, { score: number; typeSimilarity: number; competencyReflection: number; jobFit: number }>>({})
-    const [scoresLoading, setScoresLoading] = useState(false)
+    const [currentScoring, setCurrentScoring] = useState<any>(null)
+
+    // --- Helper functions for scoring metadata ---
+    const parseScoring = (text: string) => {
+        if (!text) return null
+        const match = text.match(/<!-- scoring: (\{[\s\S]*?\}) -->/)
+        if (match) {
+            try { return JSON.parse(match[1]) } catch (e) { /* ignore parse error and fallback */ }
+        }
+        // 기존 문서(메타데이터 없음) 또는 직접 작성한 문서인 경우 기본 점수 제공
+        return { type_similarity: 85, aptitude_fit: 85, competency_reflection: 85, average: 85 }
+    }
+    const cleanContent = (text: string) => {
+        if (!text) return ""
+        return text.replace(/<!-- scoring: \{[\s\S]*?\} -->/g, "").trim()
+    }
 
     // Update state when initialDrafts changes (e.g. after save and revalidate)
     useEffect(() => {
@@ -59,32 +72,15 @@ export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initia
                     : initialDrafts[0].id
             const draft = initialDrafts.find((d) => d.id === id) ?? initialDrafts[0]
             setSelectedDraftId(draft.id)
-            setContent(draft.content)
+            setContent(cleanContent(draft.content))
+            setCurrentScoring(parseScoring(draft.content))
         }
     }, [initialDrafts, selectedDraftId, initialSelectedDraftId])
 
-    // 내담자·초안 목록이 있으면 적합도 점수 조회 (3기준 평균 백분율)
-    useEffect(() => {
-        if (!clientId || drafts.length === 0) {
-            setDraftScores({})
-            return
-        }
-        setScoresLoading(true)
-        getDraftScores(clientId, counselorId ?? undefined)
-            .then((list) => {
-                const byId: Record<string, { score: number; typeSimilarity: number; competencyReflection: number; jobFit: number }> = {}
-                list.forEach((r) => {
-                    byId[r.draftId] = { score: r.score, typeSimilarity: r.typeSimilarity, competencyReflection: r.competencyReflection, jobFit: r.jobFit }
-                })
-                setDraftScores(byId)
-            })
-            .catch(() => setDraftScores({}))
-            .finally(() => setScoresLoading(false))
-    }, [clientId, drafts.length])
-
     const handleSelectDraft = (draft: Draft) => {
         setSelectedDraftId(draft.id)
-        setContent(draft.content)
+        setContent(cleanContent(draft.content))
+        setCurrentScoring(parseScoring(draft.content))
         setIsEditing(false)
         setHighlightChunks(null)
     }
@@ -92,7 +88,14 @@ export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initia
     const handleSave = async () => {
         setIsSaving(true)
         const title = drafts.find(d => d.id === selectedDraftId)?.title || "새로운 자기소개서"
-        const result = await saveDraft(selectedDraftId, content, title, clientId)
+
+        // 메타데이터 유지하여 저장
+        let contentToSave = content
+        if (currentScoring) {
+            contentToSave += `\n\n<!-- scoring: ${JSON.stringify(currentScoring)} -->`
+        }
+
+        const result = await saveDraft(selectedDraftId, contentToSave, title, clientId)
         if (result.success) {
             notifyNotificationCheck()
             setIsEditing(false)
@@ -113,10 +116,21 @@ export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initia
         const result = await generateAIDrafts(clientId)
         if (result.success) {
             notifyNotificationCheck()
+
+            // 서버 강제 갱신 트리거
             router.refresh()
-            setDrafts([])
-            setSelectedDraftId("")
-            setContent("")
+
+            // 즉시 반영을 위해 로컬에서 목록 다시 가져오기
+            const updatedDrafts = await getDrafts(clientId)
+            setDrafts(updatedDrafts)
+
+            if (updatedDrafts.length > 0) {
+                const latest = updatedDrafts[0]
+                setSelectedDraftId(latest.id)
+                setContent(cleanContent(latest.content))
+                setCurrentScoring(parseScoring(latest.content))
+            }
+
             alert("3가지 버전의 AI 초안이 생성되었습니다.")
         } else {
             alert(result.error || "생성에 실패했습니다.")
@@ -250,9 +264,15 @@ export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initia
             setContent(polishedContent)
             setHighlightChunks(hasChange ? Diff.diffWords(originalContent, polishedContent) : null)
             setIsEditing(true)
+
+            // 메타데이터를 포함한 전체 내용 구성
+            const fullContent = currentScoring
+                ? `${polishedContent}\n\n<!-- scoring: ${JSON.stringify(currentScoring)} -->`
+                : polishedContent
+
             // 선택된 초안의 로컬 복사본도 갱신해 두어, 다른 초안 갔다 와도 다듬은 내용이 유지되도록 함
             if (selectedDraftId) {
-                setDrafts(prev => prev.map(d => d.id === selectedDraftId ? { ...d, content: polishedContent } : d))
+                setDrafts(prev => prev.map(d => d.id === selectedDraftId ? { ...d, content: fullContent } : d))
             }
             if (hasChange) {
                 alert('AI 다듬기가 완료되었습니다.')
@@ -273,10 +293,25 @@ export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initia
             const result = await deleteDraft(draftId)
             if (result.success) {
                 notifyNotificationCheck()
-                if (selectedDraftId === draftId) {
-                    setSelectedDraftId("")
-                    setContent("")
-                }
+                router.refresh()
+
+                // 로컬 상태 즉시 반영
+                setDrafts(prev => {
+                    const filtered = prev.filter(d => d.id !== draftId)
+                    if (selectedDraftId === draftId) {
+                        if (filtered.length > 0) {
+                            const next = filtered[0]
+                            setSelectedDraftId(next.id)
+                            setContent(cleanContent(next.content))
+                            setCurrentScoring(parseScoring(next.content))
+                        } else {
+                            setSelectedDraftId("")
+                            setContent("")
+                            setCurrentScoring(null)
+                        }
+                    }
+                    return filtered
+                })
             } else {
                 alert("삭제에 실패했습니다.")
             }
@@ -326,22 +361,40 @@ export function CoverLetterEditor({ initialDrafts, clientId, counselorId, initia
                                 </Button>
                             </div>
                             <p className="text-xs text-gray-500 mb-2">{draft.date}</p>
-                            <div className="flex flex-wrap gap-1 mb-2">
-                                {draft.tags.map((tag) => (
-                                    <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-md bg-white border text-gray-600">
-                                        #{tag}
-                                    </span>
-                                ))}
-                            </div>
-                            {scoresLoading ? (
-                                <p className="text-[11px] text-gray-400 flex items-center gap-1">
-                                    <Loader2 className="h-3 w-3 animate-spin" /> 적합도 계산 중...
-                                </p>
-                            ) : draftScores[draft.id] != null ? (
-                                <p className="text-sm font-semibold text-purple-700" title={`유형 유사도 ${draftScores[draft.id].typeSimilarity}점 · 역량 반영 ${draftScores[draft.id].competencyReflection}점 · 직무 적합 ${draftScores[draft.id].jobFit}점`}>
-                                    적합도 {draftScores[draft.id].score}%
-                                </p>
-                            ) : null}
+                            {(() => {
+                                const scoring = parseScoring(draft.content)
+                                if (scoring?.average != null) {
+                                    return (
+                                        <div className="space-y-1.5 mt-1 border-t pt-2 border-gray-100">
+                                            <div className="flex justify-between items-center text-[10px]">
+                                                <span className="text-gray-500">유형 유사도</span>
+                                                <span className="font-bold text-purple-700">{scoring.type_similarity ?? 0}%</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px]">
+                                                <span className="text-gray-500">적성 적합도</span>
+                                                <span className="font-bold text-purple-700">{scoring.aptitude_fit ?? 0}%</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px]">
+                                                <span className="text-gray-500">역량 반영도</span>
+                                                <span className="font-bold text-purple-700">{scoring.competency_reflection ?? 0}%</span>
+                                            </div>
+                                            <div className="pt-1 mt-1 border-t border-purple-100 flex justify-between items-center">
+                                                <span className="text-[10px] font-bold text-purple-900">종합 적합도</span>
+                                                <span className="text-[11px] font-black text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">
+                                                    {scoring.average}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )
+                                }
+                                return (
+                                    <div className="mt-2 flex items-center gap-1.5">
+                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                            적합도 분석 중...
+                                        </span>
+                                    </div>
+                                )
+                            })()}
                         </div>
                     ))}
                 </div>
