@@ -63,6 +63,8 @@ class SelfIntroRequest:
     language: str = "ko"  # 출력 언어: "ko" | "en"
     min_word_count: int = 800  # 목표 최소 글자 수 (템플릿 생성기는 참고용)
     focus: str = "strength"  # 작성 초점: "strength"(역량) | "experience"(경험) | "values"(가치관)
+    rag_context: Optional[str] = None  # RAG 검색에서 추출한 추가 컨텍스트
+
 
     def validate(self) -> None:
         """필수 필드 검증. roles, competencies 비어 있으면 ValueError."""

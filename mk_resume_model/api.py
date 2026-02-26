@@ -7,7 +7,14 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from pathlib import Path
+from typing import Optional, List
+from dotenv import load_dotenv
+
+# .env.local 로드 (프로젝트 루트 디렉토리)
+env_path = Path(__file__).resolve().parent.parent / ".env.local"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -60,6 +67,8 @@ class SelfIntroRequestSchema(BaseModel):
         "strength",
         description="작성 초점: strength(역량) / experience(경험) / values(가치관)",
     )
+    rag_context: Optional[str] = Field(None, description="RAG 검색에서 추출한 추가 컨텍스트")
+
 
 
 class SelfIntroResponseSchema(BaseModel):
@@ -127,7 +136,9 @@ def generate_self_intro(request: SelfIntroRequestSchema) -> SelfIntroResponseSch
         language=request.language,
         min_word_count=request.min_word_count,
         focus=(request.focus or "strength").strip().lower(),
+        rag_context=request.rag_context,
     )
+
     try:
         result: SelfIntroResponse = create_self_introduction(req)
         return SelfIntroResponseSchema(

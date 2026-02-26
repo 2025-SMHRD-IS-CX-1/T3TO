@@ -16,8 +16,8 @@ from pathlib import Path
 from models.counseling import AIAnalysisResult, CounselingContent, ExtractedBackground, SelfIntroRequest
 from models.output import SelfIntroResponse
 from adapter import to_self_intro_input
-from self_intro_generator import SelfIntroInput, generate_self_introduction
-from openai_generator import generate_with_openai
+from self_intro_generator import SelfIntroInput as DataclassSelfIntroInput, generate_self_introduction
+from openai_generator import generate_with_openai, SelfIntroInput as OpenAISelfIntroInput
 
 _SERVICE_DIR = Path(__file__).resolve().parent
 _DEFAULT_CHECKPOINT = _SERVICE_DIR / "checkpoints" / "resume_lm"
@@ -26,7 +26,7 @@ _RESUME_LM_MODEL = None
 _RESUME_LM_TOKENIZER = None
 
 
-def _self_intro_input_to_dict(input_data: SelfIntroInput) -> dict:
+def _self_intro_input_to_dict(input_data: DataclassSelfIntroInput) -> dict:
     """생성기 입력을 inference_resume_lm.generate()에 넘길 때 쓰는 dict 형식으로 변환."""
     bg = input_data.background
     return {
@@ -52,7 +52,7 @@ def _get_resume_lm_checkpoint() -> Path | None:
     return None
 
 
-def _try_create_with_resume_lm(input_data: SelfIntroInput) -> str | None:
+def _try_create_with_resume_lm(input_data: DataclassSelfIntroInput) -> str | None:
     """
     파인튜닝 LM으로 자기소개서 본문 생성 시도.
     체크포인트 없거나 inference_resume_lm 임포트 실패 시 None 반환.
@@ -92,7 +92,25 @@ def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
     if api_key:
         try:
             model = os.environ.get("OPENAI_RESUME_MODEL", "gpt-4o-mini")
-            result = generate_with_openai(input_data, api_key, model=model)
+            
+            # OpenAI 생성을 위한 새로운 입력 객체 생성 (Dataclass -> Pydantic)
+            openai_input = OpenAISelfIntroInput(
+                roles=input_data.roles,
+                competencies=input_data.competencies,
+                background={
+                    "name": input_data.background.name,
+                    "education": input_data.background.education,
+                    "experiences": input_data.background.experiences or [],
+                    "strengths": input_data.background.strengths or [],
+                    "career_values": input_data.background.career_values
+                },
+                counseling_content=request.counseling.content,
+                language=input_data.language,
+                focus=input_data.focus,
+                min_word_count=request.min_word_count
+            )
+            
+            result = generate_with_openai(openai_input, api_key, model=model)
             
             # 요청된 focus에 따른 결과 필터링
             target_focus = input_data.focus  # strength, experience, values
