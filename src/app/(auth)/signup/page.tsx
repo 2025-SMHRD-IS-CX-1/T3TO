@@ -128,10 +128,6 @@ export default function SignupPage() {
 
         try {
             const result = await signup(formData)
-            
-            console.log('Signup result (전체):', result)
-            console.log('Signup result.error:', result?.error)
-            console.log('Signup result.success:', result?.success)
 
             if (result?.error) {
                 console.error('Signup error (상세):', {
@@ -145,7 +141,6 @@ export default function SignupPage() {
 
             // 성공 시 로그인 페이지로 리다이렉트
             if (result?.success) {
-                console.log('Signup successful, redirecting to login page...')
                 setTimeout(() => {
                     window.location.href = '/login?signup=success'
                 }, 300)

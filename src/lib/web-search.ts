@@ -40,7 +40,6 @@ async function searchWeb(query: string, maxResults = 5): Promise<SearchResult[]>
     }
 
     try {
-        console.log(`[Tavily API] 웹 검색 시작 - 쿼리: "${query}", 최대 결과: ${maxResults}`)
         const res = await fetch('https://api.tavily.com/search', {
             method: 'POST',
             headers: {
@@ -79,7 +78,6 @@ async function searchWeb(query: string, maxResults = 5): Promise<SearchResult[]>
             })
         }
 
-        console.log(`[Tavily API] 웹 검색 완료 - 결과 수: ${results.length}, 요약: ${data.answer ? '있음' : '없음'}`)
         return results
     } catch (e) {
         console.error('[Tavily API] 웹 검색 에러:', e)
@@ -102,7 +100,6 @@ export async function searchCompanyInfo(companyNames: string[]): Promise<Company
         console.warn('[Tavily API] TAVILY_API_KEY가 없어 기업 정보 검색을 건너뜁니다')
         return []
     }
-    console.log(`[Tavily API] 기업 정보 검색 시작 - 기업 수: ${companyNames.length}, 기업명: ${companyNames.join(', ')}`)
 
     const results: CompanyInfo[] = []
 
@@ -145,10 +142,8 @@ export async function searchCompanyInfo(companyNames: string[]): Promise<Company
             techStack: techStack || undefined,
             sources: allResults.slice(0, 5),
         })
-        console.log(`[Tavily API] ${company} 정보 수집 완료 - 채용: ${!!recruitmentInfo}, 인재상: ${!!talentProfile}, 기술스택: ${!!techStack}`)
     }
 
-    console.log(`[Tavily API] 기업 정보 검색 완료 - 총 ${results.length}개 기업`)
     return results
 }
 
@@ -164,7 +159,6 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
         console.warn('[Tavily API] TAVILY_API_KEY가 없어 직무 정보 검색을 건너뜁니다')
         return null
     }
-    console.log(`[Tavily API] 직무 정보 검색 시작 - 직무: "${jobTitle}"`)
 
     const queries = [
         `${jobTitle} 채용 요구사항 역량`,
@@ -211,7 +205,6 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
         certifications: certifications || undefined,
         sources: allResults.slice(0, 5),
     }
-    console.log(`[Tavily API] 직무 정보 검색 완료 - 요구사항: ${!!requirements}, 트렌드: ${!!trends}, 스킬: ${!!skills}, 자격증: ${!!certifications}`)
     return result
 }
 
@@ -259,7 +252,6 @@ export async function searchCertificationInfo(
         .slice(0, 8)
     const summary = summaryParts.join('\n\n').slice(0, 3000)
 
-    console.log(`[Tavily API] 자격증 검색 완료 - 쿼리 ${queries.length}개, 결과 ${allResults.length}건, 요약 ${summary.length}자`)
     return { summary, results: allResults.slice(0, 15) }
 }
 
