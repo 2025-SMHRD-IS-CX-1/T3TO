@@ -72,12 +72,25 @@ export default function RoadmapPageClient() {
             if (data && data.milestones) {
                 try {
                     const { steps: parsedSteps, stage_completion } = await parseMilestones(data.milestones)
-                    setSteps(parsedSteps as RoadmapStep[])
+                    const safeSteps: RoadmapStep[] = Array.isArray(parsedSteps)
+                        ? parsedSteps.map((s: unknown, i: number) => {
+                              const step = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>
+                              return {
+                                  id: String(step.id ?? `step-${i + 1}`),
+                                  title: String(step.title ?? ''),
+                                  description: String(step.description ?? ''),
+                                  status: (['completed', 'in-progress', 'locked'].includes(String(step.status)) ? step.status : 'locked') as RoadmapStep['status'],
+                                  date: step.date != null ? String(step.date) : undefined,
+                                  resources: Array.isArray(step.resources) ? step.resources : undefined,
+                                  quizScore: typeof step.quizScore === 'number' ? step.quizScore : undefined,
+                                  actionItems: Array.isArray(step.actionItems) ? step.actionItems : undefined,
+                              }
+                          })
+                        : []
+                    setSteps(safeSteps)
                     setStageCompletion(stage_completion)
-                    setSkills(data.required_skills ? JSON.parse(data.required_skills) : [])
-                    setCerts(data.certifications != null && data.certifications !== ''
-                        ? JSON.parse(data.certifications)
-                        : [])
+                    setSkills(data.required_skills && typeof data.required_skills === 'string' ? (() => { try { return JSON.parse(data.required_skills) } catch { return [] } })() : [])
+                    setCerts(data.certifications != null && data.certifications !== '' ? (() => { try { return JSON.parse(data.certifications) } catch { return [] } })() : [])
                     setHasRoadmap(true)
                 } catch (e) {
                     console.error("Failed to parse roadmap data", e)
@@ -99,34 +112,63 @@ export default function RoadmapPageClient() {
         fetchData()
     }, [clientId, counselorId])
 
-    // 로드맵 저장 후 공통 처리 로직
+    // 로드맵 저장 후 공통 처리 로직 (파싱/설정 중 예외 시 흰 화면 방지)
     const handleRoadmapSaveSuccess = async (successMessage: string) => {
         setGenerationStatus('로드맵 저장 중...')
         notifyNotificationCheck()
-        
-        const data = await getRoadmap(clientId || undefined, counselorId || undefined)
-        if (data?.milestones) {
-            const { steps: parsedSteps, stage_completion } = await parseMilestones(data.milestones)
-            setSteps(parsedSteps as RoadmapStep[])
-            setStageCompletion(stage_completion)
-            if (data.required_skills) setSkills(JSON.parse(data.required_skills))
-            if (data.certifications != null && data.certifications !== '') {
+
+        try {
+            const data = await getRoadmap(clientId || undefined, counselorId || undefined)
+            if (data?.milestones) {
+                const { steps: parsedSteps, stage_completion } = await parseMilestones(data.milestones)
+                const safeSteps: RoadmapStep[] = Array.isArray(parsedSteps)
+                    ? parsedSteps.map((s: unknown, i: number) => {
+                          const step = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>
+                          return {
+                              id: String(step.id ?? `step-${i + 1}`),
+                              title: String(step.title ?? ''),
+                              description: String(step.description ?? ''),
+                              status: (['completed', 'in-progress', 'locked'].includes(String(step.status)) ? step.status : 'locked') as RoadmapStep['status'],
+                              date: step.date != null ? String(step.date) : undefined,
+                              resources: Array.isArray(step.resources) ? step.resources : undefined,
+                              quizScore: typeof step.quizScore === 'number' ? step.quizScore : undefined,
+                              actionItems: Array.isArray(step.actionItems) ? step.actionItems : undefined,
+                          }
+                      })
+                    : []
+                setSteps(safeSteps)
+                setStageCompletion(stage_completion)
                 try {
-                    setCerts(JSON.parse(data.certifications))
+                    if (data.required_skills && typeof data.required_skills === 'string') {
+                        setSkills(JSON.parse(data.required_skills))
+                    } else {
+                        setSkills([])
+                    }
                 } catch {
+                    setSkills([])
+                }
+                if (data.certifications != null && data.certifications !== '') {
+                    try {
+                        setCerts(JSON.parse(data.certifications))
+                    } catch {
+                        setCerts([])
+                    }
+                } else {
                     setCerts([])
                 }
-            } else {
-                setCerts([])
+                setHasRoadmap(true)
             }
-            setHasRoadmap(true)
+        } catch (e) {
+            console.error('로드맵 저장 후 데이터 반영 실패:', e)
+            setGenerationStatus('저장은 완료되었으나 화면 갱신에 실패했습니다.')
+            setTimeout(() => setGenerationStatus(''), 3000)
+            return
         }
-        
+
         router.refresh()
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('roadmap-updated', { detail: { clientId } }))
         }
-        
         setGenerationStatus(successMessage)
         setTimeout(() => setGenerationStatus(''), 1000)
     }

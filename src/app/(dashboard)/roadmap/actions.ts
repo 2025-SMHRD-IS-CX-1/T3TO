@@ -86,7 +86,6 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
     const ragContext = profileId
         ? await getRoadmapRagContext(supabase, profileId, userIdStr, clientData ? [clientData] : null)
         : null
-    console.log(`[createInitialRoadmap] getRoadmapRagContext: ${Date.now() - t}ms`)
 
     const userData = ragContext ?? {
         counseling: [],
@@ -106,17 +105,11 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
     }
     t = Date.now()
     const result = await runRoadmap(userData, adapters)
-    console.log(`[createInitialRoadmap] runRoadmap 전체: ${Date.now() - t}ms`)
     const info = result.info
     const dynamicSkills = result.dynamicSkills
     const dynamicCerts = result.dynamicCerts ?? []
     const targetJob = result.targetJob
     const targetCompany = result.targetCompany
-
-    console.log('[Roadmap] 최종 로드맵 데이터 준비 완료')
-    console.log('[Roadmap] 목표 직무:', targetJob, '목표 기업:', targetCompany)
-    console.log('[Roadmap] 마일스톤 수:', info.length)
-    console.log(`[createInitialRoadmap] 총 소요: ${Date.now() - totalStart}ms`)
 
     // 기존 활성 로드맵 확인 (갱신 시 기존 stage_completion 유지 위해 milestones 포함 조회)
     const { data: existingRoadmap } = await supabase

@@ -116,9 +116,7 @@ export default function DashboardPageClient() {
 
     const fetchClients = async () => {
         setLoading(true)
-        console.log('fetchClients: 내담자 목록 조회 시작', { counselorId })
         const data = await getClients(counselorId || undefined)
-        console.log('fetchClients: 내담자 목록 조회 완료', { count: data.length, counselorId })
         setClients(data)
         setLoading(false)
     }

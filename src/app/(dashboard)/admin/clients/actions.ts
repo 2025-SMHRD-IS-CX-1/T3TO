@@ -37,11 +37,6 @@ export async function getClients(counselorId?: string | null) {
     }
 
     if (!profiles || profiles.length === 0) {
-        console.log('⚠️ getClients: 내담자 데이터가 없습니다.', { 
-            userIdForQuery, 
-            counselorId, 
-            userIdStr,
-        })
         return []
     }
 
@@ -69,17 +64,6 @@ export async function getClients(counselorId?: string | null) {
     }
 
     const data = profiles
-
-    // [검증 로그] DB에서 가져온 첫 번째 데이터의 구조를 출력합니다.
-    if (data && data.length > 0) {
-        console.log('✅ getClients: 내담자 데이터 조회 성공', {
-            count: data.length,
-            first_id: data[0].profile_id,
-            first_user_id: data[0].user_id,
-            query_user_id: userIdForQuery,
-            roadmap_count: roadmapMap.size,
-        })
-    }
 
     // Map DB fields to UI with roadmap information
     return data.map((profile: any) => {
@@ -171,8 +155,6 @@ export async function createClientProfile(formData: FormData, counselorId?: stri
         }
     }
 
-    console.log('createClientProfile: 내담자 추가 시도', { userIdForPublicUsers, name, email })
-    
     const { data: newProfile, error } = await supabase
         .from('career_profiles')
         .insert([
@@ -198,8 +180,6 @@ export async function createClientProfile(formData: FormData, counselorId?: stri
         console.error('Error creating client:', error)
         return { error: error.message }
     }
-
-    console.log('createClientProfile: 내담자 추가 성공', { profile_id: newProfile?.profile_id, user_id: newProfile?.user_id })
 
     // 로드맵은 백그라운드에서 생성 (등록은 즉시 응답)
     if (newProfile) {
