@@ -26,16 +26,16 @@ export default function LandingPage() {
                 </div>
             </header>
 
-            {/* Hero - Liner 스타일 메인 메시지 */}
-            <section className="relative overflow-hidden px-4 py-20 sm:px-6 sm:py-28">
+            {/* Hero - 상담사 대상 메인 메시지 (아래 섹션 제목이 조금 드러나도록) */}
+            <section className="relative flex min-h-[calc(100vh-3.5rem-8rem)] flex-col justify-center overflow-hidden px-4 py-16 sm:px-6 sm:py-20">
                 <div className="mx-auto max-w-4xl text-center">
-                    <h1 className="text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl md:text-6xl">
-                        당신의 커리어를
+                    <h1 className="text-4xl font-bold leading-snug tracking-tight text-[var(--foreground)] sm:text-5xl sm:leading-normal md:text-6xl">
+                        <span className="text-[var(--purple-700)]">Career Bridge</span>와 함께
                         <br />
-                        <span className="text-[var(--purple-700)]">정확하게 설계하세요</span>
+                        내담자의 미래를 설계하세요
                     </h1>
                     <p className="mt-6 text-lg text-[var(--neutral-gray-600)] sm:text-xl">
-                        AI 기반 맞춤 로드맵과 상담 관리로, 다음 단계로 나아가세요.
+                        AI 맞춤 로드맵과 상담 관리를 한곳에서, 내담자와 함께 다음 단계로 나아가세요.
                     </p>
                     <div className="mt-10">
                         <Link
