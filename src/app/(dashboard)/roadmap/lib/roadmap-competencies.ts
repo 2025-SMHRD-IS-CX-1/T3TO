@@ -256,6 +256,5 @@ export function computeCompetenciesFromProfile(
         ...secondThirdFourth,
     ]
 
-    console.log('[역량 분석] 프로필 기반 역량 수준:', { major, educationLevel, workYears, targetJob: targetJob || '(없음)', levels: competencies.map((c) => `${c.title}: ${c.level}%`) })
     return competencies
 }

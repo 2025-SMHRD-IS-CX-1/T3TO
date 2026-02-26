@@ -165,7 +165,6 @@ export function filterRelevantQualifications(
 
     const uniqueKeywords = [...new Set(keywords.map((k) => k.toLowerCase()))]
     const byEligibility = filterQualificationsByEligibility(qualifications, education_level, work_experience_years)
-    console.log('[Q-Net 필터링] 목표 직무:', targetJob, '전공:', major, '학력:', education_level || '미입력', '경력:', work_experience_years + '년', '자격조건 필터 후:', byEligibility.length + '개')
 
     const relevantCerts: Array<{ type: string; name: string; status: string; color: string; details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string } }> = []
     const seenNames = new Set<string>()
@@ -217,8 +216,6 @@ export function filterRelevantQualifications(
         }
     }
 
-    console.log('[Q-Net 필터링] 필터링된 자격증 수:', relevantCerts.length)
-    
     // 하드코딩된 폴백 제거 - RAG 기반 추천으로 대체됨
     // RAG가 실패할 때만 키워드 기반 필터링 결과 반환
 

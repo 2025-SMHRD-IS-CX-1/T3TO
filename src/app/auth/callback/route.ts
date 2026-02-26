@@ -33,7 +33,6 @@ export async function GET(request: Request) {
 
             // 회원가입 이메일 인증인 경우
             if (type === 'signup' && data.user.email_confirmed_at) {
-                console.log('Email verification successful for signup:', data.user.email)
                 const forwardedHost = request.headers.get('x-forwarded-host')
                 const isLocalEnv = process.env.NODE_ENV === 'development'
                 
