@@ -26,6 +26,7 @@ interface Draft {
 interface CoverLetterEditorProps {
     initialDrafts: Draft[]
     clientId?: string
+    counselorId?: string
     /** URL 등에서 지정된 초안 ID가 있으면 해당 초안을 선택한 상태로 열기 */
     initialSelectedDraftId?: string
 }
@@ -54,8 +55,8 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
         if (match) {
             try { return JSON.parse(match[1]) } catch (e) { /* ignore parse error and fallback */ }
         }
-        // 기존 문서(메타데이터 없음) 또는 직접 작성한 문서인 경우 기본 점수 제공
-        return { type_similarity: 85, aptitude_fit: 85, competency_reflection: 85, average: 85 }
+        // 메타데이터가 없으면 점수 정보 없음으로 처리
+        return null
     }
     const cleanContent = (text: string) => {
         if (!text) return ""
@@ -319,6 +320,24 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
     }
 
     return (
+        <>
+            {/* 자기소개서 초안 생성 중 오버레이 (로드맵 생성과 동일 스타일) */}
+            {isGenerating && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <Card className="w-full max-w-md mx-4 shadow-2xl">
+                        <CardContent className="pt-6 pb-8 px-6">
+                            <div className="flex flex-col items-center gap-4">
+                                <Loader2 className="h-12 w-12 animate-spin text-purple-600" />
+                                <div className="text-center">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">자기소개서 초안 생성 중</h3>
+                                    <p className="text-sm text-gray-600">AI가 3가지 버전의 초안을 생성하고 있습니다...</p>
+                                    <p className="text-xs text-gray-500 mt-2">잠시만 기다려주세요 (최대 약 1분 소요)</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         <div className="flex flex-col gap-4 h-[calc(100vh-140px)] min-h-[600px]">
             {/* 초안 목록: 가로 스크롤 */}
             <div className="flex flex-col gap-2 shrink-0">
@@ -499,5 +518,6 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
                 </div>
             </div>
         </div>
+        </>
     )
 }
