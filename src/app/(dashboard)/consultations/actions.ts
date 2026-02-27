@@ -68,8 +68,8 @@ export async function createConsultation(formData: FormData) {
         return { error: error.message }
     }
 
-    // Trigger AI Analysis
-    await analyzeConsultation(data.consultation_id, clientId, content)
+    // AI 분석 + 로드맵 재생성은 백그라운드에서 실행 (응답 블로킹 없음)
+    void analyzeConsultation(data.consultation_id, clientId, content)
 
     revalidatePath('/consultations')
     return { success: true }
@@ -247,6 +247,10 @@ async function analyzeConsultation(consultationId: string, profileId: string, co
     if (latestProfile) {
         await createInitialRoadmap(profileId, latestProfile)
     }
+
+    // 백그라운드 작업 완료 후 UI 갱신
+    revalidatePath('/consultations')
+    revalidatePath('/roadmap')
 }
 
 export async function updateConsultation(
