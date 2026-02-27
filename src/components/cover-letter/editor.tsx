@@ -342,6 +342,23 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
     }
 
     return (
+        <>
+            {isGenerating && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <Card className="w-full max-w-md mx-4 shadow-2xl">
+                        <CardContent className="pt-6 pb-8 px-6">
+                            <div className="flex flex-col items-center gap-4">
+                                <Loader2 className="h-12 w-12 animate-spin text-purple-600" />
+                                <div className="text-center">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">자기소개서 초안 생성 중</h3>
+                                    <p className="text-sm text-gray-600">AI가 3가지 버전의 초안을 생성하고 있습니다...</p>
+                                    <p className="text-xs text-gray-500 mt-2">잠시만 기다려주세요 (최대 약 1분 소요)</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         <div className="flex flex-col gap-4 h-[calc(100vh-140px)] min-h-[600px]">
             {/* 초안 목록: 가로 스크롤 */}
             <div className="flex flex-col gap-2 shrink-0">
@@ -533,5 +550,6 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
                 </div>
             </div>
         </div>
+        </>
     )
 }

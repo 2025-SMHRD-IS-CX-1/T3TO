@@ -64,12 +64,17 @@ def _try_create_with_resume_lm(input_data: DataclassSelfIntroInput) -> str | Non
         return None
     try:
         from inference_resume_lm import load_model, generate
-    except ImportError:
+
+        if _RESUME_LM_MODEL is None:
+            _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL = load_model(path, use_cpu=True)
+        input_dict = _self_intro_input_to_dict(input_data)
+        return generate(input_dict, _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL)
+    except ModuleNotFoundError as e:
+        print(f"[resume_lm] transformers not available, skipping fine-tuned LM: {e}")
         return None
-    if _RESUME_LM_MODEL is None:
-        _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL = load_model(path, use_cpu=True)
-    input_dict = _self_intro_input_to_dict(input_data)
-    return generate(input_dict, _RESUME_LM_TOKENIZER, _RESUME_LM_MODEL)
+    except Exception as e:
+        print(f"[resume_lm] failed to use fine-tuned LM, fallback to other generators: {e}")
+        return None
 
 
 def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
