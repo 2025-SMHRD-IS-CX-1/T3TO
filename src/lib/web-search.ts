@@ -231,9 +231,18 @@ export async function searchCertificationInfo(
     if (targetJob && targetJob !== '희망 직무' && targetJob !== '없음' && targetJob !== '미정') {
         queries.push(`${targetJob} 관련 자격증 국가기술자격 추천`)
         queries.push(`${targetJob} 필수 자격증 Q-Net`)
+        // 최신·민간 자격증까지 포함 (예: AICE, ADP 등)
+        queries.push(`${targetJob} 관련 최신 자격증 및 민간 자격증`)
     }
     if (major && major !== '정보 없음' && major !== '전공 분야') {
         queries.push(`${major} 전공 관련 자격증 한국산업인력공단`)
+        queries.push(`${major} 전공 관련 최신 자격증 및 민간 자격증`)
+    }
+    const combined = `${targetJob} ${major || ''}`
+    if (/AI|인공지능|데이터|머신러닝|ML/i.test(combined)) {
+        // AI/데이터 직무의 경우 AICE 등 최신 AI 자격증도 함께 탐색
+        queries.push('AI 활용 관련 자격증 AICE ADP ADsP 등 비교')
+        queries.push(`${targetJob || 'AI 직무'} 관련 AI 자격증 정리`)
     }
     if (queries.length === 0) {
         queries.push('한국 국가기술자격증 정보처리기사 빅데이터분석기사 추천')

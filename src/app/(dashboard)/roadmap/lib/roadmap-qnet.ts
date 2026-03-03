@@ -19,10 +19,13 @@ export function getQualTier(qual: unknown): CertTier | null {
 }
 
 /**
- * 내담자 학력·경력에 따라 취득 가능한 자격 등급 목록
- * 고졸: 기능사 (경력 2년 이상 시 산업기사 포함)
- * 대학재학: 기능사, 산업기사
- * 대학졸업: 기능사, 산업기사, 기사 (경력 4년 이상 시 기술사 포함)
+ * 내담자 학력·경력에 따라 취득 가능한 자격 등급 목록 (배열 순서 = 추천 우선순위)
+ * 한국 국가기술자격법 기준:
+ * - 고졸: 기능사 (경력 2년↑ 시 산업기사)
+ * - 전문대 재학: 산업기사, 기능사
+ * - 전문대 졸업: 산업기사, 기능사 (경력 2년↑ 시 기사 추가)
+ * - 4년제 대학교 재학/졸업예정/졸업: 기사 우선 (기능사·산업기사는 하위 등급이므로 후순위)
+ * - 대학원/석사/박사: 기사 우선 (경력 4년↑ 시 기술사)
  */
 export function getEligibleTiers(
     education_level: string,
@@ -33,19 +36,23 @@ export function getEligibleTiers(
 
     if (/고등학교\s*졸업|고졸|고교\s*졸업/i.test(level)) {
         const tiers: CertTier[] = ['기능사']
-        if (years >= 2) tiers.push('산업기사') // 고졸 + 해당 분야 실무 2년 → 산업기사 응시 가능
+        if (years >= 2) tiers.push('산업기사')
         return tiers
     }
-    if (/대학교\s*재학|대학\s*재학|대재|전문대\s*재학|재학\s*중/i.test(level)) {
-        return ['기능사', '산업기사']
+    if (/전문대\s*재학/i.test(level)) {
+        return ['산업기사', '기능사']
     }
-    if (/대학교\s*졸업|대졸|4년제|전문대\s*졸업|대학원|석사|박사/i.test(level)) {
-        const tiers: CertTier[] = ['기능사', '산업기사', '기사']
-        if (years >= 4) tiers.push('기술사')
+    if (/전문대\s*졸업/i.test(level)) {
+        const tiers: CertTier[] = ['산업기사', '기능사']
+        if (years >= 2) tiers.unshift('기사')
         return tiers
     }
-    // 학력 정보 없음 또는 기타: 모두 추천 가능 (기존 동작 유지)
-    return ['기능사', '산업기사', '기사', '기술사']
+    if (/대학교\s*재학|대학\s*재학|대재|재학\s*중|대학교\s*졸업|대졸|4년제|졸업\s*예정|대학원|석사|박사/i.test(level)) {
+        const tiers: CertTier[] = ['기사']
+        if (years >= 4) tiers.unshift('기술사')
+        return tiers
+    }
+    return ['기사', '산업기사', '기능사', '기술사']
 }
 
 /** 학력·경력에 맞는 자격증만 필터 (직종 경력 포함한 자격조건 반영) */

@@ -51,7 +51,7 @@ export async function recommendCertificationsWithRag(
         return []
     }
 
-    // 학력·경력(직종 경력 포함)에 따른 자격조건 필터: 고졸→기능사 위주, 대학재학→기능사·산업기사, 대학졸업→기능사·산업기사·기사
+    // 학력·경력에 따른 자격조건 필터: 고졸→기능사, 전문대→산업기사, 4년제 대학교 재학 이상→기사
     const eligibleQuals = filterQualificationsByEligibility(qualifications, education_level, work_experience_years)
     if (eligibleQuals.length === 0) {
         return []
@@ -182,6 +182,7 @@ export async function getCertificationsFromTavilyContext(opts: {
     analysisList: Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
     tavilyCertContext: { summary: string; results: Array<{ title: string; url: string; content: string }> }
     jobInfoFromTavily?: { jobTitle: string; requirements?: string; trends?: string; skills?: string; certifications?: string } | null
+    education_level?: string
 }): Promise<Array<{
     type: string
     name: string
@@ -189,11 +190,11 @@ export async function getCertificationsFromTavilyContext(opts: {
     color: string
     details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
 }>> {
-    const { targetJob, major, analysisList, tavilyCertContext, jobInfoFromTavily } = opts
+    const { targetJob, major, analysisList, tavilyCertContext, jobInfoFromTavily, education_level } = opts
     const openaiApiKey = process.env.OPENAI_API_KEY
     if (!openaiApiKey) {
         console.warn('[자격증 Tavily RAG] OPENAI_API_KEY가 없어 OpenAI 폴백으로 대체')
-        return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined })
+        return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined, education_level })
     }
 
     const userPrompt = buildTavilyCertRecommendationContext({
@@ -205,13 +206,19 @@ export async function getCertificationsFromTavilyContext(opts: {
     })
 
     try {
+        const educationNote = education_level
+            ? /대학교|대졸|4년제|졸업\s*예정|대학원|석사|박사/i.test(education_level)
+                ? `\n\n**[학력 필터] 내담자 학력: ${education_level} → 기사 등급만 추천. 기능사·산업기사는 4년제 대학생에게 하위 등급이므로 절대 추천 금지.**`
+                : `\n\n[학력 참고] 내담자 학력: ${education_level}`
+            : ''
+
         const openai = new OpenAI({ apiKey: openaiApiKey })
         const model = getRoadmapModel()
         const res = await openai.chat.completions.create({
             model,
             messages: [
                 { role: 'system', content: CERT_TAVILY_CONTEXT_SYSTEM_PROMPT },
-                { role: 'user', content: userPrompt },
+                { role: 'user', content: userPrompt + educationNote },
             ],
             temperature: 0.3,
             response_format: { type: 'json_object' },
@@ -246,7 +253,7 @@ export async function getCertificationsFromTavilyContext(opts: {
         }))
     } catch (error) {
         console.error('[자격증 Tavily RAG] 에러:', error)
-        return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined })
+        return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined, education_level })
     }
 }
 
@@ -256,6 +263,7 @@ export async function getCertificationsFromOpenAIFallback(opts: {
     major: string
     analysisList: Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
     jobInfoFromTavily?: { jobTitle: string; requirements?: string; trends?: string; skills?: string; certifications?: string } | null
+    education_level?: string
 }): Promise<Array<{
     type: string
     name: string
@@ -263,7 +271,7 @@ export async function getCertificationsFromOpenAIFallback(opts: {
     color: string
     details?: { written?: string; practical?: string; difficulty?: string; examSchedule?: string; examScheduleWritten?: string; examSchedulePractical?: string; description?: string }
 }>> {
-    const { targetJob, major, analysisList, jobInfoFromTavily } = opts
+    const { targetJob, major, analysisList, jobInfoFromTavily, education_level } = opts
     const openaiApiKey = process.env.OPENAI_API_KEY
     if (!openaiApiKey) {
         console.warn('[자격증 OpenAI 폴백] OPENAI_API_KEY가 없어 빈 배열 반환')
@@ -285,10 +293,18 @@ export async function getCertificationsFromOpenAIFallback(opts: {
 `
         : ''
 
+    const educationNote = education_level
+        ? /대학교|대졸|4년제|졸업\s*예정|대학원|석사|박사/i.test(education_level)
+            ? `\n- **학력**: ${education_level} → **기사 등급만 추천할 것. 기능사·산업기사는 4년제 대학생에게 하위 등급이므로 절대 추천하지 말 것.**`
+            : /전문대/i.test(education_level)
+                ? `\n- **학력**: ${education_level} → 산업기사 위주 추천, 기사는 경력 2년 이상일 때만.`
+                : `\n- **학력**: ${education_level}`
+        : ''
+
     const userPrompt = `[내담자 정보 - DB·상담 기반]
 - 목표 직무: ${targetJob || '없음'}
 - 전공: ${major || '없음'}
-- 상담 분석 (강점, 관심, 가치관): ${analysisText || '없음'}
+- 상담 분석 (강점, 관심, 가치관): ${analysisText || '없음'}${educationNote}
 ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목표 직무에 도움이 되는 한국 국가기술자격·민간자격 3~5개를 맞춤형으로 추천해라. JSON만 출력.`
 
     try {
@@ -371,6 +387,7 @@ export async function getCertificationsForRoadmap(opts: {
                 analysisList,
                 tavilyCertContext,
                 jobInfoFromTavily: jobInfoFromTavily ?? null,
+                education_level,
             })
         }
         return getCertificationsFromOpenAIFallback({
@@ -378,10 +395,12 @@ export async function getCertificationsForRoadmap(opts: {
             major,
             analysisList,
             jobInfoFromTavily: jobInfoFromTavily ?? undefined,
+            education_level,
         })
     }
 
-    return recommendCertificationsWithRag({
+    // 1차: Q-Net 기반 국가기술자격 추천 (학력·경력 필터 적용)
+    const qnetBased = await recommendCertificationsWithRag({
         qualifications,
         examSchedule,
         targetJob,
@@ -392,6 +411,38 @@ export async function getCertificationsForRoadmap(opts: {
         work_experience_years,
         examScheduleTavilyFallback,
     })
+
+    // 2차: Tavily 검색 기반 자격증(국가기술 + 민간) 추가 추천
+    // - Q-Net 국가자격 외에, 직무에 도움이 되는 기타 자격증도 함께 보여주기 위함
+    if (!tavilyCertContext || (tavilyCertContext.summary.length === 0 && tavilyCertContext.results.length === 0)) {
+        return qnetBased
+    }
+
+    const tavilyBased = await getCertificationsFromTavilyContext({
+        targetJob,
+        major,
+        analysisList,
+        tavilyCertContext,
+        jobInfoFromTavily: jobInfoFromTavily ?? null,
+        education_level,
+    })
+
+    if (!tavilyBased || tavilyBased.length === 0) {
+        return qnetBased
+    }
+
+    // 이름 기준으로 중복 제거 후 병합 (국가기술 + Tavily 자격증)
+    const seen = new Set(qnetBased.map((c) => c.name.trim()))
+    const extra = tavilyBased.filter((c) => {
+        const name = (c.name || '').trim()
+        if (!name) return false
+        if (seen.has(name)) return false
+        seen.add(name)
+        return true
+    })
+
+    // 너무 많아지지 않도록 상한 (예: 최대 7개)
+    return [...qnetBased, ...extra].slice(0, 7)
 }
 
 /** RAG 실패 시 키워드 기반 필터링으로 폴백 */
