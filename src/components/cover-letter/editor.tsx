@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import * as Diff from "diff"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Save, Sparkles, RefreshCw, FileEdit, Loader2, Download, ChevronDown, Trash2 } from "lucide-react"
 import { cn, notifyNotificationCheck } from "@/lib/utils"
-import { saveDraft, deleteDraft, generateAIDrafts, getDrafts } from "@/app/(dashboard)/cover-letter/actions"
+import { saveDraft, deleteDraft, generateAIDrafts, getDrafts, analyzeDraftScoring } from "@/app/(dashboard)/cover-letter/actions"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,10 +23,15 @@ interface Draft {
     tags: string[]
 }
 
+/** 화면에 표기되면 안 되는 스코어 메타데이터 주석 제거 (저장·표시 시 사용) */
+function stripScoringComment(text: string): string {
+    if (!text) return ""
+    return text.replace(/<!-- scoring: \{[\s\S]*?\} -->/g, "").trim()
+}
+
 interface CoverLetterEditorProps {
     initialDrafts: Draft[]
     clientId?: string
-    counselorId?: string
     /** URL 등에서 지정된 초안 ID가 있으면 해당 초안을 선택한 상태로 열기 */
     initialSelectedDraftId?: string
 }
@@ -42,11 +47,41 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
                 : ""
     const initialDraft = initialDrafts.find((d) => d.id === resolvedInitialId)
     const [selectedDraftId, setSelectedDraftId] = useState<string>(resolvedInitialId)
-    const [content, setContent] = useState<string>(initialDraft?.content ?? (initialDrafts.length > 0 ? initialDrafts[0].content : ""))
+    const [content, setContent] = useState<string>(() =>
+        stripScoringComment(initialDraft?.content ?? (initialDrafts.length > 0 ? initialDrafts[0].content : ""))
+    )
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
     const [currentScoring, setCurrentScoring] = useState<any>(null)
+    /** 실시간 분석 스코어 (DB 미저장, 화면 표시용) draftId -> scoring */
+    const [liveScores, setLiveScores] = useState<Record<string, { type_similarity: number; aptitude_fit: number; competency_reflection: number; average: number }>>({})
+    /** 실시간 분석 요청 중인 draftId 목록 (중복 요청 방지) */
+    const [loadingScoreIds, setLoadingScoreIds] = useState<Set<string>>(new Set())
+    const requestedScoreIds = useRef<Set<string>>(new Set())
+
+    // --- 실시간 적합도 분석: 스코어 없으면 본문 기반으로 분석 요청 ---
+    useEffect(() => {
+        if (!drafts.length) return
+        drafts.forEach((draft) => {
+            if (parseScoring(draft.content) != null) return
+            if (liveScores[draft.id] != null) return
+            if (requestedScoreIds.current.has(draft.id)) return
+            const content = stripScoringComment(draft.content)
+            if (!content || content.length < 100) return
+            requestedScoreIds.current.add(draft.id)
+            setLoadingScoreIds((prev) => new Set(prev).add(draft.id))
+            analyzeDraftScoring(content, draft.title).then((score) => {
+                requestedScoreIds.current.delete(draft.id)
+                setLoadingScoreIds((prev) => {
+                    const next = new Set(prev)
+                    next.delete(draft.id)
+                    return next
+                })
+                if (score) setLiveScores((prev) => ({ ...prev, [draft.id]: score }))
+            })
+        })
+    }, [drafts])
 
     // --- Helper functions for scoring metadata ---
     const parseScoring = (text: string) => {
@@ -55,13 +90,10 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
         if (match) {
             try { return JSON.parse(match[1]) } catch (e) { /* ignore parse error and fallback */ }
         }
-        // 메타데이터가 없으면 점수 정보 없음으로 처리
+        // 스코어 없음 → 미산출 표시 (가짜 85% 방지)
         return null
     }
-    const cleanContent = (text: string) => {
-        if (!text) return ""
-        return text.replace(/<!-- scoring: \{[\s\S]*?\} -->/g, "").trim()
-    }
+    const cleanContent = stripScoringComment
 
     // Update state when initialDrafts changes (e.g. after save and revalidate)
     useEffect(() => {
@@ -90,13 +122,8 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
         setIsSaving(true)
         const title = drafts.find(d => d.id === selectedDraftId)?.title || "새로운 자기소개서"
 
-        // 메타데이터 유지하여 저장
-        let contentToSave = content
-        if (currentScoring) {
-            contentToSave += `\n\n<!-- scoring: ${JSON.stringify(currentScoring)} -->`
-        }
-
-        const result = await saveDraft(selectedDraftId, contentToSave, title, clientId)
+        // 스코어 주석은 저장하지 않음 (화면에 표기되지 않도록)
+        const result = await saveDraft(selectedDraftId, content, title, clientId)
         if (result.success) {
             notifyNotificationCheck()
             setIsEditing(false)
@@ -266,14 +293,9 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
             setHighlightChunks(hasChange ? Diff.diffWords(originalContent, polishedContent) : null)
             setIsEditing(true)
 
-            // 메타데이터를 포함한 전체 내용 구성
-            const fullContent = currentScoring
-                ? `${polishedContent}\n\n<!-- scoring: ${JSON.stringify(currentScoring)} -->`
-                : polishedContent
-
-            // 선택된 초안의 로컬 복사본도 갱신해 두어, 다른 초안 갔다 와도 다듬은 내용이 유지되도록 함
+            // 스코어 주석 없이 본문만 유지 (화면에 표기되지 않도록)
             if (selectedDraftId) {
-                setDrafts(prev => prev.map(d => d.id === selectedDraftId ? { ...d, content: fullContent } : d))
+                setDrafts(prev => prev.map(d => d.id === selectedDraftId ? { ...d, content: polishedContent } : d))
             }
             if (hasChange) {
                 alert('AI 다듬기가 완료되었습니다.')
@@ -321,7 +343,6 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
 
     return (
         <>
-            {/* 자기소개서 초안 생성 중 오버레이 (로드맵 생성과 동일 스타일) */}
             {isGenerating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <Card className="w-full max-w-md mx-4 shadow-2xl">
@@ -381,7 +402,18 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
                             </div>
                             <p className="text-xs text-gray-500 mb-2">{draft.date}</p>
                             {(() => {
-                                const scoring = parseScoring(draft.content)
+                                const fromContent = parseScoring(draft.content)
+                                const scoring = fromContent ?? liveScores[draft.id]
+                                if (loadingScoreIds.has(draft.id)) {
+                                    return (
+                                        <div className="mt-2 flex items-center gap-1.5">
+                                            <Loader2 className="h-3 w-3 animate-spin text-purple-500" />
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                                적합도 분석 중...
+                                            </span>
+                                        </div>
+                                    )
+                                }
                                 if (scoring?.average != null) {
                                     return (
                                         <div className="space-y-1.5 mt-1 border-t pt-2 border-gray-100">
@@ -409,7 +441,7 @@ export function CoverLetterEditor({ initialDrafts, clientId, initialSelectedDraf
                                 return (
                                     <div className="mt-2 flex items-center gap-1.5">
                                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
-                                            적합도 분석 중...
+                                            적합도 미산출
                                         </span>
                                     </div>
                                 )

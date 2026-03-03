@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createInitialRoadmap } from '../roadmap/actions'
 import OpenAI from 'openai'
 import { getCoverLetterModel } from '@/lib/ai-models'
+import { searchSelfIntroExamples } from '@/lib/web-search'
 
 /** 자기소개서 본문에서 시스템 플레이스홀더·부적절한 문구 제거 */
 function sanitizeDraftContent(text: string): string {
@@ -49,7 +50,7 @@ function useInsightLine(insights: string, lineIndex: number, fallback: string): 
     return line.replace(/^(강점|가치관):\s*/i, '').trim() || fallback
 }
 
-/** RAG 컨텍스트 문자열 생성. (실제 RAG 백엔드 연동 시 검색 결과로 교체) */
+/** RAG 컨텍스트 문자열 생성. Supabase 프로필·상담·로드맵 데이터를 종합해 mk_resume_model에 전달 */
 function buildRagContext(params: {
     targetJob: string
     competencies: string[]
@@ -57,15 +58,45 @@ function buildRagContext(params: {
     consultationSummary?: string
     clientName?: string
     major?: string
+    educationLevel?: string
+    ageGroup?: string | null
+    workExperience?: string | null
+    careerOrientation?: string | null
+    targetCompany?: string | null
+    roadmapSkillsText?: string
 }): string {
-    const { targetJob, competencies, insights, consultationSummary, clientName, major } = params
+    const {
+        targetJob,
+        competencies,
+        insights,
+        consultationSummary,
+        clientName,
+        major,
+        educationLevel,
+        ageGroup,
+        workExperience,
+        careerOrientation,
+        targetCompany,
+        roadmapSkillsText,
+    } = params
     const lines: string[] = []
-    lines.push(`[지원 직무] ${targetJob}`)
-    if (competencies.length) lines.push(`[직무 역량] ${competencies.join(', ')}`)
-    if (insights?.trim()) lines.push(`[상담 요약] ${insights.trim()}`)
-    if (consultationSummary?.trim()) lines.push(`[상담 내용 요약] ${consultationSummary.slice(0, 300).trim()}${consultationSummary.length > 300 ? '...' : ''}`)
-    if (clientName?.trim()) lines.push(`[지원자] ${clientName}`)
-    if (major?.trim()) lines.push(`[전공/학력] ${major}`)
+    lines.push('※ 아래 상담·로드맵·DB 내용을 자기소개서 본문에 구체적으로 반영할 것.')
+    lines.push('')
+    lines.push('[지원 직무] ' + targetJob)
+    if (competencies.length) lines.push('[직무 역량] ' + competencies.join(', '))
+    if (clientName?.trim()) lines.push('[지원자] ' + clientName.trim())
+    if (major?.trim()) lines.push('[전공/학력] ' + major.trim())
+    if (educationLevel?.trim()) lines.push('[학력 수준] ' + educationLevel.trim())
+    if (ageGroup?.trim()) lines.push('[연령대] ' + ageGroup.trim())
+    if (workExperience != null && String(workExperience).trim()) lines.push('[경력/경험] ' + String(workExperience).trim())
+    if (careerOrientation?.trim()) lines.push('[진로/성향] ' + careerOrientation.trim())
+    if (targetCompany?.trim()) lines.push('[희망 기업/분야] ' + targetCompany.trim())
+    if (roadmapSkillsText?.trim()) lines.push('[로드맵 역량 요약] ' + roadmapSkillsText.trim())
+    if (insights?.trim()) lines.push('[상담 분석 요약] ' + insights.trim())
+    if (consultationSummary?.trim()) {
+        const summary = consultationSummary.slice(0, 2000).trim()
+        lines.push('[상담 원문 참고 - 에피소드·경험·성과 추출용] ' + summary + (consultationSummary.length > 2000 ? '...' : ''))
+    }
     lines.push('')
     lines.push('[STAR 템플릿] 상황(Situation)-과제(Task)-행동(Action)-결과(Result) 순으로 경험을 서술하면 설득력이 높습니다.')
     lines.push('[CAR 템플릿] 맥락(Context)-행동(Action)-결과(Result) 구조로 구체적 성과를 강조할 수 있습니다.')
@@ -150,159 +181,117 @@ export async function getDrafts(profileId?: string, counselorId?: string | null)
     }))
 }
 
-/** 자기소개서 적합도 점수용 컨텍스트 (내담자·직무·역량 정보) */
-export type DraftScoringContext = {
+/** OpenAI 직접 호출로 자기소개서 3종 생성 (mk_resume_model 미사용 시 성능·품질 확보용) */
+async function generateSelfIntroWithOpenAI(params: {
     targetJob: string
-    targetCompany?: string
-    clientName: string
-    major?: string
     competencies: string[]
-    insights: string
-}
-
-/** 점수 산출용 컨텍스트 조회 (profileId + userIdStr 기준) */
-async function getScoringContext(
-    supabase: Awaited<ReturnType<typeof createClient>>,
-    profileId: string,
-    userIdStr: string
-): Promise<DraftScoringContext | null> {
-    const { data: profile } = await supabase
-        .from('career_profiles')
-        .select('client_name, major, education_level, work_experience')
-        .eq('profile_id', profileId)
-        .eq('user_id', userIdStr)
-        .single()
-    if (!profile) return null
-
-    const { data: roadmap } = await supabase
-        .from('career_roadmaps')
-        .select('target_job, target_company, required_skills')
-        .eq('profile_id', profileId)
-        .eq('user_id', userIdStr)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    const targetJob = roadmap?.target_job || '직무'
-    let competencies: string[] = []
-    try {
-        if (roadmap?.required_skills && typeof roadmap.required_skills === 'string') {
-            const skills = JSON.parse(roadmap.required_skills) as { title?: string }[]
-            competencies = (skills || []).map((s: { title?: string }) => s.title).filter((x): x is string => Boolean(x))
-        }
-    } catch {
-        // ignore
-    }
-    if (competencies.length === 0) competencies = [targetJob + ' 역량', '문제해결', '커뮤니케이션']
-
-    const { data: latestConsultation } = await supabase
-        .from('consultations')
-        .select('consultation_id')
-        .eq('profile_id', profileId)
-        .eq('user_id', userIdStr)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    let insights = ''
-    if (latestConsultation?.consultation_id) {
-        const { data: analysis } = await supabase
-            .from('consultation_analysis')
-            .select('strengths, career_values')
-            .eq('consultation_id', latestConsultation.consultation_id)
-            .maybeSingle()
-        if (analysis) {
-            insights = `강점: ${analysis.strengths}\n가치관: ${(analysis as { career_values?: string }).career_values ?? ''}`
-        }
-    }
-
-    return {
-        targetJob,
-        targetCompany: roadmap?.target_company,
-        clientName: profile.client_name ?? '지원자',
-        major: profile.major ?? profile.education_level,
-        competencies,
-        insights: insights.trim(),
-    }
-}
-
-/** 단일 초안에 대해 3가지 기준(각 100점)으로 LLM 평가 후 평균 백분율 반환 */
-export async function scoreDraftContent(
-    draftContent: string,
-    context: DraftScoringContext
-): Promise<{ score: number; typeSimilarity: number; competencyReflection: number; jobFit: number } | { error: string }> {
+    ragContext: string
+    consultationContent: string
+    background: { name: string | null; education: string | null; experiences: string[]; strengths: string[] | null; career_values?: string }
+}): Promise<{ type: string; title: string; content: string; scoring?: any }[] | null> {
     const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) return { error: 'OPENAI_API_KEY가 설정되지 않았습니다.' }
-    const trimmed = typeof draftContent === 'string' ? draftContent.trim() : ''
-    if (!trimmed) return { error: '평가할 초안 내용이 없습니다.' }
-
+    if (!apiKey?.trim()) return null
     const client = new OpenAI({ apiKey })
     const model = getCoverLetterModel()
-    const systemPrompt = `당신은 채용 자기소개서 평가 전문가입니다. 주어진 자기소개서 초안을 아래 3가지 기준으로 각각 0~100점으로 평가한 뒤, 반드시 JSON만 한 줄로 출력하세요. 다른 설명이나 마크다운 없이 JSON만 출력합니다.
+    const { targetJob, competencies, ragContext, consultationContent, background } = params
+    const experiencesStr = background.experiences?.length ? background.experiences.join(', ') : '(데이터 없음 - 상담 원문 참고)'
+    const strengthsStr = background.strengths?.length ? background.strengths.join(', ') : '(데이터 없음 - 상담 원문 참고)'
+    const systemPrompt = `당신은 합격자 자기소개서 스타일의 채용 자기소개서 전문가입니다. 제공된 RAG 컨텍스트(상담 원문, 로드맵·DB)만 사용해 환각 없이 종합적으로 작성하세요. 컨텍스트에 없는 내용은 만들지 마세요.
+분량: 각 버전당 공백 포함 700자 이상 800자 이하. 사실성 준수, 3~4문단, 비즈니스 한국어.
+버전별: 역량 중심(직무 역량·구체 사례), 경험 중심(STAR), 가치관 중심(가치관·에피소드).
+각 버전에 scoring: { type_similarity, aptitude_fit, competency_reflection, average } 0~100 산출. 본문 품질에 따라 버전마다 다르게.
+출력은 반드시 아래 JSON만 출력하세요. 다른 설명 없이.
+{"reasoning":"요약","versions":[{"title":"역량 중심","draft":"본문...","scoring":{"type_similarity":90,"aptitude_fit":88,"competency_reflection":85,"average":88}},{"title":"경험 중심","draft":"본문...","scoring":{...}},{"title":"가치관 중심","draft":"본문...","scoring":{...}}]}`
 
-평가 기준:
-1. typeSimilarity (자기소개서 유형 유사도): 일반적으로 채용에서 선호하는 자기소개서의 구조·스타일·톤(인사말, 역량/경험/가치관 서술, 마무리 등)과 얼마나 비슷한지 (100점 만점)
-2. competencyReflection (적성·직무역량 반영도): 내담자의 적성, 강점, 직무 역량이 초안에 얼마나 구체적으로 반영되어 있는지 (100점 만점)
-3. jobFit (추천 직무 적합도): 제시된 희망 직무/직업에 초안 내용이 얼마나 적합한지 (100점 만점)
+    const userContent = `[추천 직무] ${targetJob}
+[직무 역량] ${competencies.join(', ')}
 
-출력 형식 (따옴표와 키 이름 정확히 유지): {"typeSimilarity":숫자,"competencyReflection":숫자,"jobFit":숫자}`
+[지원자 배경] 학력/전공: ${background.education ?? '제공되지 않음'}, 주요 경험: ${experiencesStr}, 보유 강점: ${strengthsStr}, 가치관: ${background.career_values ?? '제공되지 않음'}
 
-    const userContent = `[지원 직무] ${context.targetJob}${context.targetCompany ? ` / ${context.targetCompany}` : ''}
-[지원자] ${context.clientName}${context.major ? ` (전공/학력: ${context.major})` : ''}
-[직무 역량 키워드] ${context.competencies.join(', ')}
-${context.insights ? `[상담 기반 강점·가치관]\n${context.insights}` : ''}
+[상담 원문]
+\`\`\`
+${consultationContent || '상담 내용 없음'}
+\`\`\`
 
-[평가할 자기소개서 초안]
-${trimmed}`
+[로드맵·DB 종합 컨텍스트]
+\`\`\`
+${ragContext}
+\`\`\`
+
+위 내용만 참고해 역량 중심·경험 중심·가치관 중심 3종을 JSON versions 배열로 작성하세요. 각 draft 700~800자, scoring 포함.`
 
     try {
         const res = await client.chat.completions.create({
             model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userContent },
-            ],
-            temperature: 0.2,
-            max_tokens: 256,
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
+            temperature: 0.3,
+            max_tokens: 4096,
+            response_format: { type: 'json_object' },
         })
         const raw = res.choices[0]?.message?.content?.trim() ?? ''
-        const jsonMatch = raw.match(/\{[\s\S]*\}/)
-        const jsonStr = jsonMatch ? jsonMatch[0] : raw
-        const parsed = JSON.parse(jsonStr) as { typeSimilarity?: number; competencyReflection?: number; jobFit?: number }
-        const a = Math.min(100, Math.max(0, Number(parsed.typeSimilarity) || 0))
-        const b = Math.min(100, Math.max(0, Number(parsed.competencyReflection) || 0))
-        const c = Math.min(100, Math.max(0, Number(parsed.jobFit) || 0))
-        const score = Math.round((a + b + c) / 3)
-        return { score, typeSimilarity: a, competencyReflection: b, jobFit: c }
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        return { error: `점수 산출 실패: ${msg}` }
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as { versions?: Array<{ title?: string; draft?: string; scoring?: any }> }
+        const vers = parsed?.versions
+        if (!Array.isArray(vers) || vers.length < 3) return null
+        const titles = [`${targetJob} - 역량 중심`, `${targetJob} - 경험 중심`, `${targetJob} - 가치관 중심`]
+        return vers.slice(0, 3).map((v, i) => ({
+            type: `Version ${i + 1}`,
+            title: v.title ?? titles[i],
+            content: (v.draft ?? '').trim(),
+            scoring: v.scoring,
+        })).filter(v => v.content.length >= 200) as { type: string; title: string; content: string; scoring?: any }[]
+    } catch {
+        return null
     }
 }
 
-/** 내담자별 초안 3개의 적합도 점수 조회 (클라이언트에서 호출, 점수 표시용) */
-export async function getDraftScores(
-    profileId: string | undefined,
-    counselorId: string | null | undefined
-): Promise<{ draftId: string; score: number; typeSimilarity: number; competencyReflection: number; jobFit: number }[]> {
-    if (!profileId) return []
-    const supabase = await createClient()
-    const userIdStr = await getEffectiveUserId(counselorId)
-    if (!userIdStr) return []
-
-    const drafts = await getDrafts(profileId, counselorId)
-    if (drafts.length === 0) return []
-
-    const context = await getScoringContext(supabase, profileId, userIdStr)
-    if (!context) return []
-
-    const results = await Promise.all(
-        drafts.map(async (draft) => {
-            const out = await scoreDraftContent(draft.content, context)
-            if ('error' in out) return { draftId: draft.id, score: 0, typeSimilarity: 0, competencyReflection: 0, jobFit: 0 }
-            return { draftId: draft.id, score: out.score, typeSimilarity: out.typeSimilarity, competencyReflection: out.competencyReflection, jobFit: out.jobFit }
+/** 실시간 적합도 분석: 본문만으로 스코어 산출 (DB 저장 없음, 화면 표시용) */
+export async function analyzeDraftScoring(
+    draftContent: string,
+    targetJobFromTitle?: string
+): Promise<{ type_similarity: number; aptitude_fit: number; competency_reflection: number; average: number } | null> {
+    const trimmed = typeof draftContent === 'string' ? draftContent.trim() : ''
+    if (!trimmed || trimmed.length < 100) return null
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) return null
+    const client = new OpenAI({ apiKey })
+    const model = getCoverLetterModel()
+    const jobHint = targetJobFromTitle?.replace(/\s*-\s*역량\s*중심$|\s*-\s*경험\s*중심$|\s*-\s*가치관\s*중심$/i, '').trim() || '지원 직무'
+    try {
+        const res = await client.chat.completions.create({
+            model,
+            messages: [
+                {
+                    role: 'system',
+                    content: `당신은 채용 자기소개서 평가 전문가입니다. 주어진 자기소개서 본문만 읽고, 아래 3가지 항목을 각 0~100점으로 평가한 뒤 JSON만 출력하세요. 점수는 본문의 구체성·직무 연관성·역량 반영도에 따라 내담자마다·초안마다 다르게 부여하세요. 모든 초안에 같은 점수를 주지 마세요.
+- type_similarity: 이 초안의 테마(역량/경험/가치관 중 하나)가 본문에 얼마나 충실히 반영되었는지
+- aptitude_fit: 본문 내용이 추천 직무와 얼마나 맞는지(적성·경험 연관성)
+- competency_reflection: 핵심 역량이 구체적 사례·에피소드로 증명되었는지
+- average: 위 세 항목의 산술 평균(소수 가능)
+출력 형식(다른 설명 없이 JSON만): {"type_similarity":85,"aptitude_fit":88,"competency_reflection":82,"average":85}`
+                },
+                {
+                    role: 'user',
+                    content: `[참고: 추천 직무는 "${jobHint}"일 수 있음]\n\n[평가할 자기소개서 본문]\n${trimmed.slice(0, 4000)}`
+                },
+            ],
+            temperature: 0.3,
+            max_tokens: 256,
+            response_format: { type: 'json_object' },
         })
-    )
-    return results
+        const raw = res.choices[0]?.message?.content?.trim() ?? ''
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as { type_similarity?: number; aptitude_fit?: number; competency_reflection?: number; average?: number }
+        const a = typeof parsed.average === 'number' ? parsed.average : (parsed.type_similarity! + parsed.aptitude_fit! + parsed.competency_reflection!) / 3
+        return {
+            type_similarity: Math.min(100, Math.max(0, Number(parsed.type_similarity) || 0)),
+            aptitude_fit: Math.min(100, Math.max(0, Number(parsed.aptitude_fit) || 0)),
+            competency_reflection: Math.min(100, Math.max(0, Number(parsed.competency_reflection) || 0)),
+            average: Math.round(Math.min(100, Math.max(0, a))),
+        }
+    } catch {
+        return null
+    }
 }
 
 /** AI 다듬기: 본문을 자연스럽고 설득력 있게 수정 (실제 LLM 호출) */
@@ -438,19 +427,47 @@ export async function generateAIDrafts(clientId: string) {
             ? analysisStrengths
             : [targetJob + ' 역량', '문제해결', '커뮤니케이션']
 
-    // RAG 컨텍스트 생성 (파인튜닝/범용 LLM 생성 시 참고 자료로 전달)
-    const ragContext = buildRagContext({
+    // RAG 컨텍스트 생성 (Supabase 프로필·상담·로드맵 종합 → mk_resume_model에 전달해 점검·맞춤 출력)
+    const roadmapSkillsText = (() => {
+        try {
+            if (roadmap.required_skills && typeof roadmap.required_skills === 'string') {
+                const arr = JSON.parse(roadmap.required_skills) as { title?: string }[]
+                return (arr || []).map((s: { title?: string }) => s.title).filter(Boolean).join(', ')
+            }
+        } catch { /* ignore */ }
+        return ''
+    })()
+    let ragContext = buildRagContext({
         targetJob,
         competencies,
         insights,
         consultationSummary: consultationContent,
         clientName: profile.client_name ?? undefined,
         major: profile.major ?? profile.education_level ?? undefined,
+        educationLevel: (profile as { education_level?: string }).education_level ?? undefined,
+        ageGroup: (profile as { age_group?: string | null }).age_group ?? undefined,
+        workExperience: (profile as { work_experience?: string | null }).work_experience ?? (profile as { work_experience_years?: number }).work_experience_years != null ? String((profile as { work_experience_years?: number }).work_experience_years) + '년' : undefined,
+        careerOrientation: (profile as { career_orientation?: string | null }).career_orientation ?? undefined,
+        targetCompany: (profile as { target_company?: string | null }).target_company ?? (roadmap as { target_company?: string | null }).target_company ?? undefined,
+        roadmapSkillsText: roadmapSkillsText || undefined,
     })
 
-    // 3. mk_resume_model API 우선 → RAG API → 템플릿
+    // 실제 합격자 자기소개서 검색 결과를 RAG에 추가 (각 강점 제시 후 예시 참고용)
+    try {
+        const selfIntroSearch = await Promise.race([
+            searchSelfIntroExamples(targetJob),
+            new Promise<{ summary: string; results: unknown[] }>((resolve) => setTimeout(() => resolve({ summary: '', results: [] }), 8000)),
+        ])
+        if (selfIntroSearch.summary?.trim()) {
+            ragContext += '\n\n[실제 합격자 자기소개서 검색 결과 - 각 강점 제시 이후 예시 참고용]\n'
+            ragContext += selfIntroSearch.summary.trim().slice(0, 2200)
+        }
+    } catch {
+        // 검색 실패 시 RAG는 기존대로
+    }
+
+    // 3. mk_resume_model API (RAG 컨텍스트 포함) 우선 → 실패 시 템플릿
     const mkResumeApiUrl = process.env.MK_RESUME_MODEL_API_URL ?? ''
-    const ragApiUrl = process.env.RAG_COVER_LETTER_API_URL ?? ''
     let versions: { type: string; title: string; content: string; scoring?: any }[] | null = null
 
     if (mkResumeApiUrl.trim()) {
@@ -536,44 +553,27 @@ export async function generateAIDrafts(clientId: string) {
         }
     }
 
-    // 3-2. RAG API (LangChain/Chroma 기반 로컬 서버) 시도
-    if ((versions == null || versions.length === 0) && ragApiUrl.trim()) {
-        try {
-            const res = await fetch(ragApiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    client_name: profile.client_name,
-                    major: profile.major ?? '',
-                    target_job: targetJob,
-                    insights,
-                    age_group: profile.age_group,
-                    education_level: profile.education_level,
-                }),
-            })
-            if (res.ok) {
-                const data = await res.json()
-                if (data?.drafts && Array.isArray(data.drafts) && data.drafts.length >= 3) {
-                    versions = data.drafts.slice(0, 3).map((d: any) => ({
-                        type: d.type ?? 'Version',
-                        title: d.title ?? targetJob,
-                        content: d.content ?? '',
-                        // RAG 경로에서는 아직 정량 스코어를 계산하지 않으므로 점수는 비워둔다.
-                        scoring: d.scoring ?? null,
-                    }))
-                }
-            }
-        } catch (e) {
-            console.error('RAG API 호출 실패:', e)
-        }
+    // mk_resume_model 미사용/실패 시 OpenAI 직접 호출로 자기소개서 생성 (성능·품질 활용)
+    if ((versions == null || versions.length === 0) && process.env.OPENAI_API_KEY) {
+        const openaiVersions = await generateSelfIntroWithOpenAI({
+            targetJob,
+            competencies,
+            ragContext,
+            consultationContent,
+            background: {
+                name: profile.client_name ?? null,
+                education: profile.major ?? profile.education_level ?? null,
+                experiences: (profile.work_experience && String(profile.work_experience).trim()) ? [String(profile.work_experience).trim()] : [],
+                strengths: analysisStrengths.length > 0 ? analysisStrengths : null,
+                career_values: careerValues || undefined,
+            },
+        })
+        if (openaiVersions && openaiVersions.length >= 3) versions = openaiVersions
     }
 
+    // OpenAI도 없거나 실패 시 로컬 템플릿 사용 (스코어는 미산출로 표시)
     if (versions == null || versions.length === 0) {
-        // 템플릿 경로 역시 정량 점수는 아직 없으므로 scoring은 null로 둔다.
-        versions = getTemplateVersions(profile, targetJob, insights).map(v => ({
-            ...v,
-            scoring: null,
-        }))
+        versions = getTemplateVersions(profile, targetJob, insights).map(v => ({ ...v, scoring: undefined }))
     }
 
     // 생성된 3종 공통: 문맥 자연스럽게 다듬기 (OPENAI_API_KEY 있으면 적용, 실패 시 원문 유지)
@@ -590,14 +590,11 @@ export async function generateAIDrafts(clientId: string) {
             // 다듬기 실패 시 원문 유지
         }
     }
-    // 최종 가공 및 스코어 주석 결합
-    versions = versions.map(v => {
-        let content = addParagraphIndentation(sanitizeDraftContent(v.content))
-        if (v.scoring) {
-            content += `\n\n<!-- scoring: ${JSON.stringify(v.scoring)} -->`
-        }
-        return { ...v, content }
-    })
+    // 최종 가공 (스코어는 DB/화면에 노출하지 않음)
+    versions = versions.map(v => ({
+        ...v,
+        content: addParagraphIndentation(sanitizeDraftContent(v.content)),
+    }))
 
     // 4. 해당 내담자(profile_id) + 현재 로드맵의 기존 초안 전부 삭제 후, 새 3종만 삽입 (갱신)
     const { error: deleteError } = await supabase

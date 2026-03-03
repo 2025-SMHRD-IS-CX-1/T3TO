@@ -242,10 +242,12 @@ async function analyzeConsultation(consultationId: string, profileId: string, co
 
     // [AI 분석] career_orientation/skill_vector는 placeholder 문구로 덮어쓰지 않음 (대시보드에서 사용자 입력만 저장)
 
-    // [로드맵 자동 갱신] 최신화된 프로필을 바탕으로 로드맵을 즉시 다시 생성합니다.
+    // [로드맵 자동 갱신] 백그라운드에서 실행해 저장 응답 지연을 줄입니다 (웹 검색·LLM 호출으로 10초 이상 걸릴 수 있음).
     const latestProfile = await getClientProfile(profileId)
     if (latestProfile) {
-        await createInitialRoadmap(profileId, latestProfile)
+        createInitialRoadmap(profileId, latestProfile).catch((e) => {
+            console.warn('[consultations] 로드맵 백그라운드 갱신 실패:', e)
+        })
     }
 
     // 백그라운드 작업 완료 후 UI 갱신
