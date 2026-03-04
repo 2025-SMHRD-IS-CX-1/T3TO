@@ -106,8 +106,8 @@ export async function getEffectiveUserId(counselorId?: string | null): Promise<s
     return typeof user.id === 'string' ? user.id : String(user.id)
 }
 
-/** 관리자용: 상담사(role=counselor) 목록 */
-export async function getCounselorsForAdmin(): Promise<{ id: string; email: string | null }[]> {
+/** 관리자용: 상담사(role=counselor) 목록 (이름·이메일) */
+export async function getCounselorsForAdmin(): Promise<{ id: string; email: string | null; name: string | null }[]> {
     const supabase = await createClient()
     const role = await getCurrentUserRole()
     if (role !== 'admin') {
@@ -116,7 +116,7 @@ export async function getCounselorsForAdmin(): Promise<{ id: string; email: stri
     }
     const { data, error } = await supabase
         .from('users')
-        .select('user_id, email')
+        .select('user_id, email, name')
         .eq('role', 'counselor')
         .order('email')
     
@@ -125,11 +125,15 @@ export async function getCounselorsForAdmin(): Promise<{ id: string; email: stri
         return []
     }
     
-    return (data ?? []).map((r: { user_id: string; email: string | null }) => ({ id: r.user_id, email: r.email }))
+    return (data ?? []).map((r: { user_id: string; email: string | null; name?: string | null }) => ({
+        id: r.user_id,
+        email: r.email,
+        name: r.name ?? null,
+    }))
 }
 
 /** 레이아웃/사이드바용: 현재 사용자 역할과 (관리자일 때) 상담사 목록 */
-export async function getAdminContext(): Promise<{ role: 'admin' | 'user' | null; counselors: { id: string; email: string | null }[] }> {
+export async function getAdminContext(): Promise<{ role: 'admin' | 'user' | null; counselors: { id: string; email: string | null; name: string | null }[] }> {
     try {
         const role = await getCurrentUserRole()
         
