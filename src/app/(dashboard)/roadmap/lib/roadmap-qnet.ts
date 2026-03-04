@@ -151,7 +151,7 @@ export function filterRelevantQualifications(
             if (/토목|건설|측량|건축|구조/i.test(targetJob)) keywords.push('토목', '건설', '측량', '건축', '구조')
             if (/안전|산업안전|건설안전/i.test(targetJob)) keywords.push('안전', '산업안전', '건설안전', '소방')
             if (/기계|자동차|메카트로닉스/i.test(targetJob)) keywords.push('기계', '자동차', '용접', '메카트로닉스')
-            if (/전기|전자|전기기사|전자기사/i.test(targetJob)) keywords.push('전기', '전자', '전기공사', '산업계측')
+            if (/전기|전자|전기기사|전자기사/i.test(targetJob)) keywords.push('전기', '전자', '전기공사', '산업계측', '신재생에너지', '발전설비', '소방설비', '소방')
             if (/의료|의학|바이오|생명/i.test(targetJob)) keywords.push('의료', '의학', '바이오', '생명', '의료기기')
             if (/마케팅|경영|경제|상경/i.test(targetJob)) keywords.push('마케팅', '경영', '경제', '사회조사', '컨설팅')
         }
@@ -164,7 +164,7 @@ export function filterRelevantQualifications(
         if (/의학|의료|바이오|생명|의공학/i.test(major)) keywords.push('의료기기', '바이오', '생명', '임상')
         if (/토목|건설|건축|측량|구조/i.test(major)) keywords.push('토목', '건설', '건축', '측량', '구조')
         if (/기계|자동차|메카트로닉스|기계공학/i.test(major)) keywords.push('기계', '자동차', '용접', '메카트로닉스')
-        if (/전기|전자|전기공학|전자공학/i.test(major)) keywords.push('전기', '전자', '전기공사', '산업계측')
+        if (/전기|전자|전기공학|전자공학/i.test(major)) keywords.push('전기', '전자', '전기공사', '산업계측', '신재생에너지', '발전설비', '소방설비', '소방')
         if (/안전|소방|산업안전/i.test(major)) keywords.push('안전', '산업안전', '건설안전', '소방')
         if (/경영|경제|마케팅|상경|경제학/i.test(major)) keywords.push('경영', '마케팅', '경제', '사회조사', '컨설팅')
         if (/데이터|통계|경영정보/i.test(major)) keywords.push('데이터', '분석', '빅데이터', '통계')

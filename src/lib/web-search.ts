@@ -229,9 +229,11 @@ export async function searchCertificationInfo(
 
     const queries: string[] = []
     if (targetJob && targetJob !== '희망 직무' && targetJob !== '없음' && targetJob !== '미정') {
-        queries.push(`${targetJob} 관련 자격증 국가기술자격 추천`)
-        queries.push(`${targetJob} 필수 자격증 Q-Net`)
-        // 최신·민간 자격증까지 포함 (예: AICE, ADP 등)
+        // 1) 목표 직종 필수·우대 자격증
+        queries.push(`${targetJob} 필수 자격증 Q-Net 국가기술자격`)
+        queries.push(`${targetJob} 관련 자격증 취업 우대`)
+        // 2) 갯수 채우기용: 취업에 도움되는 연관 자격증
+        queries.push(`${targetJob} 연관 자격증 따두면 취업 도움`)
         queries.push(`${targetJob} 관련 최신 자격증 및 민간 자격증`)
     }
     if (major && major !== '정보 없음' && major !== '전공 분야') {
@@ -239,6 +241,10 @@ export async function searchCertificationInfo(
         queries.push(`${major} 전공 관련 최신 자격증 및 민간 자격증`)
     }
     const combined = `${targetJob} ${major || ''}`
+    if (/전기|전자/i.test(combined)) {
+        // 전기·전자: 연관 자격증(소방설비기사, 전기공사기사 등) 검색 포함
+        queries.push('전기기사 전기공사기사 신재생에너지 발전설비기사 소방설비기사 전기 관련 자격증 Q-Net')
+    }
     if (/AI|인공지능|데이터|머신러닝|ML/i.test(combined)) {
         // AI/데이터 직무의 경우 AICE 등 최신 AI 자격증도 함께 탐색
         queries.push('AI 활용 관련 자격증 AICE ADP ADsP 등 비교')

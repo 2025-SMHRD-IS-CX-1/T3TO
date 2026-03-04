@@ -168,7 +168,7 @@ export async function recommendCertificationsWithRag(
             seenNames.add(qualName)
         }
 
-        return recommendedCerts
+        return applyEducationCertFilter(recommendedCerts, education_level, work_experience_years)
     } catch (error) {
         console.error('[자격증 RAG] 에러 발생:', error)
         return fallbackToKeywordFiltering(opts)
@@ -208,7 +208,7 @@ export async function getCertificationsFromTavilyContext(opts: {
     try {
         const educationNote = education_level
             ? /대학교|대졸|4년제|졸업\s*예정|대학원|석사|박사/i.test(education_level)
-                ? `\n\n**[학력 필터] 내담자 학력: ${education_level} → 기사 등급만 추천. 기능사·산업기사는 4년제 대학생에게 하위 등급이므로 절대 추천 금지.**`
+                ? `\n\n**[학력 필터] 내담자 학력: ${education_level} → 기사 등급만 추천. 기능사·산업기사는 4년제 대학생에게 하위 등급이므로 절대 추천 금지. 연관 자격증으로 3~5개 채울 때도 이 필터를 적용할 것.**`
                 : `\n\n[학력 참고] 내담자 학력: ${education_level}`
             : ''
 
@@ -228,6 +228,8 @@ export async function getCertificationsFromTavilyContext(opts: {
         const parsed = JSON.parse(text) as { recommended?: Array<{ qualName: string; relevanceScore: number; reason: string }> }
         if (!parsed.recommended || !Array.isArray(parsed.recommended)) return []
 
+        let list = applyEducationCertFilter(parsed.recommended.slice(0, 5), education_level)
+
         const colors = [
             'text-blue-600 bg-blue-50',
             'text-green-600 bg-green-50',
@@ -237,7 +239,7 @@ export async function getCertificationsFromTavilyContext(opts: {
         ]
         const statuses = ['취득 권장', '취득 추천', '관심 분야']
 
-        return parsed.recommended.slice(0, 5).map((rec, i) => ({
+        return list.map((rec, i) => ({
             type: '자격증',
             name: rec.qualName,
             status: rec.relevanceScore >= 8 ? statuses[0] : rec.relevanceScore >= 6 ? statuses[1] : statuses[2],
@@ -255,6 +257,34 @@ export async function getCertificationsFromTavilyContext(opts: {
         console.error('[자격증 Tavily RAG] 에러:', error)
         return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined, education_level })
     }
+}
+
+/** 4년제 재학·졸업예정·졸업·대학원 등 기술사/기능장 미충족으로 볼 수 있는 학력 여부 */
+function isFourYearStudentOrNewGraduate(education_level: string | undefined): boolean {
+    if (!education_level || !education_level.trim()) return false
+    const level = education_level.trim()
+    if (/고등학교\s*졸업|^고졸$/i.test(level)) return false
+    if (/전문대|2년제|2년\s*제/i.test(level) && !/4년|대학교|대학원|석사|박사/i.test(level)) return false
+    return /대학교|대학\s*재학|재학|4년|졸업\s*예정|대졸|대학원|석사|박사/i.test(level)
+}
+
+/** 학력·경력에 따른 자격증 필터 (한 번에 적용). 4년제 재학·졸업예정 등 → 기술사·기능장·기능사·산업기사 제외. 경력 4년 미만만 해당 시 → 기술사·기능장만 제외. qualName 또는 name 필드 사용. */
+function applyEducationCertFilter<T extends { qualName?: string; name?: string }>(
+    list: T[],
+    education_level: string | undefined,
+    work_experience_years?: number
+): T[] {
+    const getName = (rec: T) => (rec.qualName ?? rec.name ?? '').trim()
+    const hasHighTier = (rec: T) => /기술사|기능장/.test(getName(rec))
+    const hasLowerTier = (rec: T) => /기능사|산업기사/.test(getName(rec))
+
+    if (isFourYearStudentOrNewGraduate(education_level)) {
+        return list.filter((rec) => !hasHighTier(rec) && !hasLowerTier(rec))
+    }
+    if (work_experience_years != null && work_experience_years < 4) {
+        return list.filter((rec) => !hasHighTier(rec))
+    }
+    return list
 }
 
 /** Q-Net API 실패 시 OpenAI로 자격증 추천 (LLM 지식 기반) */
@@ -295,7 +325,7 @@ export async function getCertificationsFromOpenAIFallback(opts: {
 
     const educationNote = education_level
         ? /대학교|대졸|4년제|졸업\s*예정|대학원|석사|박사/i.test(education_level)
-            ? `\n- **학력**: ${education_level} → **기사 등급만 추천할 것. 기능사·산업기사는 4년제 대학생에게 하위 등급이므로 절대 추천하지 말 것.**`
+            ? `\n- **학력**: ${education_level} → **기사 등급만 추천할 것. 기능사·산업기사는 하위 등급이므로 제외. 전기응용기술사·산업계측제어기술사 등 기술사도 추천 금지(기사+경력 4년 이상 요건).**`
             : /전문대/i.test(education_level)
                 ? `\n- **학력**: ${education_level} → 산업기사 위주 추천, 기사는 경력 2년 이상일 때만.`
                 : `\n- **학력**: ${education_level}`
@@ -305,7 +335,7 @@ export async function getCertificationsFromOpenAIFallback(opts: {
 - 목표 직무: ${targetJob || '없음'}
 - 전공: ${major || '없음'}
 - 상담 분석 (강점, 관심, 가치관): ${analysisText || '없음'}${educationNote}
-${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목표 직무에 도움이 되는 한국 국가기술자격·민간자격 3~5개를 맞춤형으로 추천해라. JSON만 출력.`
+${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 **우선 목표 직종 필수·우대 자격증**을 추천하고, **자격증은 3~5개** 출력할 것. 개수가 모자라면 따놓으면 취업에 도움이 되는 **연관 자격증**을 포함해 3~5개가 되게 추천해라. **연관 자격증을 넣을 때도 위 [학력] 조건을 반드시 지킬 것.** JSON만 출력.`
 
     try {
         const openai = new OpenAI({ apiKey: openaiApiKey })
@@ -324,6 +354,8 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
         const parsed = JSON.parse(text) as { recommended?: Array<{ qualName: string; relevanceScore: number; reason: string }> }
         if (!parsed.recommended || !Array.isArray(parsed.recommended)) return []
 
+        let list = applyEducationCertFilter(parsed.recommended.slice(0, 5), education_level)
+
         const colors = [
             'text-blue-600 bg-blue-50',
             'text-green-600 bg-green-50',
@@ -333,7 +365,7 @@ ${tavilySection}위 정보(Tavily 직무정보 + DB·상담)를 종합하여 목
         ]
         const statuses = ['취득 권장', '취득 추천', '관심 분야']
 
-        return parsed.recommended.slice(0, 5).map((rec, i) => ({
+        return list.map((rec, i) => ({
             type: '자격증',
             name: rec.qualName,
             status: rec.relevanceScore >= 8 ? statuses[0] : rec.relevanceScore >= 6 ? statuses[1] : statuses[2],
@@ -441,8 +473,7 @@ export async function getCertificationsForRoadmap(opts: {
         return true
     })
 
-    // 너무 많아지지 않도록 상한 (예: 최대 7개)
-    return [...qnetBased, ...extra].slice(0, 7)
+    return applyEducationCertFilter([...qnetBased, ...extra].slice(0, 7), education_level, opts.work_experience_years)
 }
 
 /** RAG 실패 시 키워드 기반 필터링으로 폴백 */

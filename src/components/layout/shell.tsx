@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/navbar"
 import { createContext, useContext } from "react"
 import { createClient } from "@/lib/supabase/client"
 
-type AdminContextType = { role: 'admin' | 'user' | null; counselors: { id: string; email: string | null }[] }
+type AdminContextType = { role: 'admin' | 'user' | null; counselors: { id: string; email: string | null; name: string | null }[] }
 
 const AdminContext = createContext<AdminContextType | null>(null)
 

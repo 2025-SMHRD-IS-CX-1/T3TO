@@ -32,7 +32,7 @@ const clientSpecificNavigation = [
     { name: "AI자기소개서", href: "/cover-letter", icon: Sparkles },
 ]
 
-type AdminContext = { role: 'admin' | 'user' | null; counselors: { id: string; email: string | null }[] }
+type AdminContext = { role: 'admin' | 'user' | null; counselors: { id: string; email: string | null; name: string | null }[] }
 
 export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
     const pathname = usePathname()
@@ -90,7 +90,9 @@ export function Sidebar({ adminContext }: { adminContext: AdminContext }) {
                                 <SelectContent>
                                     {counselors.map((c) => (
                                         <SelectItem key={c.id} value={c.id}>
-                                            {c.email || c.id.slice(0, 8)}
+                                            {c.name?.trim()
+                                                ? `${c.name.trim()}${c.email?.trim() ? ` (${c.email.trim()})` : ''}`
+                                                : (c.email || c.id.slice(0, 8))}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
