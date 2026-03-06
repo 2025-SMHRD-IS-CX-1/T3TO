@@ -6,7 +6,7 @@ import type { CompanyInfo, JobInfo } from './roadmap-types'
 import { computeCompetenciesFromProfile, extractKeywordsFromAnalysis } from './roadmap-competencies'
 import { filterRelevantQualifications } from './roadmap-qnet'
 import { GOAL_CONCRETIZATION_CONTENT } from './roadmap-prompts'
-import { recommendCertificationsWithRag, getCertificationsFromOpenAIFallback, getCertificationsFromTavilyContext } from './roadmap-qnet-rag'
+import { recommendCertificationsWithRag, getCertificationsFromOpenAIFallback, getCertificationsFromTavilyContext, ensureMinCertsForDeveloper, reorderCertsForDeveloper } from './roadmap-qnet-rag'
 
 /** 검색 결과(CompanyInfo[])에서 제목·액션용 요약 추출 (실제 검색/RAG 기반 구체화용) */
 function summarizeFromSearch(companyInfos: CompanyInfo[], jobInfo: JobInfo | null): {
@@ -38,6 +38,12 @@ function summarizeFromRag(ruleAnalysisList: Array<{ strengths?: string; interest
     return { strengths, interests }
 }
 
+/** RAG 실패 시 runRoadmap에서 이미 조회한 검색 결과를 넘기면 Tavily 중복 호출 방지 */
+export type RuleBasedSearchCache = {
+    companyInfos?: CompanyInfo[]
+    jobInfo?: JobInfo | null
+}
+
 export async function buildRuleBasedRoadmap(
     clientData: {
         recommended_careers?: string
@@ -48,7 +54,8 @@ export async function buildRuleBasedRoadmap(
         work_experience_years?: number
     },
     userData: RoadmapRagContext,
-    adapters: RoadmapAdapters
+    adapters: RoadmapAdapters,
+    searchCache?: RuleBasedSearchCache
 ): Promise<RunRoadmapResult> {
     const ruleProfile = (userData.profile?.[0] || clientData) as { major?: string; education_level?: string; work_experience_years?: number }
     const ruleAnalysisList = (userData.analysis || []) as Array<{ strengths?: string; interest_keywords?: string; career_values?: string }>
@@ -59,17 +66,26 @@ export async function buildRuleBasedRoadmap(
     const targetJob = rawTargetJob && rawTargetJob !== '없음' && rawTargetJob !== '미정' ? rawTargetJob : '희망 직무'
     const targetCompany = rawTargetCompany && rawTargetCompany !== '없음' && rawTargetCompany !== '미정' ? rawTargetCompany : ''
 
-    // 1) 검색·RAG 선행: 기업 검색 + 직무 검색 (자격증/시험일정 API 미사용)
+    // 1) 검색·RAG 선행: 캐시 있으면 재사용(중복 Tavily 호출 방지), 없으면 기업+직무 검색
     const companies = targetCompany ? targetCompany.split(/[,，、]/).map((c) => c.trim()).filter(Boolean) : []
-    const [companyInfosRule, jobInfoResult] = await Promise.all([
-        companies.length && adapters.searchCompany
-            ? Promise.race([
-                adapters.searchCompany(companies),
-                new Promise<CompanyInfo[]>((r) => setTimeout(() => r([]), 8000)),
-            ])
-            : Promise.resolve([] as CompanyInfo[]),
-        adapters.searchJob ? adapters.searchJob(targetJob).catch(() => null) : Promise.resolve(null as JobInfo | null),
-    ])
+    let companyInfosRule: CompanyInfo[]
+    let jobInfoResult: JobInfo | null
+    if (searchCache?.companyInfos !== undefined && searchCache?.jobInfo !== undefined) {
+        companyInfosRule = searchCache.companyInfos ?? []
+        jobInfoResult = searchCache.jobInfo ?? null
+    } else {
+        const [companyInfos, jobInfo] = await Promise.all([
+            companies.length && adapters.searchCompany
+                ? Promise.race([
+                    adapters.searchCompany(companies),
+                    new Promise<CompanyInfo[]>((r) => setTimeout(() => r([]), 8000)),
+                ])
+                : Promise.resolve([] as CompanyInfo[]),
+            adapters.searchJob ? adapters.searchJob(targetJob).catch(() => null) : Promise.resolve(null as JobInfo | null),
+        ])
+        companyInfosRule = companyInfos
+        jobInfoResult = jobInfo
+    }
     const qualifications: unknown[] = []
     const examSchedule: unknown[] = []
     const searchSummary = summarizeFromSearch(companyInfosRule, jobInfoResult ?? null)
@@ -108,6 +124,11 @@ export async function buildRuleBasedRoadmap(
         skills: jobInfoResult.skills,
         certifications: (jobInfoResult as { certifications?: string }).certifications,
     } : null
+    const ruleProfileRow = userData.profile?.[0] as Record<string, unknown> | undefined
+    const existingSkillsOrCerts =
+        ruleProfileRow?.skill_vector != null && String(ruleProfileRow.skill_vector).trim()
+            ? String(ruleProfileRow.skill_vector).trim()
+            : undefined
     let dynamicCerts: RunRoadmapResult['dynamicCerts']
     if (qualifications.length > 0) {
         dynamicCerts = await recommendCertificationsWithRag({
@@ -117,6 +138,9 @@ export async function buildRuleBasedRoadmap(
             major,
             analysisList: ruleAnalysisList,
             jobInfoFromTavily,
+            education_level: educationLevel,
+            work_experience_years: typeof ruleProfile?.work_experience_years === 'number' ? ruleProfile.work_experience_years : 0,
+            existingSkillsOrCerts,
         })
     } else if (adapters.searchCertification) {
         try {
@@ -132,12 +156,13 @@ export async function buildRuleBasedRoadmap(
                     tavilyCertContext,
                     jobInfoFromTavily,
                     education_level: educationLevel,
+                    existingSkillsOrCerts,
                 })
             } else {
-                dynamicCerts = await getCertificationsFromOpenAIFallback({ targetJob, major, analysisList: ruleAnalysisList, jobInfoFromTavily, education_level: educationLevel })
+                dynamicCerts = await getCertificationsFromOpenAIFallback({ targetJob, major, analysisList: ruleAnalysisList, jobInfoFromTavily, education_level: educationLevel, existingSkillsOrCerts })
             }
         } catch {
-            dynamicCerts = await getCertificationsFromOpenAIFallback({ targetJob, major, analysisList: ruleAnalysisList, jobInfoFromTavily, education_level: educationLevel })
+            dynamicCerts = await getCertificationsFromOpenAIFallback({ targetJob, major, analysisList: ruleAnalysisList, jobInfoFromTavily, education_level: educationLevel, existingSkillsOrCerts })
         }
     } else {
         dynamicCerts = await getCertificationsFromOpenAIFallback({
@@ -146,8 +171,11 @@ export async function buildRuleBasedRoadmap(
             analysisList: ruleAnalysisList,
             jobInfoFromTavily,
             education_level: educationLevel,
+            existingSkillsOrCerts,
         })
     }
+    // 1~2개만 나온 경우 개발자/IT 직무면 연관 자격증 추가 후 정렬
+    dynamicCerts = reorderCertsForDeveloper(targetJob, ensureMinCertsForDeveloper(targetJob, dynamicCerts, 3))
 
     // 전공/직무 기반 첫 번째 자격증 추천 (Q-Net 결과 우선, 없으면 전공 기반)
     const firstCertName = dynamicCerts.length > 0 ? dynamicCerts[0].name : (major && major !== '전공 분야' && major !== '정보 없음' ? `${major} 관련 자격증` : '목표 직무 관련 자격증')

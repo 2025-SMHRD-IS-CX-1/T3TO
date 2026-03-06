@@ -105,8 +105,7 @@ export async function searchCompanyInfo(companyNames: string[]): Promise<Company
 
     for (const company of companyNames) {
         const queries = [
-            `${company} 채용 공고 인재상`,
-            `${company} 기술 스택 개발 환경`,
+            `${company} 채용 공고 인재상 기술스택`,
             `${company} 기업 문화 인재상`,
         ]
 
@@ -161,10 +160,9 @@ export async function searchJobInfo(jobTitle: string): Promise<JobInfo | null> {
     }
 
     const queries = [
-        `${jobTitle} 채용 요구사항 역량`,
-        `${jobTitle} 최신 트렌드 2025 2026`,
-        `${jobTitle} 필수 스킬 기술`,
+        `${jobTitle} 채용 요구사항 역량 필수 스킬`,
         `${jobTitle} 필수 자격증 요구사항`,
+        `${jobTitle} 최신 트렌드 2025 2026`,
     ]
 
     const allResults: SearchResult[] = []

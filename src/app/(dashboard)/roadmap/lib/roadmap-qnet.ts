@@ -201,12 +201,10 @@ export function filterRelevantQualifications(
                 'text-purple-600 bg-purple-50',
                 'text-red-600 bg-red-50',
             ]
-            const statuses = ['취득 권장', '취득 추천', '관심 분야']
-
             relevantCerts.push({
                 type: '자격증',
                 name: qualName,
-                status: statuses[relevantCerts.length % statuses.length],
+                status: '취득 권장',
                 color: colors[relevantCerts.length % colors.length],
                 details: {
                     description: qualDesc || `${qualName}에 관한 국가기술자격증입니다.`,
