@@ -66,7 +66,13 @@ const BIZ_SKILLS: JobCategoryDef['skills'] = [
     { title: '문제 해결', desc: '과제의 논리적 분해·실행' },
 ]
 
+// 직무에 개발자·백엔드 등이 명시된 경우 전공(의학공학 등)보다 개발 역량을 우선 적용하기 위해 배열 최상단에 배치
 const JOB_CATEGORIES: JobCategoryDef[] = [
+    // ── SW 개발 (목표 직무가 개발자일 때 우선) ──
+    { jobPattern: /백엔드|서버|backend/i, firstTitle: '개발·설계 역량', fallbackRequirements: '정보처리기사·관련 자격, 서버·DB 개발 역량, Git·API 설계 경험', skills: SW_DEV_SKILLS },
+    { jobPattern: /프론트엔드|프론트|frontend|웹\s*개발/i, firstTitle: '개발·설계 역량', fallbackRequirements: 'HTML/CSS/JS·React 등 프레임워크, 반응형·접근성, Git·협업', skills: SW_DEV_SKILLS },
+    { jobPattern: /풀스택|fullstack/i, firstTitle: '개발·설계 역량', fallbackRequirements: '프론트·백엔드 기술 스택, DB·API, Git·배포 경험', skills: SW_DEV_SKILLS },
+    { jobPattern: /소프트웨어\s*개발|개발자|프로그래머/i, firstTitle: '개발·설계 역량', fallbackRequirements: '정보처리기사·관련 자격, 프로그래밍·설계 역량, Git·협업·프로젝트 경험', skills: SW_DEV_SKILLS },
     // ── 의료기기·의료AI ──
     {
         jobPattern: /의료AI|헬스케어\s*AI|의료\s*(개발|엔지니어)|의료기기/i,
@@ -136,7 +142,6 @@ const JOB_CATEGORIES: JobCategoryDef[] = [
     { jobPattern: /풀스택|fullstack/i, majorPattern: /컴퓨터|소프트웨어|정보|전산|IT/i, firstTitle: '개발·설계 역량', fallbackRequirements: '프론트·백엔드 기술 스택, DB·API, Git·배포 경험', skills: SW_DEV_SKILLS },
     { jobPattern: /임베디드|펌웨어|IoT/i, majorPattern: /컴퓨터|전자|전기|정보|IT/i, firstTitle: '개발·설계 역량', fallbackRequirements: 'C/C++·임베디드 개발, 하드웨어 이해, 디버깅·테스트 역량', skills: SW_DEV_SKILLS },
     { jobPattern: /앱|android|ios|모바일/i, majorPattern: /컴퓨터|소프트웨어|정보|전산|IT/i, firstTitle: '개발·설계 역량', fallbackRequirements: '모바일 프레임워크(Android/iOS), API 연동, 스토어 배포 경험', skills: SW_DEV_SKILLS },
-    { jobPattern: /소프트웨어|개발자|프로그래머/i, majorPattern: /컴퓨터|소프트웨어|정보|전산|IT|전자|전기/i, firstTitle: '개발·설계 역량', fallbackRequirements: '정보처리기사·관련 자격, 프로그래밍·설계 역량, Git·협업·프로젝트 경험', skills: SW_DEV_SKILLS },
     // ── 토목·건설 ──
     {
         jobPattern: /토목|건설|측량|건축|구조/i, firstTitle: '기술·관리 역량',
@@ -272,16 +277,24 @@ export function computeCompetenciesFromProfile(
 
     const concreteCompetencies =
         (jobRequirementsText && jobRequirementsText.trim()) || getConcreteRequiredCompetencies(targetJob, major)
-    const rawKeyPoints =
-        concreteCompetencies.length <= 100
-            ? concreteCompetencies
-            : summarizeToKeyPoints(concreteCompetencies)
-    const firstDesc = rawKeyPoints
+    // 개발·설계 역량 하단: 항상 요약해서 출력(한두 문장, 80자 이내). 채용 문구 원문 그대로 노출 방지
+    const MAX_FIRST_DESC = 80
+    const rawSummary = summarizeToKeyPoints(concreteCompetencies, 2)
+    let firstDesc = rawSummary
         .replace(/\s*·\s*프로필\s*·?\s*상담\s*반영\s*/g, ' ')
         .replace(/\s*프로필\s*·?\s*상담\s*반영\s*/g, ' ')
         .trim()
         .replace(/\s+·\s*$/, '')
         .trim() || '목표 직무 요구 역량'
+    if (firstDesc.length > MAX_FIRST_DESC) {
+        firstDesc = firstDesc.slice(0, MAX_FIRST_DESC - 1) + '…'
+    }
+    if (/recruitment|requires\s+(over|more)|rather than|place more importance/i.test(firstDesc)) {
+        firstDesc = cat?.fallbackRequirements ?? '목표 직무에서 요구하는 핵심 역량(기술·실무·협업 등)'
+    }
+    if (firstDesc.length > MAX_FIRST_DESC) {
+        firstDesc = (cat?.fallbackRequirements ?? '목표 직무 요구 역량').slice(0, MAX_FIRST_DESC)
+    }
 
     const skills = cat?.skills ?? [
         { title: `${targetJob || '직무'} 실무 역량`, desc: '목표 직무에 필요한 실무 수행 능력' },

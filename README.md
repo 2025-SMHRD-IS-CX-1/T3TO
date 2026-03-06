@@ -1,5 +1,18 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## 기술 스택 (Tech Stack)
+
+| 구분 | 기술 |
+|------|------|
+| **프레임워크** | Next.js 16, React 19 |
+| **언어** | TypeScript 5 |
+| **스타일** | Tailwind CSS 4, class-variance-authority, clsx, tailwind-merge |
+| **UI 컴포넌트** | Radix UI (Avatar, Dialog, Dropdown, Select, Tabs 등), Lucide React(아이콘), Motion(애니메이션) |
+| **백엔드·DB** | Supabase (SSR·클라이언트), Next.js Server Actions |
+| **AI·LLM** | OpenAI API (openai) |
+| **기타** | date-fns, react-day-picker, html2canvas·jspdf·html-to-image(출력·PDF), fast-xml-parser, diff |
+| **자기소개서 API** | mk_resume_model (Python: FastAPI, Uvicorn, Pydantic, OpenAI) |
+
 ## Getting Started
 
 First, run the development server:

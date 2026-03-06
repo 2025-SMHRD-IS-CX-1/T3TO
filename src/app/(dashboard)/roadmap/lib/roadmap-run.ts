@@ -25,11 +25,13 @@ export async function runRoadmap(
         work_experience: profileRow.work_experience != null ? String(profileRow.work_experience) : undefined,
     }
 
+    // RAG 실패 시 buildRuleBasedRoadmap에 넘겨 Tavily 기업/직무 검색 중복 호출 방지
+    let companyInfosResult: Awaited<ReturnType<NonNullable<RoadmapAdapters['searchCompany']>>> = []
+    let jobInfoResult: Awaited<ReturnType<NonNullable<RoadmapAdapters['searchJob']>>> = null
+
     if (adapters.openaiApiKey) {
         let companyInfoText = ''
         let jobInfoText = ''
-        let companyInfosResult: Awaited<ReturnType<NonNullable<RoadmapAdapters['searchCompany']>>> = []
-        let jobInfoResult: Awaited<ReturnType<NonNullable<RoadmapAdapters['searchJob']>>> = null
 
         const companyNames = (clientData.target_company || '')
             .split(/[,，、]/)
@@ -37,7 +39,6 @@ export async function runRoadmap(
             .filter(Boolean)
         const jobTitle = clientData.recommended_careers || ''
 
-        const tavilyStart = Date.now()
         const [companyInfos, jobInfo] = await Promise.race([
             Promise.all([
                 companyNames.length && adapters.searchCompany ? adapters.searchCompany(companyNames) : Promise.resolve([]),
@@ -66,7 +67,6 @@ export async function runRoadmap(
 
         const openai = new OpenAI({ apiKey: adapters.openaiApiKey })
         const model = adapters.model ?? 'gpt-4o-mini'
-        const ragStart = Date.now()
         const ragResult = await generateRoadmapWithRag(userData, {
             openai,
             model,
@@ -77,7 +77,6 @@ export async function runRoadmap(
         })
 
         if (ragResult?.plan?.length) {
-            const qnetStart = Date.now()
             const [qualifications, examSchedule] = await Promise.race([
                 Promise.all([
                     adapters.getQualifications?.() ?? Promise.resolve([]),
@@ -86,7 +85,7 @@ export async function runRoadmap(
                 new Promise<[unknown[], unknown[]]>((resolve) =>
                     setTimeout(() => resolve([[], []]), (global as any).QNET_TIMEOUT_MS ?? 10000)
                 ),
-            ]            )
+            ])
             const jobCompetency: unknown[] = []
             const first = ragResult.plan[0] as Record<string, unknown>
             first.자격정보 = qualifications.slice(0, 3)
@@ -114,7 +113,10 @@ export async function runRoadmap(
                 }
             }
 
-            const certsStart = Date.now()
+            const existingSkillsOrCerts =
+                profileRow.skill_vector != null && String(profileRow.skill_vector).trim()
+                    ? String(profileRow.skill_vector).trim()
+                    : undefined
             const dynamicCerts = await getCertificationsForRoadmap({
                 targetJob: targetJobForCerts,
                 major: majorForCerts,
@@ -122,6 +124,7 @@ export async function runRoadmap(
                 jobInfoFromTavily: jobInfoResult ?? undefined,
                 education_level: clientData.education_level || undefined,
                 work_experience_years: clientData.work_experience_years ?? 0,
+                existingSkillsOrCerts,
                 tavilyCertContext,
             })
             const mapped = ragPlanToMilestones(
@@ -155,5 +158,9 @@ export async function runRoadmap(
         }
     }
 
-    return buildRuleBasedRoadmap(clientData, userData, adapters)
+    // RAG 미사용 또는 실패 시 규칙 기반 폴백. OpenAI 경로에서 이미 조회한 기업/직무 결과가 있으면 넘겨 Tavily 중복 호출 방지
+    const searchCache = adapters.openaiApiKey
+        ? { companyInfos: companyInfosResult, jobInfo: jobInfoResult }
+        : undefined
+    return buildRuleBasedRoadmap(clientData, userData, adapters, searchCache)
 }

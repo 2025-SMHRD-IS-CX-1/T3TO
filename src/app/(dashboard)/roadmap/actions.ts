@@ -77,12 +77,10 @@ export async function getClientProfile(profileId: string, counselorId?: string |
 }
 
 export async function createInitialRoadmap(profileId?: string, clientData?: any, counselorId?: string | null, updateOnly: boolean = false) {
-    const totalStart = Date.now()
     const supabase = await createClient()
     const userIdStr = await getEffectiveUserId(counselorId)
     if (!userIdStr) return { error: 'Unauthorized' }
 
-    let t = Date.now()
     const ragContext = profileId
         ? await getRoadmapRagContext(supabase, profileId, userIdStr, clientData ? [clientData] : null)
         : null
@@ -103,7 +101,6 @@ export async function createInitialRoadmap(profileId?: string, clientData?: any,
         getExamSchedule: () => Promise.resolve([]),
         searchCertification: searchCertificationInfo,
     }
-    t = Date.now()
     const result = await runRoadmap(userData, adapters)
     const info = result.info
     const dynamicSkills = result.dynamicSkills
