@@ -3,7 +3,6 @@
  */
 import type OpenAI from 'openai'
 import type { RagRoadmapResult, CompanyInfo, JobInfo } from './roadmap-types'
-import { evaluateContextUtilization, evaluateRoadmapOutput } from './roadmap-evaluation'
 import { ROADMAP_SYSTEM_PROMPT, buildRoadmapUserContext } from './roadmap-prompts'
 
 export interface GenerateRoadmapWithRagOpts {
@@ -48,16 +47,6 @@ export async function generateRoadmapWithRag(
             jsonStr = lines[0].includes('json') ? lines.slice(1, -1).join('\n') : text
         }
         const parsed = JSON.parse(jsonStr) as RagRoadmapResult
-        const evalResult = evaluateRoadmapOutput(parsed)
-        const allowedCompanies = (targetCompanyFromProfile || '')
-            .split(/[,，、]/)
-            .map((c) => c.trim())
-            .filter(Boolean)
-        const contextEval = evaluateContextUtilization(parsed, {
-            hasCompanyWeb: companyInfoText.length > 0,
-            hasJobWeb: jobInfoText.length > 0,
-            allowedCompanyNames: allowedCompanies,
-        })
         const jobRequirementsText =
             jobInfoResult != null && (jobInfoResult.requirements ?? jobInfoResult.skills)
                 ? [jobInfoResult.requirements, jobInfoResult.skills]

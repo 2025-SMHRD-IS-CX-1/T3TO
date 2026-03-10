@@ -51,7 +51,7 @@ export async function createEvent(formData: FormData) {
                 user_id: user.id,
                 email: user.email,
                 login_id: user.email,
-                password_hash: 'SOCIAL_AUTH' // Placeholder for social auth users
+                password_hash: 'SOCIAL_AUTH'
             }
         ], { onConflict: 'user_id' })
 

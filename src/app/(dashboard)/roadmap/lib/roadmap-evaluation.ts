@@ -1,6 +1,6 @@
 import type { RagRoadmapResult } from './roadmap-types'
 
-/** Context 활용도·Faithfulness 평가 (Citation 포함 여부, 환각 검증). 모델 테스트용 로그 출력 */
+/** Context 활용도·Faithfulness 평가 (Citation 포함 여부, 환각 검증) */
 export function evaluateContextUtilization(
     parsed: RagRoadmapResult,
     context: { hasCompanyWeb: boolean; hasJobWeb: boolean; allowedCompanyNames: string[] }

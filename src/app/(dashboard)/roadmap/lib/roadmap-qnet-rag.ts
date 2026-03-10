@@ -2,6 +2,22 @@
  * RAG 기반 자격증 추천 - Hallucination 방지 및 맞춤형 추천
  * 실제 Q-Net API 결과만 사용하고, RAG로 필터링 및 우선순위 결정
  */
+
+/** 'AI 관련 자격증', 'OO 관련 자격증' 등 일반 문구를 실제 자격증 정식명으로 치환 (화면 표기용) */
+function normalizeCertDisplayName(name: string, targetJob?: string): string {
+    const t = (name || '').trim()
+    if (!t) return name
+    if (/^AI\s*관련\s*자격증$|^인공지능\s*관련\s*자격증$/i.test(t)) return '빅데이터분석기사'
+    if (/^데이터\s*관련\s*자격증$/i.test(t)) return 'ADsP(데이터분석준전문가)'
+    if (/^목표\s*직무\s*관련\s*자격증$|^직무\s*관련\s*자격증$|^전공\s*관련\s*자격증$/i.test(t)) {
+        const job = (targetJob || '').trim()
+        if (/개발|백엔드|소프트웨어|프로그래머|웹\s*개발|풀스택|프론트엔드|IT\s*엔지니어|데이터\s*분석|AI/i.test(job)) return '정보처리기사'
+        if (/전기|전자/i.test(job)) return '전기기사'
+        if (/기계|자동차/i.test(job)) return '기계설계기사'
+    }
+    return name
+}
+
 import OpenAI from 'openai'
 import { getRoadmapModel } from '@/lib/ai-models'
 import { filterQualificationsByEligibility, getExamScheduleWrittenAndPractical } from './roadmap-qnet'
@@ -246,20 +262,23 @@ export async function getCertificationsFromTavilyContext(opts: {
             'text-red-600 bg-red-50',
         ]
 
-        return list.map((rec, i) => ({
-            type: '자격증',
-            name: rec.qualName,
-            status: '취득 권장',
-            color: colors[i % colors.length],
-            details: {
-                description: rec.reason || `${rec.qualName} 관련 자격증입니다.`,
-                examScheduleWritten: '',
-                examSchedulePractical: '',
-                difficulty: '난이도: 중',
-                written: '필기: 100점 만점에 60점 이상',
-                practical: '실기: 100점 만점에 60점 이상',
-            },
-        }))
+        return list.map((rec, i) => {
+            const displayName = normalizeCertDisplayName(rec.qualName, targetJob)
+            return {
+                type: '자격증',
+                name: displayName,
+                status: '취득 권장',
+                color: colors[i % colors.length],
+                details: {
+                    description: rec.reason || `${displayName} 관련 자격증입니다.`,
+                    examScheduleWritten: '',
+                    examSchedulePractical: '',
+                    difficulty: '난이도: 중',
+                    written: '필기: 100점 만점에 60점 이상',
+                    practical: '실기: 100점 만점에 60점 이상',
+                },
+            }
+        })
     } catch (error) {
         console.error('[자격증 Tavily RAG] 에러:', error)
         return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined, education_level, existingSkillsOrCerts })
@@ -379,20 +398,23 @@ ${tavilySection}위 정보(내담자 프로필·DB·상담 + Tavily 직무정보
             'text-red-600 bg-red-50',
         ]
 
-        return list.map((rec, i) => ({
-            type: '자격증',
-            name: rec.qualName,
-            status: '취득 권장',
-            color: colors[i % colors.length],
-            details: {
-                description: rec.reason || `${rec.qualName}에 관한 국가기술자격증입니다.`,
-                examScheduleWritten: '',
-                examSchedulePractical: '',
-                difficulty: '난이도: 중',
-                written: '필기: 100점 만점에 60점 이상',
-                practical: '실기: 100점 만점에 60점 이상',
-            },
-        }))
+        return list.map((rec, i) => {
+            const displayName = normalizeCertDisplayName(rec.qualName, opts.targetJob)
+            return {
+                type: '자격증',
+                name: displayName,
+                status: '취득 권장',
+                color: colors[i % colors.length],
+                details: {
+                    description: rec.reason || `${displayName}에 관한 국가기술자격증입니다.`,
+                    examScheduleWritten: '',
+                    examSchedulePractical: '',
+                    difficulty: '난이도: 중',
+                    written: '필기: 100점 만점에 60점 이상',
+                    practical: '실기: 100점 만점에 60점 이상',
+                },
+            }
+        })
     } catch (error) {
         console.error('[자격증 OpenAI 폴백] 에러:', error)
         return []
