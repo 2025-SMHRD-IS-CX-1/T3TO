@@ -12,6 +12,8 @@ class SelfIntroInput(BaseModel):
     focus: str = "strength"
     min_word_count: Optional[int] = 1000
     rag_context: Optional[str] = None
+    # 로컬 LM/템플릿 등 1차 초안을 OpenAI 재작성에 참고용으로 전달 (없으면 None)
+    base_draft: Optional[str] = None
 
 class SelfIntroVersion(BaseModel):
     title: str
@@ -38,8 +40,13 @@ def generate_with_openai(input_data: SelfIntroInput, api_key: str, model: str = 
     experiences_str = ", ".join(bg.get("experiences", [])) if bg.get("experiences") else "(데이터 없음 - 상담 원문 참고)"
     strengths_str = ", ".join(bg.get("strengths", [])) if bg.get("strengths") else "(데이터 없음 - 상담 원문 참고)"
     
-    # 프롬프트 구성 (RAG 기반·환각 방지·종합 출력, 700~800자)
-    system_prompt = """당신은 **합격자 자기소개서 데이터를 바탕으로 학습된** 채용 자기소개서 전문가입니다.
+    # 길이 기준: 호출자가 준 min_word_count 우선, 최소 800자
+    min_len = max(800, int(input_data.min_word_count or 0))
+    # 상한은 너무 빡세게 제한하지 않고 약간 여유를 둠
+    max_len = min_len + 250
+
+    # 프롬프트 구성 (RAG 기반·환각 방지·종합 출력)
+    system_prompt = f"""당신은 **합격자 자기소개서 데이터를 바탕으로 학습된** 채용 자기소개서 전문가입니다.
 **현재 작동 방식**: 제공된 RAG 컨텍스트(상담 원문, 로드맵·직무역량, DB 프로필, 그리고 OpenAI 등으로 찾아온 정보)만 사용하여, **환각을 방지**하고 그 내용을 **종합적으로** 자기소개서로 출력합니다. 컨텍스트에 없는 경험이나 사실은 절대 만들지 마십시오.
 
 **[RAG 기반 · 환각 방지]**
@@ -58,7 +65,7 @@ def generate_with_openai(input_data: SelfIntroInput, api_key: str, model: str = 
 
 **[작성 공통 규칙]**
 1. **사실성**: 지원자 배경·상담 원문·RAG 컨텍스트에만 있는 내용으로 작성. 없는 것은 만들지 말 것.
-2. **분량**: 각 버전당 공백 포함 **700자 이상 800자 이하**(한글 기준). 700자 미만이거나 800자를 초과하지 말 것.
+2. **분량**: 각 버전당 공백 포함 **{min_len}자 이상 {max_len}자 이하**(한글 기준). {min_len}자 미만이거나 {max_len}자를 초과하지 말 것.
 3. **자연스러운 흐름**: [도입] 등 소제목 없이 완성된 글 형태. 3~4개 문단 구성.
 4. **문체**: 비즈니스 한국어(~합니다, ~입니다).
 
@@ -79,9 +86,9 @@ def generate_with_openai(input_data: SelfIntroInput, api_key: str, model: str = 
 {
   "reasoning": "RAG 반영 방식 및 각 버전별 스코어 산출 근거(왜 그 점수인지) 요약",
   "versions": [
-    { "title": "역량 중심", "draft": "본문(700~800자)", "scoring": { "type_similarity": 92, "aptitude_fit": 88, "competency_reflection": 90, "average": 90.0 } },
-    { "title": "경험 중심", "draft": "본문(700~800자)", "scoring": { "type_similarity": 88, "aptitude_fit": 91, "competency_reflection": 85, "average": 88.0 } },
-    { "title": "가치관 중심", "draft": "본문(700~800자)", "scoring": { "type_similarity": 90, "aptitude_fit": 86, "competency_reflection": 88, "average": 88.0 } }
+    { "title": "역량 중심", "draft": "본문({min_len}~{max_len}자)", "scoring": { "type_similarity": 92, "aptitude_fit": 88, "competency_reflection": 90, "average": 90.0 } },
+    { "title": "경험 중심", "draft": "본문({min_len}~{max_len}자)", "scoring": { "type_similarity": 88, "aptitude_fit": 91, "competency_reflection": 85, "average": 88.0 } },
+    { "title": "가치관 중심", "draft": "본문({min_len}~{max_len}자)", "scoring": { "type_similarity": 90, "aptitude_fit": 86, "competency_reflection": 88, "average": 88.0 } }
   ]
 }
 """
@@ -101,6 +108,15 @@ def generate_with_openai(input_data: SelfIntroInput, api_key: str, model: str = 
 {input_data.counseling_content or "상담 내용 없음"}
 \"\"\"
 """
+    # base_draft가 있으면 (템플릿/로컬 LM 등) 그 구조·표현을 참고해 더 풍성하고 자연스럽게 재작성
+    if input_data.base_draft and input_data.base_draft.strip():
+        user_content += f"""
+
+[참고 초안 - 템플릿/로컬 LM 결과 (사실 근거가 아니라 '표현/구성' 참고용)]
+\"\"\"
+{input_data.base_draft.strip()[:6000]}
+\"\"\"
+"""
     if input_data.rag_context and input_data.rag_context.strip():
         user_content += f"""
 
@@ -109,24 +125,48 @@ def generate_with_openai(input_data: SelfIntroInput, api_key: str, model: str = 
 {input_data.rag_context.strip()}
 \"\"\"
 """
-    user_content += """
+    user_content += f"""
 
 [작성 지침 - RAG 기반 환각 방지·종합 출력]
 - 위 상담 원문·로드맵·DB(및 제공된 찾아온 정보)만 사용하여 작성하세요. 없는 내용은 만들지 마세요.
 - **각 강점 제시 후**: RAG에 "[실제 합격자 자기소개서 검색 결과]"가 있으면 그 스타일을 참고해 구체적 예시를 이어서 작성하세요. 강점 → 예시 순으로 출력하세요.
-- 목표 분량: 버전당 **700자 이상 800자 이하**(공백 포함). 700 미만·800 초과 금지.
+- 목표 분량: 버전당 공백 포함 **{min_len}자 이상 {max_len}자 이하**. 미만/초과 금지.
 """
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content}
-        ],
-        temperature=0.3,
-        response_format={"type": "json_object"}
-    )
+    def _call(extra_instruction: str = "") -> dict:
+        uc = user_content
+        if extra_instruction.strip():
+            uc += "\n\n" + extra_instruction.strip() + "\n"
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": uc},
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"},
+        )
+        return json.loads(response.choices[0].message.content)
 
-    result_json = json.loads(response.choices[0].message.content)
-    
+    result_json = _call()
+
+    # 분량 미달 버전이 있으면 1회 재요청(확장)
+    try:
+        versions = result_json.get("versions") or []
+        too_short: list[str] = []
+        for v in versions:
+            title = str(v.get("title") or "").strip() or "(제목 없음)"
+            draft = str(v.get("draft") or "")
+            if len(draft) < min_len:
+                too_short.append(title)
+        if too_short:
+            result_json = _call(
+                "추가 지시: 아래 버전은 분량이 부족합니다. "
+                f"{min_len}자 이상이 되도록 구체 사례(상황-행동-결과), 수치/성과(컨텍스트에 있는 범위), 학습/성장 내용을 추가해 확장하세요. "
+                "단, 사실은 상담 원문/RAG에 있는 내용만 사용하고 없는 사실은 만들지 마세요. "
+                "분량 부족 버전: " + ", ".join(too_short)
+            )
+    except Exception:
+        pass
+
     return SelfIntroOutput(**result_json)

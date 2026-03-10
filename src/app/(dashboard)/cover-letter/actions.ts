@@ -42,6 +42,21 @@ function addParagraphIndentation(text: string): string {
         .join('\n\n')
 }
 
+/** scoring을 화면에서 파싱할 수 있도록 HTML 주석으로 본문 끝에 첨부 */
+function appendScoringComment(content: string, scoring: any): string {
+    const text = typeof content === 'string' ? content.trim() : ''
+    if (!text) return text
+    if (!scoring || typeof scoring !== 'object') return text
+    // 이미 포함되어 있으면 중복 삽입 방지
+    if (/<!--\s*scoring:\s*\{[\s\S]*?\}\s*-->/.test(text)) return text
+    try {
+        const json = JSON.stringify(scoring)
+        return `${text}\n\n<!-- scoring: ${json} -->`
+    } catch {
+        return text
+    }
+}
+
 /** 상담 분석 문구가 placeholder일 때 제거 (실제 강점/가치관만 사용) */
 function useInsightLine(insights: string, lineIndex: number, fallback: string): string {
     if (!insights) return fallback
@@ -589,6 +604,13 @@ export async function generateAIDrafts(clientId: string) {
         } catch {
             // 다듬기 실패 시 원문 유지
         }
+    }
+    // 다듬기 이후 최종 원고에 scoring 메타 주석 첨부 (화면 parseScoring에서 즉시 표시)
+    if (versions && versions.length > 0) {
+        versions = versions.map(v => ({
+            ...v,
+            content: appendScoringComment(v.content, v.scoring),
+        }))
     }
     // 최종 가공 (스코어는 DB/화면에 노출하지 않음)
     versions = versions.map(v => ({
