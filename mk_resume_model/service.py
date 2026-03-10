@@ -3,8 +3,9 @@
 
 - 진입점: create_self_introduction(request) — 상담 기반 요청을 받아 자기소개서 초안을 반환.
 - 동작: (1) adapter로 SelfIntroRequest → SelfIntroInput 변환
-        (2) checkpoints/resume_lm 있으면 파인튜닝 LM으로 생성
-        (3) 없으면 self_intro_generator(템플릿 기반)로 생성
+        (2) 템플릿 초안 + 파인튜닝 LM 초안을 먼저 생성(가능한 경우)
+        (3) OpenAI가 있으면 위 1차 초안들을 참고해 재작성(풍성화) 후 반환
+        (4) OpenAI를 못 쓰면 LM/템플릿 중 가능한 결과로 폴백
 - create_self_introduction_simple: 인자만 넣어서 빠르게 호출할 때 사용.
 """
 
@@ -91,14 +92,27 @@ def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
         SelfIntroResponse: draft(본문), reasoning(선택), word_count
     """
     input_data = to_self_intro_input(request)
-    
-    # 1. OpenAI 시도 (최우선)
+
+    # 1) 템플릿 기반 초안은 항상 생성 (안전한 기본값)
+    template_result = generate_self_introduction(input_data)
+    template_draft = template_result.draft or ""
+
+    # 2) 파인튜닝 로컬 LM이 있으면 동일 입력으로 초안 생성 시도
+    lm_draft = _try_create_with_resume_lm(input_data)
+
+    # 3) OpenAI가 있으면, 위 1차 초안(템플릿/LM)을 "참고 초안"으로 넘겨 재작성(풍성화)
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
         try:
             model = os.environ.get("OPENAI_RESUME_MODEL", "gpt-4o-mini")
-            
-            # OpenAI 생성을 위한 새로운 입력 객체 생성 (Dataclass -> Pydantic)
+
+            blocks: list[str] = []
+            if lm_draft:
+                blocks.append("[로컬 LM 기반 초안]\n" + lm_draft)
+            if template_draft:
+                blocks.append("[템플릿 기반 초안]\n" + template_draft)
+            base_draft = "\n\n".join(blocks).strip() if blocks else None
+
             openai_input = OpenAISelfIntroInput(
                 roles=input_data.roles,
                 competencies=input_data.competencies,
@@ -107,84 +121,73 @@ def create_self_introduction(request: SelfIntroRequest) -> SelfIntroResponse:
                     "education": input_data.background.education,
                     "experiences": input_data.background.experiences or [],
                     "strengths": input_data.background.strengths or [],
-                    "career_values": input_data.background.career_values
+                    "career_values": input_data.background.career_values,
                 },
                 counseling_content=request.counseling.content,
                 language=input_data.language,
                 focus=input_data.focus,
                 min_word_count=request.min_word_count,
                 rag_context=request.rag_context,
+                base_draft=base_draft,
             )
-            
+
             result = generate_with_openai(openai_input, api_key, model=model)
-            
-            # 요청된 focus에 따른 결과 필터링
-            target_focus = input_data.focus  # strength, experience, values
+
+            # focus(strength/experience/values)에 해당하는 버전을 우선 선택
+            target_focus = input_data.focus
             focus_map = {
                 "strength": "역량 중심",
                 "experience": "경험 중심",
-                "values": "가치관 중심"
+                "values": "가치관 중심",
             }
             target_title = focus_map.get(target_focus)
-            
+
             selected_version = None
             if target_title:
                 for v in result.versions:
-                    if target_title in v.title:
+                    if target_title in (v.title or ""):
                         selected_version = v
                         break
-            
-            reasoning = result.reasoning
-            if "(OpenAI 생성)" not in reasoning:
-                reasoning = f"(OpenAI 생성) {reasoning}"
 
-            # 특정 버전이 선택된 경우 (API 개별 호출 시)
-            if selected_version:
-                word_count = len(selected_version.draft.replace(" ", "").replace("\n", ""))
+            # 매칭 실패 시 average 최고 버전 선택
+            if selected_version is None and result.versions:
+                def _avg(ver) -> float:
+                    scoring = getattr(ver, "scoring", None) or {}
+                    try:
+                        return float(scoring.get("average") or 0)
+                    except (TypeError, ValueError):
+                        return 0.0
+
+                selected_version = max(result.versions, key=_avg)
+
+            if selected_version is not None:
+                reasoning = (result.reasoning or "").strip()
+                prefix = "(OpenAI 재작성: 템플릿/로컬 LM 참고)"
+                if prefix not in reasoning:
+                    reasoning = f"{prefix} {reasoning}".strip()
+                word_count = len((selected_version.draft or "").replace(" ", "").replace("\n", ""))
                 return SelfIntroResponse(
                     draft=selected_version.draft,
                     reasoning=reasoning,
                     word_count=word_count,
-                    scoring=selected_version.scoring
+                    scoring=getattr(selected_version, "scoring", None),
                 )
-
-            # 전체 합본 반환 (하위 호환성 또는 묶음 요청 시)
-            combined_draft = ""
-            for v in result.versions:
-                combined_draft += f"### [{v.title}]\n\n{v.draft}\n\n"
-                combined_draft += "> **[적합도 분석 스코어링]**\n"
-                combined_draft += f"> - 자소서 유형 유사도: {v.scoring['type_similarity']}점\n"
-                combined_draft += f"> - 적성 및 직무 적합도: {v.scoring['aptitude_fit']}점\n"
-                combined_draft += f"> - 직무역량 반영도: {v.scoring['competency_reflection']}점\n"
-                combined_draft += f"> - **최종 적합도 평균: {v.scoring['average']}%**\n\n"
-                combined_draft += "---\n\n"
-            
-            word_count = len(combined_draft.replace(" ", "").replace("\n", ""))
-            return SelfIntroResponse(
-                draft=combined_draft.strip(),
-                reasoning=reasoning,
-                word_count=word_count,
-            )
         except Exception as e:
-            # 실패 시 다음 단계로 폴백
             print(f"OpenAI 생성 실패: {e}")
 
-    # 2. 파인튜닝 로컬 LM 시도
-    draft_from_lm = _try_create_with_resume_lm(input_data)
-    if draft_from_lm is not None:
-        word_count = len(draft_from_lm.replace(" ", "").replace("\n", ""))
+    # 4) OpenAI를 못 쓰거나 실패한 경우: LM 초안이 있으면 LM, 없으면 템플릿 반환
+    if lm_draft:
+        word_count = len(lm_draft.replace(" ", "").replace("\n", ""))
         return SelfIntroResponse(
-            draft=draft_from_lm,
+            draft=lm_draft,
             reasoning="(학습된 모델로 생성)",
             word_count=word_count,
         )
 
-    # 3. 마지막 수단: 템플릿 기반 생성기
-    result = generate_self_introduction(input_data)
-    word_count = len(result.draft.replace(" ", "").replace("\n", ""))  # 한글 기준 글자 수
+    word_count = len(template_draft.replace(" ", "").replace("\n", ""))
     return SelfIntroResponse(
-        draft=result.draft,
-        reasoning=result.reasoning,
+        draft=template_draft,
+        reasoning=template_result.reasoning,
         word_count=word_count,
     )
 
