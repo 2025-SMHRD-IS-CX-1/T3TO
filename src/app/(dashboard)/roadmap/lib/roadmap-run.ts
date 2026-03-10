@@ -10,6 +10,7 @@ import { computeCompetenciesFromProfile } from './roadmap-competencies'
 import { getCertificationsForRoadmap } from './roadmap-qnet-rag'
 
 const SEARCH_TIMEOUT_MS = 10000
+const QNET_TIMEOUT_MS = 10000
 
 export async function runRoadmap(
     userData: RoadmapRagContext,
@@ -83,7 +84,7 @@ export async function runRoadmap(
                     adapters.getExamSchedule?.() ?? Promise.resolve([]),
                 ]),
                 new Promise<[unknown[], unknown[]]>((resolve) =>
-                    setTimeout(() => resolve([[], []]), (global as any).QNET_TIMEOUT_MS ?? 10000)
+                    setTimeout(() => resolve([[], []]), QNET_TIMEOUT_MS)
                 ),
             ])
             const jobCompetency: unknown[] = []
