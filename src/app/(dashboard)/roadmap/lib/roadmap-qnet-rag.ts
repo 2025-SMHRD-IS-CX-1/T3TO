@@ -3,6 +3,27 @@
  * 실제 Q-Net API 결과만 사용하고, RAG로 필터링 및 우선순위 결정
  */
 
+/** 보유 자격·기술(skill_vector 등)에 포함된 자격증은 추천 목록에서 제외 (LLM 지시만으로 누락될 수 있어 코드에서 필터) */
+function filterOutExistingCerts<T extends { name: string }>(
+    certs: T[],
+    existingSkillsOrCerts?: string
+): T[] {
+    if (!existingSkillsOrCerts || !existingSkillsOrCerts.trim()) return certs
+    const tokens = existingSkillsOrCerts
+        .split(/[,，、\n;\s]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 2)
+    if (tokens.length === 0) return certs
+    return certs.filter((cert) => {
+        const name = (cert.name || '').trim()
+        if (!name) return true
+        const isHeld = tokens.some(
+            (t) => name === t || name.includes(t) || t.includes(name)
+        )
+        return !isHeld
+    })
+}
+
 /** 'AI 관련 자격증', 'OO 관련 자격증' 등 일반 문구를 실제 자격증 정식명으로 치환 (화면 표기용) */
 function normalizeCertDisplayName(name: string, targetJob?: string): string {
     const t = (name || '').trim()
@@ -189,7 +210,8 @@ export async function recommendCertificationsWithRag(
             seenNames.add(qualName)
         }
 
-        return applyEducationCertFilter(recommendedCerts, education_level, work_experience_years)
+        const filtered = filterOutExistingCerts(recommendedCerts, existingSkillsOrCerts)
+        return applyEducationCertFilter(filtered, education_level, work_experience_years)
     } catch (error) {
         console.error('[자격증 RAG] 에러 발생:', error)
         return fallbackToKeywordFiltering(opts)
@@ -262,7 +284,7 @@ export async function getCertificationsFromTavilyContext(opts: {
             'text-red-600 bg-red-50',
         ]
 
-        return list.map((rec, i) => {
+        const mapped = list.map((rec, i) => {
             const displayName = normalizeCertDisplayName(rec.qualName, targetJob)
             return {
                 type: '자격증',
@@ -279,6 +301,7 @@ export async function getCertificationsFromTavilyContext(opts: {
                 },
             }
         })
+        return filterOutExistingCerts(mapped, existingSkillsOrCerts)
     } catch (error) {
         console.error('[자격증 Tavily RAG] 에러:', error)
         return getCertificationsFromOpenAIFallback({ targetJob, major, analysisList, jobInfoFromTavily: jobInfoFromTavily ?? undefined, education_level, existingSkillsOrCerts })
@@ -369,7 +392,8 @@ export async function getCertificationsFromOpenAIFallback(opts: {
 - 전공: ${major || '없음'}
 - 상담 분석 (강점, 관심, 가치관): ${analysisText || '없음'}
 ${existingLine}${educationNote}
-${tavilySection}위 정보(내담자 프로필·DB·상담 + Tavily 직무정보)를 종합하여 **우선 목표 직종 필수·우대 자격증**을 추천하고, **자격증은 3~5개** 출력할 것. **이미 보유한 자격은 제외**하고, 개수가 모자라면 취업에 도움이 되는 **연관 자격증**을 포함해 3~5개가 되게 추천해라. **연관 자격증을 넣을 때도 위 [학력] 조건을 반드시 지킬 것.** JSON만 출력.`
+${tavilySection}**추천 정의**: 내담자 정보(프로필) 및 상담 발화 데이터로 **취득 가능한** 자격(국가기술자격·민간자격) 중 **미보유**인 것만 3~5개 추천. 위 정보(내담자 프로필·DB·상담 + Tavily 직무정보)를 종합하여 **우선 목표 직종 필수·우대 자격증**을 추천하고, **자격증은 3~5개** 출력할 것. **이미 보유한 자격은 제외**하고, 개수가 모자라면 취업에 도움이 되는 **연관 자격증**을 포함해 3~5개가 되게 추천해라. **연관 자격증을 넣을 때도 위 [학력] 조건을 반드시 지킬 것.**
+**환각 방지**: qualName에는 실제 한국 국가기술·민간자격 정식명만 사용. 프로필·상담에 없는 시험일정·수치·날짜는 만들지 말 것. JSON만 출력.`
 
     try {
         const openai = new OpenAI({ apiKey: openaiApiKey })
@@ -398,7 +422,7 @@ ${tavilySection}위 정보(내담자 프로필·DB·상담 + Tavily 직무정보
             'text-red-600 bg-red-50',
         ]
 
-        return list.map((rec, i) => {
+        const mapped = list.map((rec, i) => {
             const displayName = normalizeCertDisplayName(rec.qualName, opts.targetJob)
             return {
                 type: '자격증',
@@ -415,6 +439,7 @@ ${tavilySection}위 정보(내담자 프로필·DB·상담 + Tavily 직무정보
                 },
             }
         })
+        return filterOutExistingCerts(mapped, existingSkillsOrCerts)
     } catch (error) {
         console.error('[자격증 OpenAI 폴백] 에러:', error)
         return []
@@ -601,7 +626,7 @@ function fallbackToKeywordFiltering(opts: RecommendCertificationsOpts): Array<{
     const { extractKeywordsFromAnalysis } = require('./roadmap-competencies')
 
     const extractedKw = extractKeywordsFromAnalysis(opts.analysisList)
-    return filterRelevantQualifications(
+    const result = filterRelevantQualifications(
         opts.qualifications,
         opts.examSchedule,
         opts.targetJob,
@@ -610,4 +635,5 @@ function fallbackToKeywordFiltering(opts: RecommendCertificationsOpts): Array<{
         opts.education_level ?? '',
         opts.work_experience_years ?? 0
     )
+    return filterOutExistingCerts(result, opts.existingSkillsOrCerts)
 }
